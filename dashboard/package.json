@@ -1,0 +1,40 @@
+{
+  "name": "resin-art-assistant-dashboard",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc -b --noEmit"
+  },
+  "dependencies": {
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "react-router-dom": "7.18.4",
+    "@tanstack/react-query": "5.104.0",
+    "socket.io-client": "4.8.4",
+    "lucide-react": "1.48.0",
+    "dayjs": "1.11.23",
+    "clsx": "2.1.1",
+    "tailwind-merge": "3.7.0",
+    "class-variance-authority": "0.7.1",
+    "@sentry/react": "11.0.0",
+    "workbox-window": "7.4.1"
+  },
+  "devDependencies": {
+    "typescript": "7.0.2",
+    "vite": "8.3.1",
+    "@vitejs/plugin-react": "6.1.1",
+    "tailwindcss": "4.3.3",
+    "@tailwindcss/vite": "4.3.3",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@types/node": "26.6.3",
+    "vite-plugin-pwa": "1.3.0"
+  }
+}

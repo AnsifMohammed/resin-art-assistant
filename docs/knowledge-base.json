@@ -1,0 +1,65 @@
+{
+  "business_name": "Asha Resin Art",
+  "products": [
+    { "id": "ocean-coaster-set-4", "name": "Ocean Coaster Set of 4",
+      "price": 1200, "sizes": ["10cm round"], "lead_time_days": 5,
+      "customizable": true, "custom_options": ["colour", "name_engraving"] },
+    { "id": "resin-clock-12in", "name": "12 inch Resin Wall Clock",
+      "price": 2800, "sizes": ["12 inch"], "lead_time_days": 7,
+      "customizable": true, "custom_options": ["colour", "dried_flowers", "name", "theme"] },
+    { "id": "resin-tray-large", "name": "Large Resin Serving Tray",
+      "price": 1800, "sizes": ["30cm x 20cm"], "lead_time_days": 6,
+      "customizable": true, "custom_options": ["colour", "dried_flowers", "gold_foil"] },
+    { "id": "keychain-set-3", "name": "Resin Keychain Set of 3",
+      "price": 450, "lead_time_days": 3,
+      "customizable": true, "custom_options": ["colour", "name", "shape"] },
+    { "id": "photo-frame-5x7", "name": "Resin Photo Frame 5x7",
+      "price": 950, "lead_time_days": 5,
+      "customizable": true, "custom_options": ["colour", "dried_flowers"] },
+    { "id": "bookmarks-set-4", "name": "Resin Bookmark Set of 4",
+      "price": 380, "lead_time_days": 3,
+      "customizable": true, "custom_options": ["colour", "name", "pressed_flowers"] }
+  ],
+  "custom_orders": {
+    "note": "All products can be customised. Bulk orders of 10+ pieces get 10% off.",
+    "lead_time_extra_days": 2,
+    "items_not_in_catalogue": "escalate_to_owner"
+  },
+  "delivery": {
+    "zones": [
+      { "area": "Thrissur city", "days": "1-2", "charge": 0 },
+      { "area": "Kerala (other districts)", "days": "3-5", "charge": 60 },
+      { "area": "Rest of India", "days": "7-10", "charge": 120 },
+      { "area": "International", "available": false }
+    ],
+    "courier": "Shiprocket (DTDC / Delhivery)"
+  },
+  "payment": {
+    "methods": ["Google Pay", "PhonePe", "Bank transfer", "UPI"],
+    "advance_percent": 50,
+    "balance": "before dispatch",
+    "upi_id": "asharesins@okaxis"
+  },
+  "policies": {
+    "returns": "No returns on custom orders. Exchange only for transit damage with photo proof within 24h.",
+    "cancellation": "Cancel within 24h of order. Advance refunded in 3 working days.",
+    "care": "Away from direct sunlight and heat. Wipe with dry cloth. Do not soak.",
+    "warranty": "No warranty on colour fading from sunlight."
+  },
+  "tone_examples": [
+    { "customer": "How much is the ocean coaster set?",
+      "reply": "Hi! 😊 The Ocean Coaster Set of 4 is ₹1,200. We can customise colours and add a name too! Lead time is about 5 days. Interested?" },
+    { "customer": "Do you deliver to Bangalore?",
+      "reply": "Yes, we deliver all over India! 🚚 Bangalore takes 7-10 days, shipping is ₹120. Want to place an order?" },
+    { "customer": "How do I take care of resin products?",
+      "reply": "Easy! Keep away from direct sunlight and heat, wipe with a dry cloth, don't soak in water. They'll last for years 🌸" },
+    { "customer": "Can I get a clock with my daughter's name?",
+      "reply": "Of course! 💕 The 12 inch clock with her name is ₹2,800. Which colours does she like? I'll send some options!" },
+    { "customer": "എത്ര രൂപ കൊടുക്കണം coaster set ന്?",
+      "reply": "Ocean Coaster Set of 4 ₹1,200 ആണ് 😊 Colour customise ചെയ്യാം, name കൂടി add ചെയ്യാം. Interest ഉണ്ടോ?" }
+  ],
+  "escalate_always": [
+    "refund", "return", "complaint", "damaged", "broken",
+    "payment issue", "wrong item", "legal"
+  ]
+}
