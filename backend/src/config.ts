@@ -109,9 +109,9 @@ export const envSchema = z
       { error: "file not found (path is resolved relative to the backend/ directory)" },
     ),
 
-    // Anthropic
-    ANTHROPIC_API_KEY: z.string().min(1),
-    ANTHROPIC_MODEL: z.string().min(1).default("claude-haiku-4-5-20251001"),
+    // Gemini
+    GEMINI_API_KEY: z.string().min(1),
+    GEMINI_MODEL: z.string().min(1).default("gemini-2.5-flash"),
 
     // Meta / Instagram / WhatsApp (required only when DEMO_MODE=false)
     META_APP_ID: optional(),

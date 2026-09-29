@@ -13,7 +13,7 @@ describe("config validation", () => {
     const cfg = mod.parseEnv(validEnv);
     expect(cfg.PORT).toBe(3001);
     expect(cfg.DEMO_MODE).toBe(true);
-    expect(cfg.ANTHROPIC_MODEL).toBe("claude-haiku-4-5-20251001");
+    expect(cfg.GEMINI_MODEL).toBe("gemini-2.5-flash");
     expect(cfg.META_APP_ID).toBeUndefined();
   });
 

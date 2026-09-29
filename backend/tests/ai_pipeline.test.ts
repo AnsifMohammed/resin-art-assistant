@@ -1,15 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
 import { applyTestEnv } from "./env.ts";
 
-// A real-looking key (>= 40 chars, sk-ant- prefix) so the pipeline uses the (mocked) API
+// A real-looking key ("AIza" + 35 chars = 39) so the pipeline uses the (mocked) API
 // instead of the demo keyword mock, even though DEMO_MODE=true.
-applyTestEnv({ ANTHROPIC_API_KEY: "sk-ant-api03-" + "x".repeat(40) });
+const REAL_LOOKING_KEY = "AIza" + "SyD3mo_k3y-".padEnd(35, "x");
+applyTestEnv({ GEMINI_API_KEY: REAL_LOOKING_KEY });
 
-const create = vi.fn();
+const generateContent = vi.fn();
 const ctorOptions: any[] = [];
-vi.mock("@anthropic-ai/sdk", () => ({
-  default: class {
-    messages = { create };
+vi.mock("@google/genai", () => ({
+  GoogleGenAI: class {
+    models = { generateContent };
     constructor(opts: any) {
       ctorOptions.push(opts);
     }
@@ -24,25 +25,54 @@ vi.mock("../src/ai/prompt.ts", async (importOriginal) => {
 const pipeline = await import("../src/ai/pipeline.ts");
 const { buildConversationMessages } = await import("../src/ai/prompt.ts");
 
-const textResponse = (text: string) => ({ content: [{ type: "text", text }], stop_reason: "end_turn" });
+const textResponse = (text: string) => ({ text });
 
 
 describe("AI pipeline", () => {
   it("uses the real API (not the keyword mock) in DEMO_MODE with a real key, with timeout and retries", () => {
+    expect(REAL_LOOKING_KEY).toHaveLength(39);
     expect(pipeline.useMockDecisions).toBe(false);
-    expect(ctorOptions[0]).toMatchObject({ timeout: 20_000, maxRetries: 2 });
+    expect(ctorOptions[0]).toMatchObject({
+      apiKey: REAL_LOOKING_KEY,
+      httpOptions: { timeout: 20_000, retryOptions: { attempts: 3 } },
+    });
+    expect(pipeline.GEMINI_TIMEOUT_MS).toBe(20_000);
+    expect(pipeline.GEMINI_MAX_RETRIES).toBe(2);
   });
 
-  it("treats short or non sk-ant- keys as placeholders", () => {
-    expect(pipeline.isPlaceholderKey("sk-ant-test")).toBe(true);
-    expect(pipeline.isPlaceholderKey("sk-ant-placeholder")).toBe(true);
-    expect(pipeline.isPlaceholderKey("x".repeat(60))).toBe(true);
+  it("treats short or non-Google-format keys as placeholders", () => {
+    expect(pipeline.isPlaceholderKey(undefined)).toBe(true);
     expect(pipeline.isPlaceholderKey("")).toBe(true);
-    expect(pipeline.isPlaceholderKey("sk-ant-api03-" + "x".repeat(40))).toBe(false);
+    expect(pipeline.isPlaceholderKey("AIzaSy...")).toBe(true);
+    expect(pipeline.isPlaceholderKey("AIza-test-key-for-gemini-API")).toBe(true);
+    expect(pipeline.isPlaceholderKey("AIza" + "x".repeat(34))).toBe(true);
+    expect(pipeline.isPlaceholderKey("x".repeat(60))).toBe(true);
+    expect(pipeline.isPlaceholderKey("sk-" + "x".repeat(50))).toBe(true);
+    expect(pipeline.isPlaceholderKey("AQ.short")).toBe(true);
+    expect(pipeline.isPlaceholderKey(REAL_LOOKING_KEY)).toBe(false);
+    expect(pipeline.isPlaceholderKey("AQ." + "x".repeat(50))).toBe(false);
+  });
+
+  it("requests JSON structured output derived from the Zod schema, low temperature, no thinking", async () => {
+    generateContent.mockResolvedValue(textResponse("not json"));
+    await pipeline.processAiDecision({ businessId: "b", incomingText: "hi" });
+    const cfg = generateContent.mock.lastCall![0].config;
+    expect(cfg).toMatchObject({
+      responseMimeType: "application/json",
+      temperature: 0.2,
+      maxOutputTokens: 1000,
+      thinkingConfig: { thinkingBudget: 0 },
+    });
+    expect(cfg.responseJsonSchema).toBe(pipeline.aiDecisionJsonSchema);
+    expect(cfg.responseJsonSchema).not.toHaveProperty("$schema");
+    expect(cfg.responseJsonSchema).toMatchObject({
+      type: "object",
+      required: expect.arrayContaining(["intent", "reply", "escalate", "language_detected"]),
+    });
   });
 
   it("escalates with parse_error (no canned reply) when the API call fails", async () => {
-    create.mockImplementation(async () => {
+    generateContent.mockImplementation(async () => {
       throw new Error("529 overloaded");
     });
     const decision = await pipeline.processAiDecision({ businessId: "b", incomingText: "How much is the ocean coaster set?" });
@@ -52,19 +82,19 @@ describe("AI pipeline", () => {
   });
 
   it("escalates with parse_error on invalid JSON", async () => {
-    create.mockResolvedValue(textResponse("Sure! The coasters are ₹1,200."));
+    generateContent.mockResolvedValue(textResponse("Sure! The coasters are ₹1,200."));
     const decision = await pipeline.processAiDecision({ businessId: "b", incomingText: "How much?" });
     expect(decision).toMatchObject({ escalate: true, escalate_reason: "parse_error" });
   });
 
   it("escalates with parse_error on schema-invalid JSON", async () => {
-    create.mockResolvedValue(textResponse(JSON.stringify({ intent: "price", reply: "hi" })));
+    generateContent.mockResolvedValue(textResponse(JSON.stringify({ intent: "price", reply: "hi" })));
     const decision = await pipeline.processAiDecision({ businessId: "b", incomingText: "How much?" });
     expect(decision).toMatchObject({ escalate: true, escalate_reason: "parse_error" });
   });
 
   it("returns a valid decision (with rules applied) and sends history without duplicating the current message", async () => {
-    create.mockResolvedValue(
+    generateContent.mockResolvedValue(
       textResponse(
         "```json\n" +
           JSON.stringify({
@@ -88,8 +118,8 @@ describe("AI pipeline", () => {
     });
 
     expect(decision.escalate).toBe(false);
-    const sent = create.mock.lastCall![0].messages;
-    expect(sent).toEqual([{ role: "user", content: "Hi\n\nhow much is the ocean set?" }]);
+    const sent = generateContent.mock.lastCall![0].contents;
+    expect(sent).toEqual([{ role: "user", parts: [{ text: "Hi\n\nhow much is the ocean set?" }] }]);
   });
 });
 
@@ -98,9 +128,9 @@ describe("AI pipeline logging (non-development)", () => {
     const { logger } = await import("../src/lib/logger.ts");
     const spies = (["debug", "info", "warn", "error"] as const).map((lvl) => vi.spyOn(logger, lvl));
 
-    create.mockResolvedValue(textResponse("SECRET-LLM-OUTPUT not json"));
+    generateContent.mockResolvedValue(textResponse("SECRET-LLM-OUTPUT not json"));
     await pipeline.processAiDecision({ businessId: "b", incomingText: "SECRET-CUSTOMER-TEXT" });
-    create.mockResolvedValue(textResponse(JSON.stringify({ intent: "price", reply: "SECRET-LLM-OUTPUT" })));
+    generateContent.mockResolvedValue(textResponse(JSON.stringify({ intent: "price", reply: "SECRET-LLM-OUTPUT" })));
     await pipeline.processAiDecision({ businessId: "b", incomingText: "SECRET-CUSTOMER-TEXT" });
 
     const logged = JSON.stringify(spies.flatMap((s) => s.mock.calls));
@@ -125,9 +155,9 @@ describe("buildConversationMessages", () => {
     );
 
     expect(out).toEqual([
-      { role: "user", content: "Do you ship to Kochi?" },
-      { role: "assistant", content: "Yes, 3-5 days.\n\n[Owner]: I'll send photos\n\n[Staff]: Here they are" },
-      { role: "user", content: "Thanks, how much?" },
+      { role: "user", parts: [{ text: "Do you ship to Kochi?" }] },
+      { role: "model", parts: [{ text: "Yes, 3-5 days.\n\n[Owner]: I'll send photos\n\n[Staff]: Here they are" }] },
+      { role: "user", parts: [{ text: "Thanks, how much?" }] },
     ]);
   });
 
@@ -140,7 +170,7 @@ describe("buildConversationMessages", () => {
       ],
       "c",
     );
-    expect(out).toEqual([{ role: "user", content: "a\n\nb\n\nc" }]);
+    expect(out).toEqual([{ role: "user", parts: [{ text: "a\n\nb\n\nc" }] }]);
   });
 
   it("keeps only the last N history messages", () => {
@@ -150,9 +180,9 @@ describe("buildConversationMessages", () => {
     }));
     const out = buildConversationMessages(history, "now", 20);
     // last 20 = m10..m29 (m10 is customer), then "now" merges nothing (m29 is ai)
-    expect(out[0]).toEqual({ role: "user", content: "m10" });
+    expect(out[0]).toEqual({ role: "user", parts: [{ text: "m10" }] });
     expect(out).toHaveLength(21);
-    expect(out.at(-1)).toEqual({ role: "user", content: "now" });
+    expect(out.at(-1)).toEqual({ role: "user", parts: [{ text: "now" }] });
     for (let i = 1; i < out.length; i++) expect(out[i]!.role).not.toBe(out[i - 1]!.role);
   });
 });
