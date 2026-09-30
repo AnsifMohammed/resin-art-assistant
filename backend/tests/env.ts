@@ -7,7 +7,7 @@ export const validEnv: Record<string, string> = {
   JWT_SECRET: "x".repeat(64),
   JWT_EXPIRES_IN: "7d",
   DATABASE_URL: "postgresql://user:pass@localhost:5432/test",
-  ANTHROPIC_API_KEY: "sk-ant-test",
+  GEMINI_API_KEY: "AIza-test-key-for-gemini-API",
   ENCRYPTION_KEY: "a".repeat(64),
   BUSINESS_ID: "test-business",
 };

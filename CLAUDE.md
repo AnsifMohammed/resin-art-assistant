@@ -93,7 +93,7 @@ Multiple staff per business. Limited access. They handle escalations only.
     "@neondatabase/serverless": "1.1.0",
     "drizzle-zod": "0.8.3",
     "pg-boss": "12.35.0",
-    "@anthropic-ai/sdk": "0.128.0",
+    "@google/genai": "2.24.0",
     "argon2": "0.45.1",
     "zod": "4.6.5",
     "dotenv": "18.0.4",
@@ -199,7 +199,7 @@ resin-art-assistant/
 │       │       └── refreshTokens.ts      ← Daily Instagram token refresh
 │       │
 │       ├── ai/
-│       │   ├── pipeline.ts               ← Calls Anthropic API, returns AiDecision
+│       │   ├── pipeline.ts               ← Calls Gemini API, returns AiDecision
 │       │   ├── prompt.ts                 ← Builds prompt from KB + history + message
 │       │   ├── rules.ts                  ← Escalation rules. Always applied after LLM.
 │       │   └── types.ts                  ← Zod schema + TypeScript type for AiDecision
@@ -337,9 +337,9 @@ JWT_EXPIRES_IN=7d
 # Database
 DATABASE_URL=postgresql://user:pass@host/dbname?sslmode=require
 
-# Anthropic
-ANTHROPIC_API_KEY=sk-ant-...
-ANTHROPIC_MODEL=claude-haiku-4-5-20251001
+# Gemini
+GEMINI_API_KEY=AIzaSy...
+GEMINI_MODEL=gemini-2.5-flash
 
 # Meta (leave empty in demo mode)
 META_APP_ID=
@@ -1859,9 +1859,9 @@ JWT_EXPIRES_IN=7d
 # Database
 DATABASE_URL=postgresql://user:pass@host/dbname?sslmode=require
 
-# Anthropic
-ANTHROPIC_API_KEY=sk-ant-...
-ANTHROPIC_MODEL=claude-haiku-4-5-20251001
+# Gemini
+GEMINI_API_KEY=AIzaSy...
+GEMINI_MODEL=gemini-2.5-flash
 
 # Meta (leave empty in demo mode)
 META_APP_ID=

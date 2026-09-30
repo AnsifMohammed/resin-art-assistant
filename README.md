@@ -6,7 +6,7 @@ AI messaging assistant for a small resin art business. Customer messages from Wh
 
 ## Layout
 
-- `backend/`: Fastify + Drizzle (Postgres) + pg-boss + Anthropic API
+- `backend/`: Fastify + Drizzle (Postgres) + pg-boss + Google Gemini API (@google/genai)
 - `dashboard/`: React + Vite (not built yet)
 - `docs/`: API contracts, sample knowledge base, demo scenarios
 

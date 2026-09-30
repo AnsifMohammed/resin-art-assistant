@@ -1,29 +1,53 @@
-import Anthropic from "@anthropic-ai/sdk";
+import { GoogleGenAI } from "@google/genai";
 import { config } from "../config.ts";
 import { logger } from "../lib/logger.ts";
 import { buildConversationMessages, buildSystemPrompt, getKnowledgeBase, type HistoryMessage } from "./prompt.ts";
 import { applyRules } from "./rules.ts";
 import { aiDecisionSchema, type AiDecision } from "./types.ts";
+import { z } from "zod";
 
 const isDev = () => config.NODE_ENV === "development";
 
-/** Anthropic request limits: fail fast and escalate instead of hanging the job. */
-export const ANTHROPIC_TIMEOUT_MS = 20_000;
-export const ANTHROPIC_MAX_RETRIES = 2;
+/** Gemini request limits: fail fast and escalate instead of hanging the job. */
+export const GEMINI_TIMEOUT_MS = 20_000;
+export const GEMINI_MAX_RETRIES = 2;
+/** Output cap for one decision (the JSON is small; thinking is disabled below). */
+export const GEMINI_MAX_OUTPUT_TOKENS = 1000;
+export const GEMINI_TEMPERATURE = 0.2;
 
-/** A key that doesn't look like a real Anthropic key (dummy/placeholder values). */
+/**
+ * A key that doesn't look like a real Gemini key (dummy/placeholder values).
+ * Classic Google API keys are "AIza" + 35 chars (39 total); newer Google API
+ * keys use the "AQ." prefix and are longer.
+ */
 export const isPlaceholderKey = (key: string | undefined) =>
-  !key || !key.startsWith("sk-ant-") || key.length < 40;
+  !key ||
+  !((key.startsWith("AIza") && key.length >= 39) || (key.startsWith("AQ.") && key.length >= 40));
+
+/**
+ * JSON Schema for Gemini structured output, derived from the Zod schema so the
+ * two never drift. `$schema` is dropped (not part of Gemini's supported subset).
+ * Zod validation after the call remains the source of truth.
+ */
+export const aiDecisionJsonSchema: Record<string, unknown> = (() => {
+  const { $schema: _ignored, ...schema } = z.toJSONSchema(aiDecisionSchema) as Record<string, unknown>;
+  return schema;
+})();
 
 /** The keyword mock is ONLY used in DEMO_MODE without a real API key. */
-export const useMockDecisions = config.DEMO_MODE && isPlaceholderKey(config.ANTHROPIC_API_KEY);
+export const useMockDecisions = config.DEMO_MODE && isPlaceholderKey(config.GEMINI_API_KEY);
 
-const anthropic = useMockDecisions
+const ai = useMockDecisions
   ? null
-  : new Anthropic({
-      apiKey: config.ANTHROPIC_API_KEY,
-      timeout: ANTHROPIC_TIMEOUT_MS,
-      maxRetries: ANTHROPIC_MAX_RETRIES,
+  : new GoogleGenAI({
+      apiKey: config.GEMINI_API_KEY,
+      httpOptions: {
+        // Per-attempt timeout in ms.
+        timeout: GEMINI_TIMEOUT_MS,
+        // SDK-level retries: `attempts` includes the first call. Retries only on
+        // 408/429/5xx (SDK default status list) and network errors.
+        retryOptions: { attempts: GEMINI_MAX_RETRIES + 1, initialDelay: 1, maxDelay: 8 },
+      },
     });
 
 /**
@@ -178,10 +202,10 @@ export async function processAiDecision(params: {
   /** Prior messages BEFORE the current batch (the batch itself must not be included). */
   history?: HistoryMessage[];
 }): Promise<AiDecision> {
-  if (!anthropic) {
+  if (!ai) {
     logger.info(
       { businessId: params.businessId, incomingTextLength: params.incomingText.length },
-      "Using demo mock decision (DEMO_MODE with placeholder Anthropic API key)",
+      "Using demo mock decision (DEMO_MODE with placeholder Gemini API key)",
     );
     return applyRules(mockDemoDecision(params.incomingText), params.incomingText);
   }
@@ -189,30 +213,38 @@ export async function processAiDecision(params: {
   let rawDecision: AiDecision;
   try {
     const kb = await getKnowledgeBase(params.businessId);
-    const response = await anthropic.messages.create({
-      model: config.ANTHROPIC_MODEL,
-      max_tokens: 1000,
-      system: buildSystemPrompt(kb),
-      messages: buildConversationMessages(params.history ?? [], params.incomingText),
+    const response = await ai.models.generateContent({
+      model: config.GEMINI_MODEL,
+      contents: buildConversationMessages(params.history ?? [], params.incomingText),
+      config: {
+        systemInstruction: buildSystemPrompt(kb),
+        responseMimeType: "application/json",
+        responseJsonSchema: aiDecisionJsonSchema,
+        temperature: GEMINI_TEMPERATURE,
+        maxOutputTokens: GEMINI_MAX_OUTPUT_TOKENS,
+        // gemini-2.5-flash thinks by default and thinking tokens count against
+        // maxOutputTokens; disable it so the budget goes to the JSON answer.
+        thinkingConfig: { thinkingBudget: 0 },
+      },
     });
 
-    const textBlock = response.content.find((b) => b.type === "text");
-    if (!textBlock || textBlock.type !== "text") {
-      logger.warn({ stopReason: response.stop_reason }, "LLM response had no text block, escalating (parse_error)");
+    const text = response.text;
+    if (!text) {
+      logger.warn({ stopReason: "empty_text" }, "LLM response had no text block, escalating (parse_error)");
       return parseErrorDecision();
     }
 
     // Message and LLM text are only logged in development (M7). Elsewhere: lengths only.
     if (isDev()) {
-      logger.debug({ incomingText: params.incomingText, llmText: textBlock.text }, "LLM raw response");
+      logger.debug({ incomingText: params.incomingText, llmText: text }, "LLM raw response");
     }
 
     let json: unknown;
     try {
-      json = extractJson(textBlock.text);
+      json = extractJson(text);
     } catch {
       // SyntaxError messages quote the input, so never log the error itself.
-      logger.warn({ llmTextLength: textBlock.text.length }, "LLM response was not valid JSON, escalating (parse_error)");
+      logger.warn({ llmTextLength: text.length }, "LLM response was not valid JSON, escalating (parse_error)");
       return parseErrorDecision();
     }
 
@@ -226,7 +258,7 @@ export async function processAiDecision(params: {
     }
     rawDecision = validated.data;
   } catch (err) {
-    logger.error({ err }, "Anthropic API call or JSON parse failed, escalating (parse_error)");
+    logger.error({ err }, "Gemini API call or JSON parse failed, escalating (parse_error)");
     return parseErrorDecision();
   }
 

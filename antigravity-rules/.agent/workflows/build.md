@@ -60,7 +60,7 @@ Guard with: `if (config.DEMO_MODE !== "true") return reply.status(404).send()`
 `backend/src/ai/types.ts` — AiDecision Zod schema + TypeScript type
 `backend/src/ai/rules.ts` — applyRules function
 `backend/src/ai/prompt.ts` — buildPrompt + getKnowledgeBase (with Redis cache) + invalidateKBCache
-`backend/src/ai/pipeline.ts` — call Anthropic API, validate JSON, retry once on failure
+`backend/src/ai/pipeline.ts` — call Gemini API, validate JSON, retry once on failure
 
 ## Step 10: processMessage job
 `backend/src/queue/jobs/processMessage.ts` — full job flow (9 steps from the AI pipeline rules)

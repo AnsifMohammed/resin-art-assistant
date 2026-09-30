@@ -207,7 +207,7 @@ describe("POST /simulate/message", () => {
   });
 });
 
-// DEMO_MODE + placeholder key ("sk-ant-test") -> keyword mock decisions + rules.
+// DEMO_MODE + placeholder key ("AIza-test-key-for-gemini-API") -> keyword mock decisions + rules.
 describe("Demo decisions (DEMO_MODE, placeholder API key)", () => {
   const decide = (text: string) => processAiDecision({ businessId: "test-biz", incomingText: text });
 

@@ -25,7 +25,7 @@ alwaysApply: true
   "@neondatabase/serverless": "1.1.0",
   "drizzle-zod": "0.8.3",
   "pg-boss": "12.35.0",
-  "@anthropic-ai/sdk": "0.128.0",
+  "@google/genai": "2.24.0",
   "argon2": "0.45.1",
   "zod": "4.6.5",
   "dotenv": "18.0.4",
