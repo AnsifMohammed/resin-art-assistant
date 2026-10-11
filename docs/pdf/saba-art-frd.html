@@ -1,0 +1,1238 @@
+<!doctype html>
+<!--
+  SABA ART · AI MESSAGING ASSISTANT · FUNCTIONAL REQUIREMENTS DOCUMENT v1.0
+  Editable source. Re-export to PDF with headless Chrome:
+    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless=new --disable-gpu \
+      --no-pdf-header-footer --virtual-time-budget=8000 \
+      --print-to-pdf=saba-art-frd.pdf file://$(pwd)/saba-art-frd.html
+  Contents page numbers are typed by hand: re-check them after edits that change pagination.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Saba Art FRD</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700&family=Noto+Sans+Malayalam:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* ───────────── Tokens (shared style spec) ───────────── */
+  :root {
+    --text: #1C1917;
+    --muted: #706963;
+    --border: #E7E5E4;
+    --th: #F5F5F4;
+    --amber: #F59E0B;
+    --amber-text: #B45309;
+    --amber-soft: #FEF3C7;
+    --teal: #0F766E;
+    --teal-soft: #E6F2F1;
+    --success: #047857;
+    --success-soft: #ECFDF5;
+    --danger: #B91C1C;
+    --danger-soft: #FEF2F2;
+    --body-font: "Inter", "Noto Sans Malayalam", "Malayalam Sangam MN", -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+    --head-font: "Outfit", "Inter", -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+  }
+
+  /* ───────────── Page setup ───────────── */
+  @page {
+    size: A4;
+    margin: 18mm 18mm 20mm 18mm;
+    @bottom-left {
+      content: "Saba Art · Functional Requirements v1.0";
+      font-family: "Inter", -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+      font-size: 8pt;
+      color: #706963;
+    }
+    @bottom-right {
+      content: "Page " counter(page) " of " counter(pages);
+      font-family: "Inter", -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+      font-size: 8pt;
+      color: #706963;
+    }
+  }
+  @page :first {
+    margin: 0;
+    @bottom-left { content: none; }
+    @bottom-right { content: none; }
+  }
+
+  html {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  body {
+    margin: 0;
+    background: #FFFFFF;
+    color: var(--text);
+    font-family: var(--body-font);
+    font-size: 10pt;
+    line-height: 1.5;
+    font-weight: 400;
+  }
+  * { box-sizing: border-box; }
+
+  /* ───────────── Typography ───────────── */
+  h1, h2, h3 { font-family: var(--head-font); color: var(--text); margin: 0; }
+  h1 {
+    position: relative;
+    font-size: 20pt;
+    font-weight: 700;
+    line-height: 1.2;
+    padding-top: 12pt;
+    margin: 0 0 10pt;
+    break-after: avoid;
+  }
+  h1::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 34px;
+    height: 3px;
+    border-radius: 2px;
+    background: var(--amber);
+  }
+  h1 .num { color: var(--amber-text); margin-right: 6pt; }
+  h2 {
+    font-size: 14pt;
+    font-weight: 600;
+    line-height: 1.25;
+    margin: 16pt 0 6pt;
+    break-after: avoid;
+  }
+  h2 .num { color: var(--muted); font-weight: 500; margin-right: 5pt; }
+  h3 {
+    font-size: 11pt;
+    font-weight: 600;
+    margin: 12pt 0 4pt;
+    break-after: avoid;
+  }
+  p { margin: 0 0 7pt; }
+  .lead { font-size: 10.5pt; color: var(--text); }
+  .muted { color: var(--muted); }
+  .small { font-size: 8.5pt; }
+  ul, ol { margin: 0 0 8pt; padding-left: 16pt; }
+  li { margin: 0 0 3pt; }
+  strong { font-weight: 600; }
+  code, .mono {
+    font-family: "SFMono-Regular", Menlo, Consolas, monospace;
+    font-size: 8.5pt;
+    background: var(--th);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 0 3px;
+    white-space: nowrap;
+  }
+  td code { font-size: 8pt; }
+  .ml { font-family: "Noto Sans Malayalam", "Malayalam Sangam MN", var(--body-font); }
+
+  section.sec + section.sec { margin-top: 20pt; }
+  .page-break, section.sec.page-break, h2.page-break { break-before: page; margin-top: 0 !important; }
+  .keep { break-inside: avoid; }
+  table.keep { break-inside: avoid; }
+  table.compact td { padding-top: 4pt; padding-bottom: 4pt; }
+  table.compact td.small { font-size: 8pt; }
+  .nw { white-space: nowrap; }
+
+  /* ───────────── Tables ───────────── */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 9pt;
+    line-height: 1.42;
+    margin: 4pt 0 12pt;
+  }
+  thead { display: table-header-group; }
+  tr { break-inside: avoid; }
+  th, td {
+    border: 1px solid var(--border);
+    padding: 5pt 7pt;
+    text-align: left;
+    vertical-align: top;
+  }
+  th {
+    background: var(--th);
+    font-weight: 600;
+    color: var(--text);
+  }
+  td.id {
+    font-weight: 600;
+    color: var(--teal);
+    white-space: nowrap;
+    font-size: 8.5pt;
+  }
+  td.c, th.c { text-align: center; }
+  tr.group { break-after: avoid; page-break-after: avoid; }
+  tr.group td {
+    background: #FBFAF9;
+    font-family: var(--head-font);
+    font-weight: 600;
+    font-size: 9.5pt;
+    color: var(--amber-text);
+    padding-top: 6pt;
+    padding-bottom: 5pt;
+  }
+  table.req col.c-id { width: 21mm; }
+  table.req col.c-pr { width: 17mm; }
+  table.req col.c-ph { width: 13mm; }
+
+  .pill {
+    display: inline-block;
+    font-size: 7.5pt;
+    font-weight: 600;
+    line-height: 1;
+    padding: 3px 7px;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+  .pill.must { background: var(--amber-soft); color: var(--amber-text); }
+  .pill.should { background: var(--teal-soft); color: var(--teal); }
+  .pill.could { background: var(--th); color: var(--muted); }
+  .pill.open { background: var(--amber-soft); color: var(--amber-text); }
+  .pill.st-active { background: var(--success-soft); color: var(--success); }
+  .pill.st-esc { background: var(--danger-soft); color: var(--danger); }
+  .pill.st-owner { background: var(--amber-soft); color: var(--amber-text); }
+  .pill.st-paused { background: var(--th); color: var(--muted); }
+
+  .yes, .no, .part { display: inline-flex; align-items: center; gap: 4px; font-weight: 600; }
+  .yes { color: var(--success); }
+  .no { color: var(--danger); }
+  .part { color: var(--amber-text); font-weight: 500; }
+  .yes svg, .no svg, .part svg { width: 10px; height: 10px; flex: none; }
+  table.perm td { padding-top: 4pt; padding-bottom: 4pt; }
+
+  /* ───────────── Callouts ───────────── */
+  .callout {
+    background: var(--amber-soft);
+    border-left: 3px solid var(--amber);
+    border-radius: 0 8px 8px 0;
+    padding: 9pt 12pt;
+    margin: 8pt 0 12pt;
+    break-inside: avoid;
+  }
+  .callout p:last-child, .callout ul:last-child { margin-bottom: 0; }
+  .callout .label {
+    display: block;
+    font-family: var(--head-font);
+    font-weight: 600;
+    font-size: 9.5pt;
+    color: var(--amber-text);
+    margin-bottom: 2pt;
+  }
+
+  /* ───────────── Figures ───────────── */
+  figure {
+    margin: 8pt 0 12pt;
+    break-inside: avoid;
+  }
+  figure svg { display: block; width: 100%; height: auto; }
+  figcaption {
+    font-size: 8.5pt;
+    color: var(--muted);
+    margin-top: 5pt;
+    text-align: center;
+  }
+  .diagram-frame {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10pt 8pt 8pt;
+  }
+
+  /* Component description list */
+  .comp {
+    display: grid;
+    grid-template-columns: 34mm 1fr;
+    gap: 0;
+    border-top: 1px solid var(--border);
+    margin: 4pt 0 10pt;
+  }
+  .comp { font-size: 9.5pt; line-height: 1.45; }
+  .comp > div {
+    padding: 4pt 0;
+    border-bottom: 1px solid var(--border);
+    break-inside: avoid;
+  }
+  .comp .k { font-weight: 600; padding-right: 8pt; }
+
+  /* ───────────── Cover (matches the sibling proposal) ───────────── */
+  .cover {
+    position: relative;
+    width: 210mm;
+    height: 296.5mm;
+    overflow: hidden;
+    break-after: page;
+    background:
+      radial-gradient(120mm 120mm at 105% -5%, rgba(254, 243, 199, 0.95), rgba(254, 243, 199, 0) 70%),
+      radial-gradient(140mm 110mm at -15% 110%, rgba(231, 243, 241, 0.9), rgba(231, 243, 241, 0) 70%),
+      linear-gradient(170deg, #FFFCF6 0%, #FFF8EC 60%, #FDF3E1 100%);
+    padding: 22mm 22mm 18mm;
+    display: flex;
+    flex-direction: column;
+  }
+  .cover-art { position: absolute; right: -34mm; top: 30mm; width: 138mm; height: 138mm; }
+  .brand { display: flex; align-items: center; gap: 3.5mm; position: relative; z-index: 2; }
+  .brand svg { width: 13mm; height: 15mm; }
+  .wordmark { font-family: var(--head-font); font-weight: 700; font-size: 21pt; letter-spacing: -0.01em; line-height: 1; }
+  .wordmark-sub { font-size: 8.5pt; color: var(--muted); margin-top: 1.5mm; letter-spacing: 0.02em; }
+  .cover-main { margin-top: auto; position: relative; z-index: 2; }
+  .cover-eyebrow {
+    font-family: var(--head-font); font-weight: 600; font-size: 10pt;
+    letter-spacing: 0.18em; text-transform: uppercase; color: var(--amber-text);
+    margin-bottom: 4mm;
+  }
+  .cover-title {
+    font-family: var(--head-font); font-weight: 700;
+    font-size: 40pt; line-height: 1.05; letter-spacing: -0.02em;
+    margin: 0 0 5mm; max-width: 130mm;
+  }
+  .cover-sub { font-family: var(--head-font); font-weight: 500; font-size: 16pt; line-height: 1.35; color: var(--teal); margin: 0; }
+  .cover-line { height: 1.5px; background: var(--amber); width: 100%; margin: 12mm 0 7mm; opacity: 0.9; }
+  .cover-meta { display: grid; grid-template-columns: 1.25fr 1fr 0.6fr 1fr 1fr; gap: 5mm; }
+  .cover-meta .k { font-size: 8pt; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); margin-bottom: 1.2mm; }
+  .cover-meta .v { font-size: 10.5pt; font-weight: 600; line-height: 1.4; }
+  .cover-meta .v span { display: block; font-weight: 400; color: var(--muted); font-size: 9.5pt; }
+  .cover-foot {
+    margin-top: 16mm; position: relative; z-index: 2;
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 8.5pt; color: var(--muted);
+    border-top: 1px solid rgba(180, 83, 9, 0.18); padding-top: 4mm;
+  }
+
+  /* ───────────── Table of contents ───────────── */
+  .toc { list-style: none; padding: 0; margin: 6pt 0 0; }
+  .toc li {
+    display: flex;
+    align-items: baseline;
+    margin: 0;
+    padding: 4.2pt 0;
+    font-size: 10pt;
+  }
+  .toc li.top { font-weight: 600; margin-top: 3pt; }
+  .toc li.sub { padding: 2pt 0 2pt 18pt; font-size: 9.3pt; color: #3F3A36; }
+  .toc .n { width: 20pt; color: var(--amber-text); font-weight: 600; flex: none; }
+  .toc li.sub .n { width: 26pt; color: var(--muted); font-weight: 500; }
+  .toc .dots { flex: 1; border-bottom: 1px dotted #CFCAC6; margin: 0 6pt; transform: translateY(-3px); }
+  .toc .pg { color: var(--muted); font-weight: 500; min-width: 14pt; text-align: right; }
+
+  /* Signature table */
+  table.sign td { height: 22mm; vertical-align: middle; }
+  table.sign td.label { font-weight: 600; }
+</style>
+</head>
+<body>
+
+<!-- ═════════════════════════ COVER ═════════════════════════ -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="dropFill" x1="0" y1="0" x2="0.35" y2="1">
+      <stop offset="0" stop-color="#FCD34D"/>
+      <stop offset="0.55" stop-color="#F59E0B"/>
+      <stop offset="1" stop-color="#B45309"/>
+    </linearGradient>
+    <linearGradient id="dropWave" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#14B8A6"/>
+      <stop offset="1" stop-color="#0F766E"/>
+    </linearGradient>
+    <clipPath id="dropClip"><path d="M24 2C24 2 6 24.5 6 37a18 18 0 0 0 36 0C42 24.5 24 2 24 2Z"/></clipPath>
+  </defs>
+  <symbol id="drop" viewBox="0 0 48 56">
+    <path d="M24 2C24 2 6 24.5 6 37a18 18 0 0 0 36 0C42 24.5 24 2 24 2Z" fill="url(#dropFill)"/>
+    <g clip-path="url(#dropClip)">
+      <path d="M0 41c6-3.5 11 2.5 17-.5s10-4 16-.5 9 2.5 15-.5V60H0Z" fill="url(#dropWave)" opacity="0.92"/>
+      <path d="M0 41c6-3.5 11 2.5 17-.5s10-4 16-.5 9 2.5 15-.5" fill="none" stroke="#FFFFFF" stroke-width="1.6" stroke-linecap="round" opacity="0.95"/>
+    </g>
+    <ellipse cx="16.5" cy="31" rx="3" ry="5.5" fill="#FFFFFF" opacity="0.45" transform="rotate(18 16.5 31)"/>
+  </symbol>
+</svg>
+
+<section class="cover">
+  <svg class="cover-art" viewBox="0 0 400 400" aria-hidden="true">
+    <defs>
+      <radialGradient id="coasterBase" cx="38%" cy="30%" r="80%">
+        <stop offset="0" stop-color="#FEF3C7"/>
+        <stop offset="0.35" stop-color="#FCD34D"/>
+        <stop offset="0.7" stop-color="#F59E0B"/>
+        <stop offset="1" stop-color="#C2680A"/>
+      </radialGradient>
+      <linearGradient id="sea1" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#2DD4BF"/>
+        <stop offset="1" stop-color="#0F766E"/>
+      </linearGradient>
+      <linearGradient id="sea2" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#0F766E"/>
+        <stop offset="1" stop-color="#134E4A"/>
+      </linearGradient>
+      <clipPath id="coasterClip"><circle cx="200" cy="200" r="186"/></clipPath>
+    </defs>
+    <circle cx="200" cy="200" r="198" fill="#FFFFFF" opacity="0.85"/>
+    <circle cx="200" cy="200" r="198" fill="none" stroke="#F3E3C3" stroke-width="1.5"/>
+    <g clip-path="url(#coasterClip)">
+      <rect width="400" height="400" fill="url(#coasterBase)"/>
+      <!-- gold veins -->
+      <path d="M40 120c50-30 90 10 140-15s80-40 150-10" fill="none" stroke="#FFF7E0" stroke-width="2" opacity="0.6"/>
+      <path d="M20 170c60-20 110 25 170 0s100-30 190 5" fill="none" stroke="#B45309" stroke-width="1.2" opacity="0.35"/>
+      <!-- sand band -->
+      <path d="M0 228c55-26 105 12 165-8s110-30 160-6 60 14 75 8V400H0Z" fill="#FDE9C4"/>
+      <!-- sea layers -->
+      <path d="M0 250c50-24 100 16 160-4s110-30 165-4 55 12 75 6V400H0Z" fill="url(#sea1)"/>
+      <path d="M0 300c60-22 110 14 170-4s105-26 160-2 50 12 70 6V400H0Z" fill="url(#sea2)" opacity="0.95"/>
+      <!-- foam lace -->
+      <path d="M0 250c50-24 100 16 160-4s110-30 165-4 55 12 75 6" fill="none" stroke="#FFFFFF" stroke-width="6" stroke-linecap="round" opacity="0.92"/>
+      <path d="M10 262c40-14 80 10 130-2s95-22 150-4 60 10 90 4" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-dasharray="1 7" stroke-linecap="round" opacity="0.9"/>
+      <path d="M0 300c60-22 110 14 170-4s105-26 160-2 50 12 70 6" fill="none" stroke="#FFFFFF" stroke-width="3.5" stroke-linecap="round" opacity="0.7"/>
+      <path d="M20 312c50-12 90 8 140-2s95-20 140-4" fill="none" stroke="#FFFFFF" stroke-width="1.6" stroke-dasharray="1 6" stroke-linecap="round" opacity="0.7"/>
+      <!-- gold specks -->
+      <g fill="#FFFFFF" opacity="0.85">
+        <circle cx="120" cy="90" r="2.2"/><circle cx="160" cy="70" r="1.4"/><circle cx="250" cy="110" r="1.8"/>
+        <circle cx="300" cy="80" r="1.2"/><circle cx="90" cy="150" r="1.3"/><circle cx="210" cy="160" r="2"/>
+        <circle cx="330" cy="150" r="1.5"/><circle cx="270" cy="190" r="1.1"/>
+      </g>
+      <g fill="#B45309" opacity="0.5">
+        <circle cx="140" cy="130" r="1.3"/><circle cx="230" cy="80" r="1"/><circle cx="310" cy="120" r="1.2"/><circle cx="180" cy="200" r="1"/>
+      </g>
+      <ellipse cx="140" cy="110" rx="70" ry="38" fill="#FFFFFF" opacity="0.18" transform="rotate(-28 140 110)"/>
+    </g>
+    <circle cx="200" cy="200" r="186" fill="none" stroke="#FFFFFF" stroke-width="3" opacity="0.6"/>
+  </svg>
+
+  <div class="brand">
+    <svg viewBox="0 0 48 56" aria-hidden="true"><use href="#drop"/></svg>
+    <div>
+      <div class="wordmark">Saba Art</div>
+      <div class="wordmark-sub">Handmade resin art · Thrissur, Kerala</div>
+    </div>
+  </div>
+
+  <div class="cover-main">
+    <div class="cover-eyebrow">Functional Requirements</div>
+    <div class="cover-title">AI Messaging Assistant</div>
+    <p class="cover-sub">Functional Requirements Document</p>
+    <div class="cover-line"></div>
+    <div class="cover-meta">
+      <div><div class="k">Prepared for</div><div class="v">Saba Art<span>Thrissur, Kerala</span></div></div>
+      <div><div class="k">Prepared by</div><div class="v">Tecza<span>Development team</span></div></div>
+      <div><div class="k">Version</div><div class="v">1.0</div></div>
+      <div><div class="k">Date</div><div class="v">2 October 2026</div></div>
+      <div><div class="k">Status</div><div class="v">Draft for review</div></div>
+    </div>
+  </div>
+
+  <div class="cover-foot">
+    <span>Confidential — prepared for Saba Art</span>
+    <span>Tecza</span>
+  </div>
+</section>
+
+<!-- ═════════════════════════ CONTENTS ═════════════════════════ -->
+<section class="sec">
+  <h1>Contents</h1>
+  <ul class="toc">
+    <li class="top"><span class="n">1</span>Document control<span class="dots"></span><span class="pg">3</span></li>
+    <li class="top"><span class="n">2</span>Introduction<span class="dots"></span><span class="pg">3</span></li>
+    <li class="top"><span class="n">3</span>Business context and objectives<span class="dots"></span><span class="pg">5</span></li>
+    <li class="top"><span class="n">4</span>Users and roles<span class="dots"></span><span class="pg">6</span></li>
+    <li class="top"><span class="n">5</span>System overview<span class="dots"></span><span class="pg">7</span></li>
+    <li class="top"><span class="n">6</span>Functional requirements<span class="dots"></span><span class="pg">8</span></li>
+    <li class="sub"><span class="n">6.1</span>Message intake (INT)<span class="dots"></span><span class="pg">8</span></li>
+    <li class="sub"><span class="n">6.2</span>AI replies (AI)<span class="dots"></span><span class="pg">8</span></li>
+    <li class="sub"><span class="n">6.3</span>Business rules (RUL)<span class="dots"></span><span class="pg">9</span></li>
+    <li class="sub"><span class="n">6.4</span>Escalations (ESC)<span class="dots"></span><span class="pg">10</span></li>
+    <li class="sub"><span class="n">6.5</span>Conversation management (CNV)<span class="dots"></span><span class="pg">10</span></li>
+    <li class="sub"><span class="n">6.6</span>Dashboard (DSH)<span class="dots"></span><span class="pg">11</span></li>
+    <li class="sub"><span class="n">6.7</span>Knowledge base (KB)<span class="dots"></span><span class="pg">11</span></li>
+    <li class="sub"><span class="n">6.8</span>User management (USR)<span class="dots"></span><span class="pg">12</span></li>
+    <li class="sub"><span class="n">6.9</span>Analytics (ANL)<span class="dots"></span><span class="pg">13</span></li>
+    <li class="sub"><span class="n">6.10</span>Audit log (AUD)<span class="dots"></span><span class="pg">13</span></li>
+    <li class="sub"><span class="n">6.11</span>Settings and channels (SET)<span class="dots"></span><span class="pg">13</span></li>
+    <li class="sub"><span class="n">6.12</span>Demo mode (DEM)<span class="dots"></span><span class="pg">14</span></li>
+    <li class="sub"><span class="n">6.13</span>Future requirements (phases 3–4)<span class="dots"></span><span class="pg">14</span></li>
+    <li class="top"><span class="n">7</span>Business rules summary<span class="dots"></span><span class="pg">16</span></li>
+    <li class="top"><span class="n">8</span>Conversation state machine<span class="dots"></span><span class="pg">17</span></li>
+    <li class="top"><span class="n">9</span>Acceptance scenarios<span class="dots"></span><span class="pg">18</span></li>
+    <li class="top"><span class="n">10</span>Non-functional requirements<span class="dots"></span><span class="pg">19</span></li>
+    <li class="top"><span class="n">11</span>Integrations<span class="dots"></span><span class="pg">20</span></li>
+    <li class="top"><span class="n">12</span>Assumptions, constraints and out of scope<span class="dots"></span><span class="pg">20</span></li>
+    <li class="top"><span class="n">13</span>Open questions<span class="dots"></span><span class="pg">21</span></li>
+    <li class="top"><span class="n">14</span>Approval<span class="dots"></span><span class="pg">21</span></li>
+  </ul>
+</section>
+
+<!-- ═════════════════════════ 1. DOCUMENT CONTROL ═════════════════════════ -->
+<section class="sec page-break" id="s1">
+  <h1><span class="num">1</span>Document control</h1>
+
+  <h3>Version history</h3>
+  <table>
+    <colgroup><col style="width:18mm"><col style="width:30mm"><col style="width:26mm"><col></colgroup>
+    <thead><tr><th>Version</th><th>Date</th><th>Author</th><th>Changes</th></tr></thead>
+    <tbody>
+      <tr><td>1.0</td><td>2 October 2026</td><td>Tecza</td><td>Initial draft for review.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Reviewers and approvers</h3>
+  <table>
+    <colgroup><col style="width:44mm"><col style="width:40mm"><col></colgroup>
+    <thead><tr><th>Role</th><th>Name</th><th>Responsibility</th></tr></thead>
+    <tbody>
+      <tr><td>Owner, Saba Art</td><td class="muted">[To be completed]</td><td>Reviews and approves the business requirements, rules and acceptance scenarios.</td></tr>
+      <tr><td>Project lead, Tecza</td><td class="muted">[To be completed]</td><td>Reviews and approves technical feasibility, scope and phasing.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Distribution</h3>
+  <ul>
+    <li>Saba Art — owner.</li>
+    <li>Tecza — project team (development and testing).</li>
+  </ul>
+</section>
+
+<!-- ═════════════════════════ 2. INTRODUCTION ═════════════════════════ -->
+<section class="sec" id="s2">
+  <h1><span class="num">2</span>Introduction</h1>
+
+  <h2><span class="num">2.1</span>Purpose</h2>
+  <p>This document defines what the Saba Art AI Messaging Assistant must do. It is the agreed reference for the client and the development team when designing, building and accepting the system. Each requirement has a unique ID, a priority and a delivery phase so that it can be traced through development and testing.</p>
+  <p>Priorities: <span class="pill must">Must</span> required for the phase to be accepted; <span class="pill should">Should</span> important, delivered in the phase unless agreed otherwise; <span class="pill could">Could</span> desirable, delivered if time allows.</p>
+
+  <h2><span class="num">2.2</span>Scope</h2>
+  <p>The scope covers two connected parts:</p>
+  <ul>
+    <li><strong>The AI messaging assistant</strong> — receives customer messages from WhatsApp and Instagram, answers routine questions automatically from the business's own information, and hands everything sensitive to a person.</li>
+    <li><strong>The admin and staff dashboard</strong> — a web app, installable on a phone, where the owner and helpers read conversations, reply, handle escalations and manage the business information the AI uses.</li>
+  </ul>
+  <p>Work is planned in four phases, as set out in the project proposal. The phase shown against each requirement indicates when it is delivered.</p>
+  <table>
+    <colgroup><col style="width:18mm"><col style="width:48mm"><col></colgroup>
+    <thead><tr><th>Phase</th><th>Focus</th><th>Summary</th></tr></thead>
+    <tbody>
+      <tr><td class="c">1</td><td>Working demo and setup</td><td>AI replies to routine questions, hand-over to the owner or helpers, the admin and staff dashboard, knowledge base editing, analytics, audit log and demo mode with simulated customers.</td></tr>
+      <tr><td class="c">2</td><td>Go live on WhatsApp and Instagram</td><td>Connection of the real WhatsApp Business number and Instagram account through Meta (including business verification and app approval), replies to real customers, and alerts by phone notification and email.</td></tr>
+      <tr><td class="c">3</td><td>Orders and customer tools</td><td>Order board, payment records, message templates, broadcasts, customer lists and product catalogue.</td></tr>
+      <tr><td class="c">4</td><td>Payments and delivery tracking</td><td>Payment links, shipping and tracking, Instagram comment replies, away message and 24-hour window alerts.</td></tr>
+    </tbody>
+  </table>
+
+  <h2><span class="num">2.3</span>Glossary</h2>
+  <table>
+    <colgroup><col style="width:36mm"><col></colgroup>
+    <thead><tr><th>Term</th><th>Meaning</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Escalation</strong></td><td>Handing a conversation from the AI to a person (admin or staff) because it needs human judgement. Every escalation has a recorded reason.</td></tr>
+      <tr><td><strong>Auto-reply</strong></td><td>A reply written by the AI and sent to the customer without human review. Allowed only for approved routine questions.</td></tr>
+      <tr><td><strong>Knowledge Base (KB)</strong></td><td>The business's own information that the AI may use: products, prices, custom-order rules, delivery, payment, policies, tone examples and always-escalate topics.</td></tr>
+      <tr><td><strong>24-hour window</strong></td><td>The 24 hours after a customer's most recent message, during which the business may send free-form replies. Outside it, WhatsApp only allows approved template messages.</td></tr>
+      <tr><td><strong>Echo</strong></td><td>A reply the owner sends directly from the WhatsApp or Instagram phone app, which Meta reports back to the system through the webhook.</td></tr>
+      <tr><td><strong>Demo mode</strong></td><td>An operating mode in which incoming messages are simulated and outgoing replies are logged instead of being sent through Meta.</td></tr>
+      <tr><td><strong>Batching</strong></td><td>Waiting 10 seconds so that several messages a customer sends in quick succession are answered with one reply.</td></tr>
+      <tr><td><strong>Intent</strong></td><td>The AI's classification of what the customer wants: <code>price</code>, <code>delivery</code>, <code>care</code>, <code>custom_order</code>, <code>payment</code>, <code>complaint</code>, <code>refund</code>, <code>unknown</code> or <code>off_topic</code>.</td></tr>
+      <tr><td><strong>Conversation state</strong></td><td>Who is currently responsible for a conversation: the AI (<code>ai_active</code>), waiting for a person (<code>escalated</code>), a person (<code>owner_handling</code>), or automation stopped (<code>paused</code>).</td></tr>
+      <tr><td><strong>Admin</strong></td><td>The business owner. One per business, with full access to the dashboard.</td></tr>
+      <tr><td><strong>Staff</strong></td><td>A helper employed by the business who handles escalated conversations only.</td></tr>
+      <tr><td><strong>PWA</strong></td><td>Progressive Web App: a website that can be added to a phone's home screen and opened full-screen like an app, without an app store.</td></tr>
+      <tr><td><strong>Template message</strong></td><td>A WhatsApp message format approved in advance by Meta. Required for business-initiated messages outside the 24-hour window; Meta charges for these messages.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ═════════════════════════ 3. BUSINESS CONTEXT ═════════════════════════ -->
+<section class="sec" id="s3">
+  <h1><span class="num">3</span>Business context and objectives</h1>
+
+  <h2><span class="num">3.1</span>Context</h2>
+  <p>Saba Art is a small handmade resin-art business in Thrissur, Kerala. Customers contact the business on WhatsApp and Instagram. Most messages are repetitive questions — prices, delivery times and charges, product care and custom orders — written in English, Malayalam or Manglish (Malayalam written in English letters). Answering these by hand takes the owner's time away from making products, and customers who message outside working hours wait for a reply.</p>
+  <p>A smaller number of messages are sensitive: refunds, complaints, payment claims, damaged items and questions about products the business does not list. These must always be handled by a person.</p>
+
+  <h2><span class="num">3.2</span>Objectives</h2>
+  <ol>
+    <li><strong>Instant replies, 24/7, for routine questions</strong>, grounded only in the business's own price list and policies.</li>
+    <li><strong>Never let the AI handle sensitive matters.</strong> Refunds, complaints, payment claims and unknown products go to a person.</li>
+    <li><strong>One dashboard</strong> for the owner and helpers, usable on a phone.</li>
+    <li><strong>A full audit trail</strong> of every reply, escalation and change.</li>
+  </ol>
+
+  <h2><span class="num">3.3</span>Success measures</h2>
+  <p>Targets will be agreed with the owner before go-live (see Open Questions).</p>
+  <table>
+    <colgroup><col style="width:42mm"><col><col style="width:30mm"></colgroup>
+    <thead><tr><th>Measure</th><th>Definition</th><th>Target</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Auto-reply rate</strong></td><td>Share of customer message batches answered by the AI without a person.</td><td class="muted">To be agreed</td></tr>
+      <tr><td><strong>Average response time</strong></td><td>Average time from a customer's message to the first reply (AI or person).</td><td class="muted">To be agreed</td></tr>
+      <tr><td><strong>Escalations resolved</strong></td><td>Share of escalations resolved, and the time taken to resolve them.</td><td class="muted">To be agreed</td></tr>
+      <tr><td><strong>Wrong prices sent</strong></td><td>Number of AI replies that state a price or fact that is not in the knowledge base.</td><td>None</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ═════════════════════════ 4. USERS & ROLES ═════════════════════════ -->
+<section class="sec page-break" id="s4">
+  <h1><span class="num">4</span>Users and roles</h1>
+
+  <h2><span class="num">4.1</span>Actors</h2>
+  <table>
+    <colgroup><col style="width:30mm"><col><col style="width:62mm"></colgroup>
+    <thead><tr><th>Actor</th><th>Description</th><th>Interaction with the system</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Customer</strong></td><td>A person who messages Saba Art on WhatsApp or Instagram.</td><td>Uses only WhatsApp or Instagram. Never sees the dashboard.</td></tr>
+      <tr><td><strong>Admin</strong></td><td>The business owner. One admin per business.</td><td>Full access to every part of the dashboard.</td></tr>
+      <tr><td><strong>Staff</strong></td><td>Helpers hired by the business. Several staff per business.</td><td>Handles escalated conversations only.</td></tr>
+      <tr><td><strong>AI assistant</strong></td><td>Google Gemini, guided by the knowledge base and the business rules.</td><td>Answers routine questions and creates escalations.</td></tr>
+      <tr><td><strong>System</strong></td><td>Automated background processes: job queue, reminders, token refresh and notifications.</td><td>Acts without a user; recorded as "system" in the audit log.</td></tr>
+    </tbody>
+  </table>
+
+  <h2><span class="num">4.2</span>Permission matrix</h2>
+  <table class="perm">
+    <colgroup><col><col style="width:36mm"><col style="width:50mm"></colgroup>
+    <thead><tr><th>Capability</th><th>Admin</th><th>Staff</th></tr></thead>
+    <tbody>
+      <tr><td>View all conversations (every state and channel)</td><td><span class="yes"><svg viewBox="0 0 10 10"><path d="M1.5 5.3 4 7.8 8.5 2.4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>Yes</span></td><td><span class="no"><svg viewBox="0 0 10 10"><path d="M2 2l6 6M8 2 2 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>No</span></td></tr>
+      <tr><td>View escalated conversations assigned to them or unassigned</td><td><span class="yes"><svg viewBox="0 0 10 10"><path d="M1.5 5.3 4 7.8 8.5 2.4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>Yes</span></td><td><span class="yes"><svg viewBox="0 0 10 10"><path d="M1.5 5.3 4 7.8 8.5 2.4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>Yes</span></td></tr>
+      <tr><td>Reply to customers</td><td><span class="yes"><svg viewBox="0 0 10 10"><path d="M1.5 5.3 4 7.8 8.5 2.4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>Any conversation</span></td><td><span class="part"><svg viewBox="0 0 10 10"><circle cx="5" cy="5" r="3.2" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>Only those escalations</span></td></tr>
+      <tr><td>Resolve a conversation (return it to the AI)</td><td><span class="yes"><svg viewBox="0 0 10 10"><path d="M1.5 5.3 4 7.8 8.5 2.4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>Yes</span></td><td><span class="part"><svg viewBox="0 0 10 10"><circle cx="5" cy="5" r="3.2" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>Only those escalations</span></td></tr>
+      <tr><td>Assign escalations to staff</td><td><span class="yes"><svg viewBox="0 0 10 10"><path d="M1.5 5.3 4 7.8 8.5 2.4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>Yes</span></td><td><span class="no"><svg viewBox="0 0 10 10"><path d="M2 2l6 6M8 2 2 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>No</span></td></tr>
+      <tr><td>Manage staff accounts</td><td><span class="yes"><svg viewBox="0 0 10 10"><path d="M1.5 5.3 4 7.8 8.5 2.4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>Yes</span></td><td><span class="no"><svg viewBox="0 0 10 10"><path d="M2 2l6 6M8 2 2 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>No</span></td></tr>
+      <tr><td>Edit the knowledge base</td><td><span class="yes"><svg viewBox="0 0 10 10"><path d="M1.5 5.3 4 7.8 8.5 2.4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>Yes</span></td><td><span class="no"><svg viewBox="0 0 10 10"><path d="M2 2l6 6M8 2 2 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>No</span></td></tr>
+      <tr><td>Pause and resume automation</td><td><span class="yes"><svg viewBox="0 0 10 10"><path d="M1.5 5.3 4 7.8 8.5 2.4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>Yes</span></td><td><span class="no"><svg viewBox="0 0 10 10"><path d="M2 2l6 6M8 2 2 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>No</span></td></tr>
+      <tr><td>View analytics</td><td><span class="yes"><svg viewBox="0 0 10 10"><path d="M1.5 5.3 4 7.8 8.5 2.4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>Yes</span></td><td><span class="no"><svg viewBox="0 0 10 10"><path d="M2 2l6 6M8 2 2 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>No</span></td></tr>
+      <tr><td>View the audit log</td><td><span class="yes"><svg viewBox="0 0 10 10"><path d="M1.5 5.3 4 7.8 8.5 2.4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>Yes</span></td><td><span class="no"><svg viewBox="0 0 10 10"><path d="M2 2l6 6M8 2 2 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>No</span></td></tr>
+      <tr><td>Settings and channel connections (WhatsApp, Instagram)</td><td><span class="yes"><svg viewBox="0 0 10 10"><path d="M1.5 5.3 4 7.8 8.5 2.4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>Yes</span></td><td><span class="no"><svg viewBox="0 0 10 10"><path d="M2 2l6 6M8 2 2 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>No</span></td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout">
+    <span class="label">Access principle</span>
+    <p>Staff see the minimum needed to handle the customer in front of them, and nothing more. Roles are enforced by the backend on every request, using the role in the verified login token. The dashboard hides pages a user cannot use, but this is for convenience only and is never relied on for security.</p>
+  </div>
+</section>
+
+<!-- ═════════════════════════ 5. SYSTEM OVERVIEW ═════════════════════════ -->
+<section class="sec page-break" id="s5">
+  <h1><span class="num">5</span>System overview</h1>
+  <p>The diagram shows how a customer message travels through the system and how people interact with it.</p>
+
+  <figure>
+    <div class="diagram-frame">
+    <svg viewBox="0 0 680 336" role="img" aria-label="System context diagram">
+      <defs>
+        <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0 0 L10 5 L0 10 Z" fill="#706963"/>
+        </marker>
+        <marker id="ahA" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0 0 L10 5 L0 10 Z" fill="#B45309"/>
+        </marker>
+      </defs>
+      <style>
+        .bx { fill: #FFFFFF; stroke: #D6D3D1; stroke-width: 1.2; }
+        .bxA { fill: #FFFFFF; stroke: #F59E0B; stroke-width: 1.3; }
+        .t { font-family: Inter, -apple-system, Helvetica, Arial, sans-serif; font-size: 11.5px; font-weight: 600; fill: #1C1917; }
+        .s { font-family: Inter, -apple-system, Helvetica, Arial, sans-serif; font-size: 9.5px; fill: #706963; }
+        .lbl { font-family: Inter, -apple-system, Helvetica, Arial, sans-serif; font-size: 9px; fill: #706963; paint-order: stroke; stroke: #FFFFFF; stroke-width: 3px; }
+        .lblA { font-family: Inter, -apple-system, Helvetica, Arial, sans-serif; font-size: 9px; fill: #B45309; paint-order: stroke; stroke: #FFFBF0; stroke-width: 3px; }
+        .ln { stroke: #706963; stroke-width: 1.2; fill: none; }
+        .lnA { stroke: #B45309; stroke-width: 1.2; fill: none; }
+        .ttl { font-family: Outfit, Inter, -apple-system, Helvetica, Arial, sans-serif; font-size: 12.5px; font-weight: 600; fill: #B45309; }
+      </style>
+
+      <!-- Customer -->
+      <rect class="bx" x="6" y="94" width="92" height="58" rx="8"/>
+      <circle cx="52" cy="111" r="6" fill="none" stroke="#706963" stroke-width="1.3"/>
+      <path d="M41 127 a11 8 0 0 1 22 0" fill="none" stroke="#706963" stroke-width="1.3"/>
+      <text class="t" x="52" y="144" text-anchor="middle">Customer</text>
+
+      <!-- Channels -->
+      <rect class="bx" x="124" y="58" width="104" height="44" rx="8"/>
+      <text class="t" x="176" y="77" text-anchor="middle">WhatsApp</text>
+      <text class="s" x="176" y="91" text-anchor="middle">Business number</text>
+      <rect class="bx" x="124" y="144" width="104" height="44" rx="8"/>
+      <text class="t" x="176" y="163" text-anchor="middle">Instagram</text>
+      <text class="s" x="176" y="177" text-anchor="middle">Professional account</text>
+
+      <!-- Customer <-> channels -->
+      <path class="ln" d="M98 112 L124 84" marker-start="url(#ah)" marker-end="url(#ah)"/>
+      <path class="ln" d="M98 134 L124 162" marker-start="url(#ah)" marker-end="url(#ah)"/>
+
+      <!-- Meta -->
+      <rect class="bx" x="254" y="58" width="96" height="130" rx="8"/>
+      <text class="t" x="302" y="108" text-anchor="middle">Meta</text>
+      <text class="s" x="302" y="123" text-anchor="middle">webhooks</text>
+      <text class="s" x="302" y="136" text-anchor="middle">+ send APIs</text>
+
+      <!-- channels <-> Meta -->
+      <path class="ln" d="M228 80 L254 80" marker-start="url(#ah)" marker-end="url(#ah)"/>
+      <path class="ln" d="M228 166 L254 166" marker-start="url(#ah)" marker-end="url(#ah)"/>
+
+      <!-- Assistant container -->
+      <rect x="376" y="8" width="298" height="222" rx="10" fill="#FFFBF0" stroke="#F59E0B" stroke-width="1.4"/>
+      <text class="ttl" x="390" y="28">Saba Art Assistant</text>
+
+      <rect class="bxA" x="390" y="44" width="122" height="54" rx="8"/>
+      <text class="t" x="451" y="66" text-anchor="middle">Message intake</text>
+      <text class="s" x="451" y="81" text-anchor="middle">verify · de-duplicate</text>
+      <text class="s" x="451" y="92" text-anchor="middle">store · queue</text>
+
+      <rect class="bxA" x="538" y="44" width="122" height="54" rx="8"/>
+      <text class="t" x="599" y="66" text-anchor="middle">AI decision</text>
+      <text class="s" x="599" y="81" text-anchor="middle">Google Gemini</text>
+      <text class="s" x="599" y="92" text-anchor="middle">+ business rules</text>
+
+      <rect x="390" y="158" width="122" height="54" rx="8" fill="#ECFDF5" stroke="#047857" stroke-width="1.2"/>
+      <text class="t" x="451" y="181" text-anchor="middle">Auto-reply</text>
+      <text class="s" x="451" y="196" text-anchor="middle">routine questions</text>
+
+      <rect x="538" y="158" width="122" height="54" rx="8" fill="#FEF2F2" stroke="#B91C1C" stroke-width="1.2"/>
+      <text class="t" x="599" y="181" text-anchor="middle">Escalation</text>
+      <text class="s" x="599" y="196" text-anchor="middle">hand to a person</text>
+
+      <!-- Meta -> intake -->
+      <path class="ln" d="M350 71 L390 71" marker-end="url(#ah)"/>
+      <text class="lbl" x="370" y="64" text-anchor="middle">events</text>
+      <!-- intake -> AI -->
+      <path class="lnA" d="M512 71 L538 71" marker-end="url(#ahA)"/>
+      <!-- AI -> auto-reply / escalation -->
+      <path class="lnA" d="M572 98 L486 158" marker-end="url(#ahA)"/>
+      <path class="lnA" d="M599 98 L599 158" marker-end="url(#ahA)"/>
+      <text class="lblA" x="512" y="132" text-anchor="middle">safe</text>
+      <text class="lblA" x="606" y="132">sensitive</text>
+      <!-- auto-reply -> Meta -->
+      <path class="ln" d="M390 185 L350 185" marker-end="url(#ah)"/>
+      <text class="lbl" x="370" y="200" text-anchor="middle">reply</text>
+
+      <!-- Dashboard + notifications -->
+      <rect class="bx" x="376" y="264" width="160" height="56" rx="8"/>
+      <text class="t" x="456" y="286" text-anchor="middle">Dashboard</text>
+      <text class="s" x="456" y="301" text-anchor="middle">web app · installable on phone</text>
+
+      <rect class="bx" x="552" y="264" width="122" height="56" rx="8"/>
+      <text class="t" x="613" y="286" text-anchor="middle">Notifications</text>
+      <text class="s" x="613" y="301" text-anchor="middle">email · push</text>
+
+      <path class="ln" d="M456 230 L456 264" marker-start="url(#ah)" marker-end="url(#ah)"/>
+      <text class="lbl" x="462" y="251">live updates · replies</text>
+      <path class="ln" d="M613 212 L613 264" marker-end="url(#ah)"/>
+      <text class="lbl" x="619" y="251">alerts</text>
+
+      <!-- Admin & staff -->
+      <rect class="bx" x="124" y="264" width="226" height="56" rx="8"/>
+      <text class="t" x="237" y="286" text-anchor="middle">Admin &amp; Staff</text>
+      <text class="s" x="237" y="301" text-anchor="middle">owner and helpers</text>
+      <path class="ln" d="M350 292 L376 292" marker-start="url(#ah)" marker-end="url(#ah)"/>
+      <path class="ln" d="M613 320 L613 330 L237 330 L237 320" marker-end="url(#ah)"/>
+    </svg>
+    </div>
+    <figcaption>Figure 1 — System context</figcaption>
+  </figure>
+
+  <div class="comp">
+    <div class="k">Channels</div><div>Customers use their normal WhatsApp or Instagram app. The business connects a WhatsApp Business number (WhatsApp Cloud API) and an Instagram Professional account (Instagram API with Instagram Login).</div>
+    <div class="k">Meta webhooks</div><div>Meta delivers every new message and event to the assistant, and the assistant sends replies back through Meta's APIs.</div>
+    <div class="k">Message intake</div><div>Checks that each event really comes from Meta, ignores duplicates, detects echoes, stores the message and a copy of any media, and places it in a job queue for processing.</div>
+    <div class="k">AI decision</div><div>After a 10-second batching wait, sends the knowledge base, recent history and the new messages to Google Gemini (model <code>gemini-2.5-flash</code>) through the Gemini API. The result is checked against a strict format, then the business rules are applied.</div>
+    <div class="k">Auto-reply or escalation</div><div>Routine questions are answered automatically. Anything sensitive, unclear or not covered by the knowledge base becomes an escalation for a person.</div>
+    <div class="k">Dashboard</div><div>A web app for the admin and staff, installable on a phone as a PWA, with live updates of new messages and escalations.</div>
+    <div class="k">Notifications</div><div>Push notifications and email alerts tell the admin about new escalations.</div>
+    <div class="k">Data</div><div>A PostgreSQL database holds all records and the job queue. Redis is used for login rate limiting and for caching the knowledge base.</div>
+  </div>
+</section>
+
+<!-- ═════════════════════════ 6. FUNCTIONAL REQUIREMENTS ═════════════════════════ -->
+<section class="sec page-break" id="s6">
+  <h1><span class="num">6</span>Functional requirements</h1>
+  <p>Each requirement is written as "The system shall…". Priority and phase are defined in Section 2.</p>
+
+  <!-- 6.1 -->
+  <h2><span class="num">6.1</span>Message intake (INT)</h2>
+  <table class="req">
+    <colgroup><col class="c-id"><col><col class="c-pr"><col class="c-ph"></colgroup>
+    <thead><tr><th>ID</th><th>Requirement</th><th>Priority</th><th class="c">Phase</th></tr></thead>
+    <tbody>
+      <tr><td class="id">FR-INT-01</td><td>The system shall receive incoming customer messages from WhatsApp and Instagram through Meta webhooks.</td><td><span class="pill must">Must</span></td><td class="c">2</td></tr>
+      <tr><td class="id">FR-INT-02</td><td>The system shall complete Meta's webhook verification handshake, returning the challenge only when the verify token matches the configured value.</td><td><span class="pill must">Must</span></td><td class="c">2</td></tr>
+      <tr><td class="id">FR-INT-03</td><td>The system shall validate the <code>X-Hub-Signature-256</code> header of every webhook event against the raw request body and shall reject any event whose signature is missing or invalid.</td><td><span class="pill must">Must</span></td><td class="c">2</td></tr>
+      <tr><td class="id">FR-INT-04</td><td>The system shall acknowledge each webhook event immediately with HTTP 200 and process it asynchronously in a job queue.</td><td><span class="pill must">Must</span></td><td class="c">2</td></tr>
+      <tr><td class="id">FR-INT-05</td><td>The system shall ignore any message whose Meta message ID has already been stored, so that redelivered events are never processed twice.</td><td><span class="pill must">Must</span></td><td class="c">2</td></tr>
+      <tr><td class="id">FR-INT-06</td><td>The system shall detect echoes (replies the owner sends from the phone app), store them as owner messages, and switch the conversation to human handling (<code>owner_handling</code>) before any AI job runs for that conversation.</td><td><span class="pill must">Must</span></td><td class="c">2</td></tr>
+      <tr><td class="id">FR-INT-07</td><td>The system shall download media attached to an incoming message immediately on arrival and keep its own copy, because Meta media URLs expire.</td><td><span class="pill must">Must</span></td><td class="c">2</td></tr>
+      <tr><td class="id">FR-INT-08</td><td>The system shall keep one customer record per channel. The same person on WhatsApp and on Instagram is treated as two customers.</td><td><span class="pill must">Must</span></td><td class="c">1</td></tr>
+      <tr><td class="id">FR-INT-09</td><td>The system shall keep one ongoing conversation per customer, holding the full message history.</td><td><span class="pill must">Must</span></td><td class="c">1</td></tr>
+    </tbody>
+  </table>
+
+  <!-- 6.2 -->
+  <h2><span class="num">6.2</span>AI replies (AI)</h2>
+  <table class="req">
+    <colgroup><col class="c-id"><col><col class="c-pr"><col class="c-ph"></colgroup>
+    <thead><tr><th>ID</th><th>Requirement</th><th>Priority</th><th class="c">Phase</th></tr></thead>
+    <tbody>
+      <tr><td class="id">FR-AI-01</td><td>The system shall process a message with the AI only when its conversation is in the <code>ai_active</code> state. In any other state the message is stored and not answered.</td><td><span class="pill must">Must</span></td><td class="c">1</td></tr>
+      <tr><td class="id">FR-AI-02</td><td>The system shall wait 10 seconds after a customer message, combine all messages the customer sends in that time, and send at most one reply for the batch.</td><td><span class="pill must">Must</span></td><td class="c">1</td></tr>
+      <tr><td class="id">FR-AI-03</td><td>The system shall ground every reply only in the knowledge base. The AI shall not state any price, product, time, charge or policy that is not in the knowledge base.</td><td><span class="pill must">Must</span></td><td class="c">1</td></tr>
+      <tr><td class="id">FR-AI-04</td><td>For each batch, the AI shall return a decision containing: intent, reply text, facts used, missing facts, an escalate flag with reason, a suggested tag and the detected language.</td><td><span class="pill must">Must</span></td><td class="c">1</td></tr>
+      <tr><td class="id">FR-AI-05</td><td>The system shall detect whether the customer writes in English, Malayalam or Manglish and reply in the same language.</td><td><span class="pill must">Must</span></td><td class="c">1</td></tr>
+      <tr><td class="id">FR-AI-06</td><td>The system shall instruct the AI to follow the tone examples stored in the knowledge base.</td><td><span class="pill should">Should</span></td><td class="c">1</td></tr>
+      <tr><td class="id">FR-AI-07</td><td>The system shall include up to the last 20 messages of the conversation as context for the AI.</td><td><span class="pill must">Must</span></td><td class="c">1</td></tr>
+      <tr><td class="id">FR-AI-08</td><td>The system shall validate the AI output against a strict schema. If the output is invalid or the AI call fails, the system shall escalate with reason <code>parse_error</code> and shall never send a fallback or canned reply.</td><td><span class="pill must">Must</span></td><td class="c">1</td></tr>
+      <tr><td class="id">FR-AI-09</td><td>The system shall send an auto-reply only when the intent is <code>price</code>, <code>delivery</code>, <code>care</code> or <code>custom_order</code> and no business rule requires escalation.</td><td><span class="pill must">Must</span></td><td class="c">1</td></tr>
+      <tr><td class="id">FR-AI-10</td><td>The system shall record every AI decision, including whether its reply was sent.</td><td><span class="pill must">Must</span></td><td class="c">1</td></tr>
+      <tr><td class="id">FR-AI-11</td><td>The system shall apply a 20-second timeout to each AI request and retry a limited number of times on temporary failures before escalating.</td><td><span class="pill must">Must</span></td><td class="c">1</td></tr>
+      <tr><td class="id">FR-AI-12</td><td>The system shall use Google Gemini (<code>gemini-2.5-flash</code>) through the Gemini API. The model shall be configurable without code changes.</td><td><span class="pill must">Must</span></td><td class="c">1</td></tr>
+    </tbody>
+  </table>
+
+  <!-- 6.3 -->
+  <h2><span class="num">6.3</span>Business rules (RUL)</h2>
+  <table class="req keep">
+    <colgroup><col class="c-id"><col><col class="c-pr"><col class="c-ph"></colgroup>
+    <thead><tr><th>ID</th><th>Requirement</th><th>Priority</th><th class="c">Phase</th></tr></thead>
+    <tbody>
+      <tr><td class="id">FR-RUL-01</td><td>The system shall apply the business rules after every AI decision, in the order given in Section 7. The rules override the AI: they can turn an auto-reply into an escalation, never the reverse.</td><td><span class="pill must">Must</span></td><td class="c">1</td></tr>
+      <tr><td class="id">FR-RUL-02</td><td>The system shall always escalate, with reason <code>always_escalate_phrase</code>, when the customer's message contains any of these phrases (case-insensitive): "i paid", "already paid", "payment done", "sent money", "where is my order", "not received", "damaged", "broken", "want refund", "cancel my order", "cheated", "fraud", "police", "consumer court".</td><td><span class="pill must">Must</span></td><td class="c">1</td></tr>
+      <tr><td class="id">FR-RUL-03</td><td>The system shall always escalate the intents <code>complaint</code>, <code>refund</code>, <code>unknown</code>, <code>off_topic</code> and <code>payment</code>, with the reasons listed in Section 7.</td><td><span class="pill must">Must</span></td><td class="c">1</td></tr>
+      <tr><td class="id">FR-RUL-04</td><td>The system shall escalate with reason <code>missing_facts</code> when the answer needs facts that are not in the knowledge base.</td><td><span class="pill must">Must</span></td><td class="c">1</td></tr>
+      <tr><td class="id">FR-RUL-05</td><td>The system shall escalate with reason <code>unapproved_intent</code> any intent that is not in the auto-reply list (<code>price</code>, <code>delivery</code>, <code>care</code>, <code>custom_order</code>).</td><td><span class="pill must">Must</span></td><td class="c">1</td></tr>
+      <tr><td class="id">FR-RUL-06</td><td>The AI shall never confirm that a payment has been received. Payment claims are always handled by a person.</td><td><span class="pill must">Must</span></td><td class="c">1</td></tr>
+    </tbody>
+  </table>
+
+  <!-- 6.4 -->
+  <h2><span class="num">6.4</span>Escalations (ESC)</h2>
+  <table class="req">
+    <colgroup><col class="c-id"><col><col class="c-pr"><col class="c-ph"></colgroup>
+    <thead><tr><th>ID</th><th>Requirement</th><th>Priority</th><th class="c">Phase</th></tr></thead>
+    <tbody>
+      <tr><td class="id">FR-ESC-01</td><td>The system shall create an escalation, set the conversation to <code>escalated</code> and record one reason: <code>intent_complaint</code>, <code>intent_refund</code>, <code>intent_unknown</code>, <code>missing_facts</code>, <code>always_escalate_phrase</code>, <code>payment_claim</code>, <code>unapproved_intent</code>, <code>parse_error</code>, <code>manual</code> or <code>window_closed</code>.</td><td><span class="pill must">Must</span></td><td class="c">1</td></tr>
+      <tr><td class="id">FR-ESC-02</td><td>The system shall create new escalations unassigned, so that any staff member can pick them up.</td><td><span class="pill must">Must</span></td><td class="c">1</td></tr>
+      <tr><td class="id">FR-ESC-03</td><td>The system shall allow the admin to assign an escalation to a staff member, recording who assigned it and when.</td><td><span class="pill must">Must</span></td><td class="c">1</td></tr>
+      <tr><td class="id">FR-ESC-04</td><td>The system shall show the admin all open escalations, and show each staff member only the open escalations assigned to them or unassigned.</td><td><span class="pill must">Must</span></td><td class="c">1</td></tr>
+      <tr><td class="id">FR-ESC-05</td><td>The system shall alert the admin when an escalation is created, by push notification and by email as a backup.</td><td><span class="pill must">Must</span></td><td class="c">2</td></tr>
+      <tr><td class="id">FR-ESC-06</td><td>The system shall send a reminder when an escalation has had no reply from a person for 2 hours.</td><td><span class="pill should">Should</span></td><td class="c">2</td></tr>
+      <tr><td class="id">FR-ESC-07</td><td>The system shall allow the admin, or a staff member permitted on that escalation, to resolve it. Resolving closes the escalation, records who resolved it and returns the conversation to <code>ai_active</code>.</td><td><span class="pill must">Must</span></td><td class="c">1</td></tr>
+      <tr><td class="id">FR-ESC-08</td><td>The system shall record every escalation action (creation, assignment, reminder, resolution) in the audit log.</td><td><span class="pill must">Must</span></td><td class="c">1</td></tr>
+    </tbody>
+  </table>
+
+  <!-- 6.5 -->
+  <h2><span class="num">6.5</span>Conversation management (CNV)</h2>
+  <table class="req">
+    <colgroup><col class="c-id"><col><col class="c-pr"><col class="c-ph"></colgroup>
+    <thead><tr><th>ID</th><th>Requirement</th><th>Priority</th><th class="c">Phase</th></tr></thead>
+    <tbody>
+      <tr><td class="id">FR-CNV-01</td><td>The system shall keep every conversation in exactly one state — <code>ai_active</code>, <code>escalated</code>, <code>owner_handling</code> or <code>paused</code> — and change state only as defined in Section 8.</td><td><span class="pill must">Must</span></td><td class="c">1</td></tr>
+      <tr><td class="id">FR-CNV-02</td><td>When the admin or a staff member replies from the dashboard, the system shall send the reply to the customer, set the conversation to <code>owner_handling</code> and stop AI replies until the conversation is resolved.</td><td><span class="pill must">Must</span></td><td class="c">1</td></tr>
+      <tr><td class="id">FR-CNV-03</td><td>The system shall allow the admin to pause and resume automation for the whole business. While paused, incoming messages are stored but the AI does not reply.</td><td><span class="pill must">Must</span></td><td class="c">1</td></tr>
+      <tr><td class="id">FR-CNV-04</td><td>The system shall support the conversation tags <code>new_lead</code>, <code>custom_order</code>, <code>payment_pending</code>, <code>order_confirmed</code> and <code>follow_up</code>. The AI may suggest a tag, which is applied with its auto-reply.</td><td><span class="pill should">Should</span></td><td class="c">1</td></tr>
+      <tr><td class="id">FR-CNV-05</td><td>The system shall track the 24-hour customer-service window for each conversation and show the time left in the dashboard, highlighted in red when less than 2 hours remain.</td><td><span class="pill must">Must</span></td><td class="c">1</td></tr>
+      <tr><td class="id">FR-CNV-06</td><td>If the 24-hour window has already closed when a message is processed, the system shall not auto-reply and shall escalate with reason <code>window_closed</code>.</td><td><span class="pill must">Must</span></td><td class="c">1</td></tr>
+      <tr><td class="id">FR-CNV-07</td><td>Outside the 24-hour window, the system shall allow only approved WhatsApp template messages to be sent.</td><td><span class="pill must">Must</span></td><td class="c">2</td></tr>
+      <tr><td class="id">FR-CNV-08</td><td>The system shall record every conversation state change in the audit log.</td><td><span class="pill must">Must</span></td><td class="c">1</td></tr>
+    </tbody>
+  </table>
+
+  <!-- 6.6 -->
+  <h2><span class="num">6.6</span>Dashboard (DSH)</h2>
+  <table class="req">
+    <colgroup><col class="c-id"><col><col class="c-pr"><col class="c-ph"></colgroup>
+    <thead><tr><th>ID</th><th>Requirement</th><th>Priority</th><th class="c">Phase</th></tr></thead>
+    <tbody>
+      <tr><td class="id">FR-DSH-01</td><td>The system shall let admin and staff log in with email and password, then open the inbox for the admin and the escalation queue for staff.</td><td><span class="pill must">Must</span></td><td class="c">1</td></tr>
+      <tr><td class="id">FR-DSH-02</td><td>The system shall let users log out, and shall end a login session after a configured period (default 7 days), returning the user to the login page.</td><td><span class="pill should">Should</span></td><td class="c">1</td></tr>
+      <tr><td class="id">FR-DSH-03</td><td>The admin inbox shall list all conversations with state, tag, channel and last message, filterable by state, tag and channel.</td><td><span class="pill must">Must</span></td><td class="c">1</td></tr>
+      <tr><td class="id">FR-DSH-04</td><td>The chat view shall show the full message thread, with a distinct colour for each sender: customer, AI, owner, staff and system.</td><td><span class="pill must">Must</span></td><td class="c">1</td></tr>
+      <tr><td class="id">FR-DSH-05</td><td>The chat view shall include a reply box with Send and Resolve actions.</td><td><span class="pill must">Must</span></td><td class="c">1</td></tr>
+      <tr><td class="id">FR-DSH-06</td><td>The staff escalation queue shall list the staff member's assigned and unassigned open escalations, with reason and waiting time.</td><td><span class="pill must">Must</span></td><td class="c">1</td></tr>
+      <tr><td class="id">FR-DSH-07</td><td>Staff shall open a single chat view for one escalated conversation, showing its history and the customer profile.</td><td><span class="pill must">Must</span></td><td class="c">1</td></tr>
+      <tr><td class="id">FR-DSH-08</td><td>The dashboard shall update in real time when new messages, escalations, assignments or state changes occur, without reloading the page.</td><td><span class="pill should">Should</span></td><td class="c">1</td></tr>
+      <tr><td class="id">FR-DSH-09</td><td>If the real-time connection is lost, the dashboard shall poll for updates every 5 seconds until it reconnects.</td><td><span class="pill should">Should</span></td><td class="c">1</td></tr>
+      <tr><td class="id">FR-DSH-10</td><td>The dashboard shall be installable on a phone as a PWA and open full-screen from the home screen.</td><td><span class="pill should">Should</span></td><td class="c">1</td></tr>
+      <tr><td class="id">FR-DSH-11</td><td>After login, the dashboard shall ask permission for notifications and register the device to receive push notifications.</td><td><span class="pill should">Should</span></td><td class="c">2</td></tr>
+    </tbody>
+  </table>
+
+  <!-- 6.7 -->
+  <h2><span class="num">6.7</span>Knowledge base (KB)</h2>
+  <p class="small muted">All knowledge base editing is restricted to the admin.</p>
+  <table class="req">
+    <colgroup><col class="c-id"><col><col class="c-pr"><col class="c-ph"></colgroup>
+    <thead><tr><th>ID</th><th>Requirement</th><th>Priority</th><th class="c">Phase</th></tr></thead>
+    <tbody>
+      <tr><td class="id">FR-KB-01</td><td>The system shall let the admin add, edit and remove products, each with name, price, sizes, lead time and custom options.</td><td><span class="pill must">Must</span></td><td class="c">1</td></tr>
+      <tr><td class="id">FR-KB-02</td><td>The system shall let the admin edit the custom-order rules (for example bulk discount, extra lead time, and how to treat items not in the catalogue).</td><td><span class="pill must">Must</span></td><td class="c">1</td></tr>
+      <tr><td class="id">FR-KB-03</td><td>The system shall let the admin edit delivery zones, each with area, delivery days, charge and availability.</td><td><span class="pill must">Must</span></td><td class="c">1</td></tr>
+      <tr><td class="id">FR-KB-04</td><td>The system shall let the admin edit payment methods, the advance percentage and the balance terms.</td><td><span class="pill must">Must</span></td><td class="c">1</td></tr>
+      <tr><td class="id">FR-KB-05</td><td>The system shall let the admin edit the policies for returns, cancellation, care and warranty.</td><td><span class="pill must">Must</span></td><td class="c">1</td></tr>
+      <tr><td class="id">FR-KB-06</td><td>The system shall let the admin edit tone examples (a customer message paired with an ideal reply).</td><td><span class="pill should">Should</span></td><td class="c">1</td></tr>
+      <tr><td class="id">FR-KB-07</td><td>The system shall let the admin edit the list of always-escalate topics given to the AI.</td><td><span class="pill should">Should</span></td><td class="c">1</td></tr>
+      <tr><td class="id">FR-KB-08</td><td>Knowledge base changes shall take effect for the AI immediately; the cached copy shall be cleared on every save.</td><td><span class="pill must">Must</span></td><td class="c">1</td></tr>
+      <tr><td class="id">FR-KB-09</td><td>The system shall record which admin last edited the knowledge base and when.</td><td><span class="pill should">Should</span></td><td class="c">1</td></tr>
+    </tbody>
+  </table>
+
+  <!-- 6.8 -->
+  <h2><span class="num">6.8</span>User management (USR)</h2>
+  <table class="req keep">
+    <colgroup><col class="c-id"><col><col class="c-pr"><col class="c-ph"></colgroup>
+    <thead><tr><th>ID</th><th>Requirement</th><th>Priority</th><th class="c">Phase</th></tr></thead>
+    <tbody>
+      <tr><td class="id">FR-USR-01</td><td>The system shall let the admin create staff accounts with name, email and password. The role of a created account is always staff.</td><td><span class="pill must">Must</span></td><td class="c">1</td></tr>
+      <tr><td class="id">FR-USR-02</td><td>The system shall send a new staff member a welcome email with the login address and their login details.</td><td><span class="pill should">Should</span></td><td class="c">2</td></tr>
+      <tr><td class="id">FR-USR-03</td><td>The system shall list staff accounts with name, email, active status and last login time.</td><td><span class="pill must">Must</span></td><td class="c">1</td></tr>
+      <tr><td class="id">FR-USR-04</td><td>The system shall let the admin deactivate and reactivate staff accounts. A deactivated user shall not be able to log in.</td><td><span class="pill must">Must</span></td><td class="c">1</td></tr>
+      <tr><td class="id">FR-USR-05</td><td>The system shall store passwords only as one-way hashes and shall never show or return a password or password hash.</td><td><span class="pill must">Must</span></td><td class="c">1</td></tr>
+    </tbody>
+  </table>
+
+  <!-- 6.9 -->
+  <h2><span class="num">6.9</span>Analytics (ANL)</h2>
+  <table class="req keep">
+    <colgroup><col class="c-id"><col><col class="c-pr"><col class="c-ph"></colgroup>
+    <thead><tr><th>ID</th><th>Requirement</th><th>Priority</th><th class="c">Phase</th></tr></thead>
+    <tbody>
+      <tr><td class="id">FR-ANL-01</td><td>The system shall show the admin message counts (received and sent).</td><td><span class="pill should">Should</span></td><td class="c">1</td></tr>
+      <tr><td class="id">FR-ANL-02</td><td>The system shall show the auto-reply rate.</td><td><span class="pill should">Should</span></td><td class="c">1</td></tr>
+      <tr><td class="id">FR-ANL-03</td><td>The system shall show the escalation rate.</td><td><span class="pill should">Should</span></td><td class="c">1</td></tr>
+      <tr><td class="id">FR-ANL-04</td><td>The system shall show the average response time.</td><td><span class="pill should">Should</span></td><td class="c">1</td></tr>
+      <tr><td class="id">FR-ANL-05</td><td>The system shall let the admin filter all analytics by date range and by channel.</td><td><span class="pill should">Should</span></td><td class="c">1</td></tr>
+    </tbody>
+  </table>
+
+  <!-- 6.10 -->
+  <h2><span class="num">6.10</span>Audit log (AUD)</h2>
+  <table class="req keep">
+    <colgroup><col class="c-id"><col><col class="c-pr"><col class="c-ph"></colgroup>
+    <thead><tr><th>ID</th><th>Requirement</th><th>Priority</th><th class="c">Phase</th></tr></thead>
+    <tbody>
+      <tr><td class="id">FR-AUD-01</td><td>The system shall record every reply, auto-reply, escalation creation, assignment and resolution, conversation state change, user-management change and settings change.</td><td><span class="pill must">Must</span></td><td class="c">1</td></tr>
+      <tr><td class="id">FR-AUD-02</td><td>Each audit entry shall include the actor (user, AI or system), the time, the action and its details, with links to the related conversation, escalation or user.</td><td><span class="pill must">Must</span></td><td class="c">1</td></tr>
+      <tr><td class="id">FR-AUD-03</td><td>The system shall let the admin view the audit log, filter it by actor and action, and page through it.</td><td><span class="pill must">Must</span></td><td class="c">1</td></tr>
+    </tbody>
+  </table>
+
+  <!-- 6.11 -->
+  <h2><span class="num">6.11</span>Settings and channels (SET)</h2>
+  <table class="req keep">
+    <colgroup><col class="c-id"><col><col class="c-pr"><col class="c-ph"></colgroup>
+    <thead><tr><th>ID</th><th>Requirement</th><th>Priority</th><th class="c">Phase</th></tr></thead>
+    <tbody>
+      <tr><td class="id">FR-SET-01</td><td>The system shall provide the admin with a clearly visible pause / resume switch for automation.</td><td><span class="pill must">Must</span></td><td class="c">1</td></tr>
+      <tr><td class="id">FR-SET-02</td><td>The system shall show the connection status of the WhatsApp and Instagram channels.</td><td><span class="pill should">Should</span></td><td class="c">2</td></tr>
+      <tr><td class="id">FR-SET-03</td><td>The system shall store Meta access tokens encrypted, never in plain text.</td><td><span class="pill must">Must</span></td><td class="c">2</td></tr>
+      <tr><td class="id">FR-SET-04</td><td>The system shall check the Instagram access token daily and refresh it before it expires.</td><td><span class="pill must">Must</span></td><td class="c">2</td></tr>
+    </tbody>
+  </table>
+
+  <!-- 6.12 -->
+  <h2><span class="num">6.12</span>Demo mode (DEM)</h2>
+  <table class="req keep">
+    <colgroup><col class="c-id"><col><col class="c-pr"><col class="c-ph"></colgroup>
+    <thead><tr><th>ID</th><th>Requirement</th><th>Priority</th><th class="c">Phase</th></tr></thead>
+    <tbody>
+      <tr><td class="id">FR-DEM-01</td><td>The system shall let an authorised user simulate an incoming message (customer name, channel, text and optional image) from the dashboard or the API.</td><td><span class="pill must">Must</span></td><td class="c">1</td></tr>
+      <tr><td class="id">FR-DEM-02</td><td>In demo mode, the system shall log outgoing replies instead of sending them to Meta.</td><td><span class="pill must">Must</span></td><td class="c">1</td></tr>
+      <tr><td class="id">FR-DEM-03</td><td>The system shall accept simulated messages only when demo mode is switched on.</td><td><span class="pill must">Must</span></td><td class="c">1</td></tr>
+    </tbody>
+  </table>
+
+  <!-- 6.13 -->
+  <h2><span class="num">6.13</span>Future requirements (phases 3–4)</h2>
+  <p>These requirements are planned after go-live. The phase allocation follows the roadmap in the project proposal. FR-STA-01 is not yet allocated to a phase (see OQ-08).</p>
+  <table class="req">
+    <colgroup><col class="c-id"><col><col class="c-pr"><col class="c-ph"></colgroup>
+    <thead><tr><th>ID</th><th>Requirement</th><th>Priority</th><th class="c">Phase</th></tr></thead>
+    <tbody>
+      <tr class="group"><td colspan="4">Orders</td></tr>
+      <tr><td class="id">FR-ORD-01</td><td>The system shall let the admin create an order from a conversation.</td><td><span class="pill should">Should</span></td><td class="c">3</td></tr>
+      <tr><td class="id">FR-ORD-02</td><td>The system shall track each order through the statuses <code>pending</code>, <code>confirmed</code>, <code>in_production</code>, <code>ready</code>, <code>dispatched</code>, <code>delivered</code> and <code>cancelled</code>.</td><td><span class="pill should">Should</span></td><td class="c">3</td></tr>
+      <tr><td class="id">FR-ORD-03</td><td>The system shall show an order board grouping orders by status.</td><td><span class="pill should">Should</span></td><td class="c">3</td></tr>
+      <tr><td class="id">FR-ORD-04</td><td>The system shall notify the customer when their order status changes.</td><td><span class="pill should">Should</span></td><td class="c">3</td></tr>
+
+      <tr class="group"><td colspan="4">Payments</td></tr>
+      <tr><td class="id">FR-PAY-01</td><td>The system shall record the 50% advance and the balance for each order.</td><td><span class="pill should">Should</span></td><td class="c">3</td></tr>
+      <tr><td class="id">FR-PAY-02</td><td>The system shall let the admin mark a payment as paid manually.</td><td><span class="pill should">Should</span></td><td class="c">3</td></tr>
+      <tr><td class="id">FR-PAY-03</td><td>The system shall create Razorpay payment links. Only the gateway's verified payment confirmation, or the admin, may mark a payment as paid.</td><td><span class="pill could">Could</span></td><td class="c">4</td></tr>
+
+      <tr class="group"><td colspan="4">Delivery tracking</td></tr>
+      <tr><td class="id">FR-DLV-01</td><td>The system shall create Shiprocket shipments, store the tracking number and record shipment status updates.</td><td><span class="pill could">Could</span></td><td class="c">4</td></tr>
+
+      <tr class="group"><td colspan="4">Customers and segments</td></tr>
+      <tr><td class="id">FR-CUS-01</td><td>The system shall group customers into segments: favourites, priority, recent buyers and new.</td><td><span class="pill should">Should</span></td><td class="c">3</td></tr>
+      <tr><td class="id">FR-CUS-02</td><td>The system shall process messages from priority customers first during busy periods.</td><td><span class="pill could">Could</span></td><td class="c">3</td></tr>
+
+      <tr class="group"><td colspan="4">Message templates</td></tr>
+      <tr><td class="id">FR-TPL-01</td><td>The system shall let the admin create message templates organised by category, with variables such as <code>{customerName}</code>, <code>{product}</code>, <code>{trackingId}</code>, <code>{amount}</code> and <code>{balanceAmount}</code> filled in when sent.</td><td><span class="pill should">Should</span></td><td class="c">3</td></tr>
+
+      <tr class="group"><td colspan="4">Broadcasts</td></tr>
+      <tr><td class="id">FR-BRD-01</td><td>The system shall let the admin send approved WhatsApp templates to selected customer segments, schedule them, and view delivery statistics.</td><td><span class="pill should">Should</span></td><td class="c">3</td></tr>
+      <tr><td class="id">FR-BRD-02</td><td>The system shall never send a broadcast to a customer who has opted out.</td><td><span class="pill should">Should</span></td><td class="c">3</td></tr>
+
+      <tr class="group"><td colspan="4">Other</td></tr>
+      <tr><td class="id">FR-CAT-01</td><td>The system shall provide a product catalogue with photos, built from the knowledge base.</td><td><span class="pill should">Should</span></td><td class="c">3</td></tr>
+      <tr><td class="id">FR-IGC-01</td><td>The system shall respond to Instagram comments matching keyword rules with a public reply or a direct message.</td><td><span class="pill could">Could</span></td><td class="c">4</td></tr>
+      <tr><td class="id">FR-AWY-01</td><td>The system shall send an away message outside business hours.</td><td><span class="pill could">Could</span></td><td class="c">4</td></tr>
+      <tr><td class="id">FR-WIN-01</td><td>The system shall alert the admin before a conversation's 24-hour window expires.</td><td><span class="pill could">Could</span></td><td class="c">4</td></tr>
+      <tr><td class="id">FR-STA-01</td><td>The system shall provide detailed message statistics with CSV export.</td><td><span class="pill could">Could</span></td><td class="c">TBC</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ═════════════════════════ 7. BUSINESS RULES SUMMARY ═════════════════════════ -->
+<section class="sec page-break" id="s7">
+  <h1><span class="num">7</span>Business rules summary</h1>
+  <p>Before the rules run, three checks apply: the conversation must be <code>ai_active</code> and automation not paused (otherwise the message is stored with no reply); the 24-hour window must be open (otherwise <code>window_closed</code>); and the AI output must be valid (otherwise <code>parse_error</code>). The rules are then applied to every AI decision in this order. The first rule that matches decides the outcome.</p>
+  <table>
+    <colgroup><col style="width:12mm"><col><col style="width:56mm"><col style="width:32mm"></colgroup>
+    <thead><tr><th class="c">Step</th><th>Check</th><th>Escalation reason</th><th>Outcome</th></tr></thead>
+    <tbody>
+      <tr><td class="c">1</td><td>Message contains an always-escalate phrase (<span class="nw">FR-RUL-02</span>)</td><td><code>always_escalate_phrase</code></td><td><span class="pill st-esc">Escalate</span></td></tr>
+      <tr><td class="c">2</td><td>Intent is an always-escalate intent (<span class="nw">FR-RUL-03</span>)</td><td>complaint → <code>intent_complaint</code><br>refund → <code>intent_refund</code><br>unknown → <code>intent_unknown</code><br>payment → <code>payment_claim</code><br>off_topic → <code>unapproved_intent</code></td><td><span class="pill st-esc">Escalate</span></td></tr>
+      <tr><td class="c">3</td><td>The answer needs facts not in the knowledge base (<span class="nw">FR-RUL-04</span>)</td><td><code>missing_facts</code></td><td><span class="pill st-esc">Escalate</span></td></tr>
+      <tr><td class="c">4</td><td>Intent is not <code>price</code>, <code>delivery</code>, <code>care</code> or <code>custom_order</code> (<span class="nw">FR-RUL-05</span>)</td><td><code>unapproved_intent</code></td><td><span class="pill st-esc">Escalate</span></td></tr>
+      <tr><td class="c">—</td><td>None of the above</td><td>—</td><td><span class="pill st-active">Auto-reply</span></td></tr>
+    </tbody>
+  </table>
+  <div class="callout">
+    <span class="label">Note on rule order</span>
+    <p>Intent is checked before missing facts. A question about a product that is not in the catalogue, which the AI labels <code>unknown</code>, therefore escalates as <code>intent_unknown</code> rather than <code>missing_facts</code>. Either way, the customer receives no automatic answer and a person handles it.</p>
+  </div>
+</section>
+
+<!-- ═════════════════════════ 8. STATE MACHINE ═════════════════════════ -->
+<section class="sec page-break" id="s8">
+  <h1><span class="num">8</span>Conversation state machine</h1>
+  <p>Every conversation is in exactly one of four states. The AI only works on conversations in <code>ai_active</code>.</p>
+
+  <figure>
+    <div class="diagram-frame">
+    <svg viewBox="0 0 680 290" role="img" aria-label="Conversation state machine">
+      <defs>
+        <marker id="sm" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0 0 L10 5 L0 10 Z" fill="#706963"/>
+        </marker>
+      </defs>
+      <style>
+        .st { font-family: "SFMono-Regular", Menlo, Consolas, monospace; font-size: 12px; font-weight: 600; }
+        .sd { font-family: Inter, -apple-system, Helvetica, Arial, sans-serif; font-size: 9.5px; fill: #706963; }
+        .el { font-family: Inter, -apple-system, Helvetica, Arial, sans-serif; font-size: 9.5px; fill: #1C1917; paint-order: stroke; stroke: #FFFFFF; stroke-width: 3.5px; }
+        .eln { font-family: Inter, -apple-system, Helvetica, Arial, sans-serif; font-size: 9px; fill: #706963; font-style: italic; }
+        .ar { stroke: #706963; stroke-width: 1.3; fill: none; }
+      </style>
+
+      <!-- start -->
+      <circle cx="330" cy="22" r="6" fill="#1C1917"/>
+      <path class="ar" d="M330 28 L330 113" marker-end="url(#sm)"/>
+      <text class="el" x="338" y="62">new conversation</text>
+
+      <!-- states -->
+      <rect x="260" y="115" width="140" height="56" rx="10" fill="#ECFDF5" stroke="#047857" stroke-width="1.4"/>
+      <text class="st" x="330" y="140" text-anchor="middle" fill="#047857">ai_active</text>
+      <text class="sd" x="330" y="156" text-anchor="middle">AI answers</text>
+
+      <rect x="520" y="22" width="150" height="56" rx="10" fill="#FEF2F2" stroke="#B91C1C" stroke-width="1.4"/>
+      <text class="st" x="595" y="47" text-anchor="middle" fill="#B91C1C">escalated</text>
+      <text class="sd" x="595" y="63" text-anchor="middle">waiting for a person</text>
+
+      <rect x="520" y="208" width="150" height="56" rx="10" fill="#FEF3C7" stroke="#B45309" stroke-width="1.4"/>
+      <text class="st" x="595" y="233" text-anchor="middle" fill="#B45309">owner_handling</text>
+      <text class="sd" x="595" y="249" text-anchor="middle">a person is replying</text>
+
+      <rect x="14" y="115" width="140" height="56" rx="10" fill="#F5F5F4" stroke="#706963" stroke-width="1.4"/>
+      <text class="st" x="84" y="140" text-anchor="middle" fill="#57534E">paused</text>
+      <text class="sd" x="84" y="156" text-anchor="middle">stored, no AI reply</text>
+
+      <!-- ai_active <-> paused -->
+      <path class="ar" d="M260 132 L154 132" marker-end="url(#sm)"/>
+      <text class="el" x="207" y="125" text-anchor="middle">admin pauses</text>
+      <path class="ar" d="M154 155 L260 155" marker-end="url(#sm)"/>
+      <text class="el" x="207" y="170" text-anchor="middle">admin resumes</text>
+      <text class="eln" x="84" y="190" text-anchor="middle">pause applies from any state</text>
+
+      <!-- ai_active <-> escalated -->
+      <path class="ar" d="M400 124 L520 52" marker-end="url(#sm)"/>
+      <text class="el" x="438" y="82" text-anchor="middle">rule triggers</text>
+      <path class="ar" d="M520 70 L400 142" marker-end="url(#sm)"/>
+      <text class="el" x="486" y="114" text-anchor="middle">resolved</text>
+
+      <!-- ai_active <-> owner_handling -->
+      <path class="ar" d="M400 162 L520 234" marker-end="url(#sm)"/>
+      <text class="el" x="430" y="202" text-anchor="middle">human reply</text>
+      <text class="el" x="430" y="214" text-anchor="middle">or echo</text>
+      <path class="ar" d="M520 216 L400 144" marker-end="url(#sm)"/>
+      <text class="el" x="486" y="174" text-anchor="middle">resolved</text>
+
+      <!-- escalated -> owner_handling -->
+      <path class="ar" d="M595 78 L595 208" marker-end="url(#sm)"/>
+      <text class="el" x="603" y="140">human</text>
+      <text class="el" x="603" y="152">replies</text>
+    </svg>
+    </div>
+    <figcaption>Figure 2 — Conversation states and transitions</figcaption>
+  </figure>
+
+  <table>
+    <colgroup><col style="width:38mm"><col><col style="width:32mm"><col style="width:34mm"></colgroup>
+    <thead><tr><th>From</th><th>Event</th><th>To</th><th>Who</th></tr></thead>
+    <tbody>
+      <tr><td><span class="pill st-active">ai_active</span></td><td>A business rule or AI decision requires a person</td><td><span class="pill st-esc">escalated</span></td><td>AI / system</td></tr>
+      <tr><td><span class="pill st-active">ai_active</span></td><td>Admin or staff replies from the dashboard, or an echo arrives from the phone app</td><td><span class="pill st-owner">owner_handling</span></td><td>Admin / staff</td></tr>
+      <tr><td><span class="pill st-esc">escalated</span></td><td>A person replies to the customer</td><td><span class="pill st-owner">owner_handling</span></td><td>Admin / staff</td></tr>
+      <tr><td><span class="pill st-esc">escalated</span> / <span class="pill st-owner">owner_handling</span></td><td>Conversation marked resolved</td><td><span class="pill st-active">ai_active</span></td><td>Admin / staff</td></tr>
+      <tr><td>Any state</td><td>Admin pauses automation</td><td><span class="pill st-paused">paused</span></td><td>Admin</td></tr>
+      <tr><td><span class="pill st-paused">paused</span></td><td>Admin resumes automation</td><td><span class="pill st-active">ai_active</span></td><td>Admin</td></tr>
+    </tbody>
+  </table>
+  <div class="callout">
+    <p>All state changes are written to the audit log. Staff cannot pause or resume automation. An echo must switch the conversation to <code>owner_handling</code> before any AI job runs for that conversation.</p>
+  </div>
+</section>
+
+<!-- ═════════════════════════ 9. ACCEPTANCE ═════════════════════════ -->
+<section class="sec page-break" id="s9">
+  <h1><span class="num">9</span>Acceptance scenarios</h1>
+  <p>The following scenarios must pass, in demo mode, before Phase 1 is accepted.</p>
+
+  <h2><span class="num">9.1</span>Message handling</h2>
+  <table class="compact">
+    <colgroup><col style="width:9mm"><col style="width:58mm"><col><col style="width:29mm"></colgroup>
+    <thead><tr><th class="c">#</th><th>Customer message or action</th><th>Expected result</th><th>Covers</th></tr></thead>
+    <tbody>
+      <tr><td class="c">1</td><td>"How much is the ocean coaster set?"</td><td>Auto-reply stating ₹1,200.</td><td class="small"><span class="nw">FR-AI-09</span>, <span class="nw">FR-KB-01</span></td></tr>
+      <tr><td class="c">2</td><td>"I want a custom clock with my daughter's name"</td><td>Auto-reply asking which colours the customer would like.</td><td class="small"><span class="nw">FR-AI-09</span></td></tr>
+      <tr><td class="c">3</td><td>"Do you deliver to Bangalore?"</td><td>Auto-reply: 7–10 days, ₹120 shipping.</td><td class="small"><span class="nw">FR-AI-09</span>, <span class="nw">FR-KB-03</span></td></tr>
+      <tr><td class="c">4</td><td>"How much for a 6 foot resin table?"</td><td>Escalated, reason <code>missing_facts</code>. No price is given.</td><td class="small"><span class="nw">FR-RUL-04</span></td></tr>
+      <tr><td class="c">5</td><td>"I want a refund"</td><td>Escalated, reason <code>intent_refund</code>.</td><td class="small"><span class="nw">FR-RUL-03</span></td></tr>
+      <tr><td class="c">6</td><td>"I paid already, where is my order?"</td><td>Escalated, reason <code>always_escalate_phrase</code>. The AI does not confirm the payment.</td><td class="small"><span class="nw">FR-RUL-02</span>, <span class="nw">FR-RUL-06</span></td></tr>
+      <tr><td class="c">7</td><td>Three messages sent within 5 seconds</td><td>One combined reply, about 10 seconds after the last message.</td><td class="small"><span class="nw">FR-AI-02</span></td></tr>
+      <tr><td class="c">8</td><td>Admin or staff replies from the dashboard</td><td>Conversation moves to <code>owner_handling</code>; the AI stops replying.</td><td class="small"><span class="nw">FR-CNV-02</span></td></tr>
+      <tr><td class="c">9</td><td><span class="ml">"എത്ര രൂപ കൊടുക്കണം <span class="nw">keychain ന്?"</span></span></td><td>Auto-reply in Malayalam stating ₹450.</td><td class="small"><span class="nw">FR-AI-05</span></td></tr>
+      <tr><td class="c">10</td><td>Automation paused, then a message arrives</td><td>Message is stored; no AI reply is sent.</td><td class="small"><span class="nw">FR-CNV-03</span></td></tr>
+    </tbody>
+  </table>
+
+  <h2><span class="num">9.2</span>Roles and security</h2>
+  <table class="compact keep">
+    <colgroup><col style="width:9mm"><col style="width:58mm"><col><col style="width:29mm"></colgroup>
+    <thead><tr><th class="c">#</th><th>Action</th><th>Expected result</th><th>Covers</th></tr></thead>
+    <tbody>
+      <tr><td class="c">R1</td><td>Staff member tries to open the Inbox, Settings, Users, Analytics, Audit log or Knowledge base pages</td><td>The dashboard redirects to the staff escalation queue.</td><td class="small">Section 4.2</td></tr>
+      <tr><td class="c">R2</td><td>Staff member calls the same admin functions directly through the API</td><td>Refused with HTTP 403 "Admin access required".</td><td class="small"><span class="nw">NFR-SEC-06</span></td></tr>
+      <tr><td class="c">R3</td><td>Staff member opens an escalation assigned to another staff member</td><td>Refused with HTTP 403.</td><td class="small"><span class="nw">FR-ESC-04</span></td></tr>
+      <tr><td class="c">R4</td><td>Six wrong login attempts from the same IP address within 15 minutes</td><td>The sixth attempt is blocked with HTTP 429.</td><td class="small"><span class="nw">NFR-SEC-05</span></td></tr>
+      <tr><td class="c">R5</td><td>A deactivated staff member tries to log in</td><td>Login refused: "Account deactivated".</td><td class="small"><span class="nw">FR-USR-04</span></td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ═════════════════════════ 10. NFR ═════════════════════════ -->
+<section class="sec" id="s10">
+  <h1><span class="num">10</span>Non-functional requirements</h1>
+  <table>
+    <colgroup><col style="width:23mm"><col style="width:30mm"><col></colgroup>
+    <thead><tr><th>ID</th><th>Category</th><th>Requirement</th></tr></thead>
+    <tbody>
+      <tr><td class="id">NFR-SEC-01</td><td>Security</td><td>Every dashboard and API request, except public endpoints (health check, login, webhook), shall require a valid signed login token (JWT).</td></tr>
+      <tr><td class="id">NFR-SEC-02</td><td>Security</td><td>Passwords shall be hashed with argon2id.</td></tr>
+      <tr><td class="id">NFR-SEC-03</td><td>Security</td><td>Stored Meta tokens shall be encrypted with AES-256-GCM.</td></tr>
+      <tr><td class="id">NFR-SEC-04</td><td>Security</td><td>The signature of every webhook event shall be validated before it is processed.</td></tr>
+      <tr><td class="id">NFR-SEC-05</td><td>Security</td><td>Login shall be limited to 5 attempts per 15 minutes per IP address; further attempts receive HTTP 429.</td></tr>
+      <tr><td class="id">NFR-SEC-06</td><td>Security</td><td>Roles shall be enforced on the server for every request, using the role in the verified token, never a role sent by the browser.</td></tr>
+      <tr><td class="id">NFR-SEC-07</td><td>Security</td><td>Production logs shall not contain message content; they record IDs only.</td></tr>
+      <tr><td class="id">NFR-SEC-08</td><td>Security</td><td>Secrets and credentials shall never be committed to source control.</td></tr>
+      <tr><td class="id">NFR-PRF-01</td><td>Performance</td><td>Webhook events shall be acknowledged immediately, before any processing.</td></tr>
+      <tr><td class="id">NFR-PRF-02</td><td>Performance</td><td>A typical auto-reply shall be sent within about 10–20 seconds of the customer's last message, including the 10-second batching window.</td></tr>
+      <tr><td class="id">NFR-AVL-01</td><td>Availability</td><td>The health endpoint shall be monitored every minute (BetterStack), with alerts to the development team if it fails.</td></tr>
+      <tr><td class="id">NFR-AVL-02</td><td>Monitoring</td><td>Errors in the backend and dashboard shall be reported to an error-tracking service (Sentry).</td></tr>
+      <tr><td class="id">NFR-SCL-01</td><td>Scalability</td><td>Every record shall carry a business ID, so the system can serve more than one business without redesign.</td></tr>
+      <tr><td class="id">NFR-USE-01</td><td>Usability</td><td>The dashboard shall work on phone screens and be installable as a PWA.</td></tr>
+      <tr><td class="id">NFR-USE-02</td><td>Usability</td><td>The dashboard interface shall be in English. The AI shall handle customers in English, Malayalam and Manglish.</td></tr>
+      <tr><td class="id">NFR-PRV-01</td><td>Privacy</td><td>Customer data shall be used only to reply to and serve that customer.</td></tr>
+      <tr><td class="id">NFR-PRV-02</td><td>Privacy</td><td>Customer media shall be stored as copies held by the system, not as links to Meta.</td></tr>
+      <tr><td class="id">NFR-MNT-01</td><td>Maintainability</td><td>The system shall have an automated test suite covering the business rules, the AI pipeline and role-based access.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ═════════════════════════ 11. INTEGRATIONS ═════════════════════════ -->
+<section class="sec" id="s11">
+  <h1><span class="num">11</span>Integrations</h1>
+  <table>
+    <colgroup><col style="width:52mm"><col><col style="width:22mm"></colgroup>
+    <thead><tr><th>Service</th><th>Used for</th><th>Phase</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Meta WhatsApp Cloud API</strong></td><td>Receiving and sending WhatsApp messages; template messages.</td><td>2</td></tr>
+      <tr><td><strong>Instagram API with Instagram Login</strong></td><td>Receiving and sending Instagram direct messages; comments later.</td><td>2</td></tr>
+      <tr><td><strong>Google Gemini API</strong></td><td>AI decisions and reply drafting (<code>gemini-2.5-flash</code>).</td><td>1</td></tr>
+      <tr><td><strong>PostgreSQL database (Supabase)</strong></td><td>All business records and the job queue.</td><td>1</td></tr>
+      <tr><td><strong>Upstash Redis</strong></td><td>Login rate limiting; knowledge base cache.</td><td>1</td></tr>
+      <tr><td><strong>Resend</strong></td><td>Escalation alert emails; staff welcome emails.</td><td>2</td></tr>
+      <tr><td><strong>Web Push</strong></td><td>Browser and phone notifications for escalations.</td><td>2</td></tr>
+      <tr><td><strong>Sentry</strong></td><td>Error tracking for backend and dashboard.</td><td>1</td></tr>
+      <tr><td><strong>BetterStack</strong></td><td>Uptime monitoring of the health endpoint.</td><td>1</td></tr>
+      <tr class="group"><td colspan="3">Future</td></tr>
+      <tr><td><strong>Razorpay</strong></td><td>Payment links with verified payment confirmation.</td><td>4</td></tr>
+      <tr><td><strong>Shiprocket</strong></td><td>Shipments, tracking numbers and status updates.</td><td>4</td></tr>
+      <tr><td><strong>Cloudflare R2</strong></td><td>Long-term storage of customer media.</td><td>To be scheduled</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ═════════════════════════ 12. ASSUMPTIONS ═════════════════════════ -->
+<section class="sec" id="s12">
+  <h1><span class="num">12</span>Assumptions, constraints and out of scope</h1>
+
+  <h2><span class="num">12.1</span>Assumptions and constraints</h2>
+  <ul>
+    <li>Meta business verification and App Review are required before going live. Their timing depends on Meta and is outside the project team's control.</li>
+    <li>The WhatsApp number used for the business must not be registered on the WhatsApp phone app.</li>
+    <li>The Instagram account must be a Professional account.</li>
+    <li>Business-initiated WhatsApp messages outside the 24-hour window require approved template messages, and Meta charges for template messages.</li>
+    <li>The quality of AI replies depends on an accurate, up-to-date knowledge base maintained by the business.</li>
+  </ul>
+
+  <div class="keep">
+  <h2><span class="num">12.2</span>Out of scope (for now)</h2>
+  <ul>
+    <li>Native apps in the Apple App Store or Google Play Store (the dashboard is installed as a PWA instead).</li>
+    <li>International shipping.</li>
+    <li>Taking payments inside the chat.</li>
+    <li>Voice and video calls.</li>
+  </ul>
+  </div>
+</section>
+
+<!-- ═════════════════════════ 13. OPEN QUESTIONS ═════════════════════════ -->
+<section class="sec" id="s13">
+  <h1><span class="num">13</span>Open questions</h1>
+  <table>
+    <colgroup><col style="width:14mm"><col><col style="width:32mm"><col style="width:17mm"></colgroup>
+    <thead><tr><th>#</th><th>Question</th><th>Owner</th><th>Status</th></tr></thead>
+    <tbody>
+      <tr><td class="id">OQ-01</td><td>The UPI ID and the demo login email addresses still use the old "asharesins" name. What are the correct values for Saba Art?</td><td>Saba Art</td><td><span class="pill open">Open</span></td></tr>
+      <tr><td class="id">OQ-02</td><td>What is the Instagram handle to be connected?</td><td>Saba Art</td><td><span class="pill open">Open</span></td></tr>
+      <tr><td class="id">OQ-03</td><td>Should staff be able to see and handle orders and payments once those features exist?</td><td>Saba Art</td><td><span class="pill open">Open</span></td></tr>
+      <tr><td class="id">OQ-04</td><td>Once orders exist, should the AI answer "where is my order?" from the order status? Today it always escalates.</td><td>Saba Art, Tecza</td><td><span class="pill open">Open</span></td></tr>
+      <tr><td class="id">OQ-05</td><td>What are the business hours, and what should the away message say?</td><td>Saba Art</td><td><span class="pill open">Open</span></td></tr>
+      <tr><td class="id">OQ-06</td><td>What targets should apply to the success measures in Section 3.3?</td><td>Saba Art, Tecza</td><td><span class="pill open">Open</span></td></tr>
+      <tr><td class="id">OQ-07</td><td>How long should messages, customer details and media be kept?</td><td>Saba Art, Tecza</td><td><span class="pill open">Open</span></td></tr>
+      <tr><td class="id">OQ-08</td><td>Detailed message statistics with CSV export (FR-STA-01) is not yet in the roadmap. Which phase should include it?</td><td>Saba Art, Tecza</td><td><span class="pill open">Open</span></td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ═════════════════════════ 14. APPROVAL ═════════════════════════ -->
+<section class="sec" id="s14">
+  <h1><span class="num">14</span>Approval</h1>
+  <p>By signing below, the parties confirm that this document is the agreed basis for design, development and acceptance of the Saba Art AI Messaging Assistant.</p>
+  <table class="sign">
+    <colgroup><col style="width:34mm"><col style="width:40mm"><col style="width:38mm"><col><col style="width:26mm"></colgroup>
+    <thead><tr><th>Organisation</th><th>Name</th><th>Role</th><th>Signature</th><th>Date</th></tr></thead>
+    <tbody>
+      <tr><td class="label">Saba Art</td><td></td><td>Owner</td><td></td><td></td></tr>
+      <tr><td class="label">Tecza</td><td></td><td>Project lead</td><td></td><td></td></tr>
+    </tbody>
+  </table>
+</section>
+
+</body>
+</html>

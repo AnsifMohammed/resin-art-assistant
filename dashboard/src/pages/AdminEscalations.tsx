@@ -23,7 +23,7 @@ export default function AdminEscalations() {
   const unassigned = showResolved ? 0 : items.filter((e) => !e.assignedToUserId).length;
 
   return (
-    <div className="mx-auto w-full max-w-5xl px-4 py-4 md:px-6 md:py-6">
+    <div className="w-full">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="inline-flex rounded-lg bg-gray-100 p-1" role="group" aria-label="Show escalations">
           {[

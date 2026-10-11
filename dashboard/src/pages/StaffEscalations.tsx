@@ -81,7 +81,7 @@ export default function StaffEscalations() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-5xl space-y-6 px-4 py-4 md:px-6 md:py-6">
+    <div className="w-full space-y-6">
       <Section title="Assigned to me" items={mine} empty="Nothing assigned to you." userId={user?.id} />
       <Section title="Unassigned" items={unassigned} empty="No unassigned escalations." userId={user?.id} />
     </div>

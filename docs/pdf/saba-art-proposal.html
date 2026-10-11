@@ -1,0 +1,1133 @@
+<!DOCTYPE html>
+<!--
+  SABA ART · AI MESSAGING ASSISTANT · CLIENT PROPOSAL v1.1
+  Editable source. Re-export to PDF with headless Chrome:
+    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless=new --disable-gpu \
+      --no-pdf-header-footer --virtual-time-budget=8000 \
+      --print-to-pdf=saba-art-proposal.pdf file://$(pwd)/saba-art-proposal.html
+
+  FILL-IN FIELDS TO COMPLETE BEFORE SENDING
+  (every one is wrapped in <span class="fill">…</span> — search for class="fill")
+
+  Section 12 · Next steps
+    [ ] F1  Tecza phone number
+    [ ] F2  Tecza email address
+
+  Everything else (phase dates, prices, support terms, running costs, payment terms)
+  is filled in as of v1.1. The timeline bars in Section 10 are drawn to scale from the
+  proposal date (6 Oct) to the target dates (20 Oct, 30 Oct) — adjust .g-bar
+  style="left/width" if the dates change.
+
+  Note: the Name / Signature / Date lines in the acceptance box are left blank on purpose
+  for handwritten signatures and are not fill-in fields.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Saba Art — AI Messaging Assistant · Proposal v1.1</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --text: #1C1917;
+    --muted: #706963;
+    --border: #E7E5E4;
+    --panel: #F5F5F4;
+    --amber: #F59E0B;
+    --amber-text: #B45309;
+    --amber-soft: #FEF3C7;
+    --teal: #0F766E;
+    --teal-soft: #E7F3F1;
+    --teal-line: #CBE4DF;
+    --success: #047857;
+    --success-soft: #E6F4EE;
+    --danger: #B91C1C;
+    --danger-soft: #FCEBEB;
+    --font-body: "Inter", -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji";
+    --font-head: "Outfit", "Inter", -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+
+  /* ---------- Page setup ---------- */
+  @page {
+    size: A4;
+    margin: 18mm 18mm 20mm 18mm;
+    @bottom-left {
+      content: "Saba Art · Proposal v1.1";
+      font-family: "Inter", -apple-system, Helvetica, Arial, sans-serif;
+      font-size: 8pt;
+      color: #706963;
+    }
+    @bottom-right {
+      content: "Page " counter(page) " of " counter(pages);
+      font-family: "Inter", -apple-system, Helvetica, Arial, sans-serif;
+      font-size: 8pt;
+      color: #706963;
+    }
+  }
+  @page :first {
+    margin: 0;
+    @bottom-left { content: none; }
+    @bottom-right { content: none; }
+  }
+
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: #FFFFFF;
+    color: var(--text);
+    font-family: var(--font-body);
+    font-size: 10.5pt;
+    line-height: 1.55;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ---------- Typography ---------- */
+  h1, h2, h3 { font-family: var(--font-head); color: var(--text); margin: 0; break-after: avoid; }
+  h1 {
+    font-size: 22pt;
+    font-weight: 700;
+    line-height: 1.2;
+    letter-spacing: -0.01em;
+    padding-top: 5mm;
+    margin-bottom: 3mm;
+    position: relative;
+  }
+  h1::before {
+    content: "";
+    position: absolute;
+    top: 0; left: 0;
+    width: 34px; height: 3px;
+    border-radius: 2px;
+    background: var(--amber);
+  }
+  h2 { font-size: 14pt; font-weight: 600; line-height: 1.3; margin: 6mm 0 2.5mm; }
+  h3 { font-size: 11.5pt; font-weight: 600; line-height: 1.3; margin: 0 0 1.5mm; }
+  p { margin: 0 0 2.6mm; }
+  .lead { font-size: 11.5pt; color: var(--muted); margin-bottom: 5mm; max-width: 150mm; }
+  .muted { color: var(--muted); }
+  .small { font-size: 9pt; line-height: 1.5; }
+  strong, b { font-weight: 600; }
+
+  .page { break-before: page; }
+  .keep { break-inside: avoid; }
+
+  /* ---------- Building blocks ---------- */
+  .card {
+    background: #FFFFFF;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 4mm 4.5mm;
+    break-inside: avoid;
+  }
+  .panel { background: var(--panel); border-radius: 10px; padding: 4mm 4.5mm; break-inside: avoid; }
+  .callout {
+    background: var(--amber-soft);
+    border-left: 3px solid var(--amber);
+    border-radius: 0 8px 8px 0;
+    padding: 3.5mm 4.5mm;
+    break-inside: avoid;
+  }
+  .callout p:last-child { margin-bottom: 0; }
+
+  .fill {
+    display: inline-block;
+    background: var(--amber-soft);
+    border-bottom: 1.5px dashed var(--amber);
+    border-radius: 5px 5px 2px 2px;
+    padding: 0 2.2mm;
+    color: var(--amber-text);
+    font-weight: 600;
+    white-space: nowrap;
+    line-height: 1.6;
+  }
+
+  .icon { width: 18px; height: 18px; flex: none; }
+  .icon-tile {
+    width: 34px; height: 34px; flex: none;
+    border-radius: 9px;
+    background: var(--amber-soft);
+    color: var(--amber-text);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .icon-tile.teal { background: var(--teal-soft); color: var(--teal); }
+  .icon-tile.green { background: var(--success-soft); color: var(--success); }
+  .icon-tile.red { background: var(--danger-soft); color: var(--danger); }
+
+  .pill {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 8pt; font-weight: 600; line-height: 1;
+    padding: 4px 8px; border-radius: 999px;
+    letter-spacing: 0.02em; white-space: nowrap;
+  }
+  .pill.green { background: var(--success-soft); color: var(--success); }
+  .pill.amber { background: var(--amber-soft); color: var(--amber-text); }
+  .pill.grey { background: var(--panel); color: var(--muted); }
+  .pill.red { background: var(--danger-soft); color: var(--danger); }
+  .pill.teal { background: var(--teal-soft); color: var(--teal); }
+
+  ul.clean { list-style: none; margin: 0; padding: 0; }
+  ul.clean li { display: flex; gap: 2.5mm; align-items: flex-start; padding: 1.3mm 0; }
+  ul.clean li .icon { margin-top: 2px; width: 16px; height: 16px; }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 4mm; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4mm; }
+  .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 3mm; }
+
+  /* ---------- Cover ---------- */
+  .cover {
+    position: relative;
+    width: 100%;
+    height: 297mm;
+    overflow: hidden;
+    background:
+      radial-gradient(120mm 120mm at 105% -5%, rgba(254, 243, 199, 0.95), rgba(254, 243, 199, 0) 70%),
+      radial-gradient(140mm 110mm at -15% 110%, rgba(231, 243, 241, 0.9), rgba(231, 243, 241, 0) 70%),
+      linear-gradient(170deg, #FFFCF6 0%, #FFF8EC 60%, #FDF3E1 100%);
+    padding: 22mm 22mm 18mm;
+    display: flex;
+    flex-direction: column;
+  }
+  .cover-art { position: absolute; right: -34mm; top: 30mm; width: 138mm; height: 138mm; }
+  .brand { display: flex; align-items: center; gap: 3.5mm; position: relative; z-index: 2; }
+  .brand svg { width: 13mm; height: 15mm; }
+  .wordmark { font-family: var(--font-head); font-weight: 700; font-size: 21pt; letter-spacing: -0.01em; line-height: 1; }
+  .wordmark-sub { font-size: 8.5pt; color: var(--muted); margin-top: 1.5mm; letter-spacing: 0.02em; }
+  .cover-main { margin-top: auto; position: relative; z-index: 2; }
+  .cover-eyebrow {
+    font-family: var(--font-head); font-weight: 600; font-size: 10pt;
+    letter-spacing: 0.18em; text-transform: uppercase; color: var(--amber-text);
+    margin-bottom: 4mm;
+  }
+  .cover-title {
+    font-family: var(--font-head); font-weight: 700;
+    font-size: 40pt; line-height: 1.05; letter-spacing: -0.02em;
+    margin: 0 0 5mm; max-width: 130mm;
+  }
+  .cover-sub { font-size: 13.5pt; line-height: 1.45; color: #44403C; max-width: 150mm; margin: 0; }
+  .cover-line { height: 1.5px; background: var(--amber); width: 100%; margin: 12mm 0 7mm; opacity: 0.9; }
+  .cover-meta { display: grid; grid-template-columns: 1.3fr 0.9fr 0.7fr 0.9fr; gap: 6mm; }
+  .cover-meta .k { font-size: 8pt; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); margin-bottom: 1.2mm; }
+  .cover-meta .v { font-size: 10.5pt; font-weight: 600; line-height: 1.4; }
+  .cover-meta .v span { display: block; font-weight: 400; color: var(--muted); font-size: 9.5pt; }
+  .cover-foot {
+    margin-top: 16mm; position: relative; z-index: 2;
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 8.5pt; color: var(--muted);
+    border-top: 1px solid rgba(180, 83, 9, 0.18); padding-top: 4mm;
+  }
+
+  /* ---------- Summary ---------- */
+  .challenge { display: grid; grid-template-columns: 1fr 66mm; gap: 7mm; align-items: start; }
+  .phone-mini {
+    background: #FFFFFF; border: 1px solid var(--border); border-radius: 14px;
+    padding: 3.5mm; break-inside: avoid;
+  }
+  .phone-mini .bar { display: flex; justify-content: space-between; align-items: center; font-size: 8.5pt; color: var(--muted); margin-bottom: 2.5mm; }
+  .mini-msg { display: flex; justify-content: space-between; align-items: center; gap: 2mm; background: var(--panel); border-radius: 4px 12px 12px 12px; padding: 2mm 3mm; margin-bottom: 2mm; font-size: 9pt; line-height: 1.35; }
+  .mini-msg time { font-size: 7.5pt; color: var(--muted); white-space: nowrap; }
+  .solution { display: grid; gap: 2.5mm; }
+  .solution .row { display: flex; gap: 3.5mm; align-items: center; }
+  .solution .row p { margin: 0; }
+  .glance { display: grid; grid-template-columns: repeat(4, 1fr); gap: 3mm; margin-top: 6mm; }
+  .glance .tile { background: var(--panel); border-radius: 10px; padding: 3.5mm; break-inside: avoid; border-top: 3px solid var(--amber); }
+  .glance .tile b { display: block; font-family: var(--font-head); font-size: 11.5pt; font-weight: 600; line-height: 1.25; margin-bottom: 1mm; }
+  .glance .tile span { font-size: 9pt; color: var(--muted); line-height: 1.4; display: block; }
+
+  /* ---------- How it works flow ---------- */
+  .flow { margin-top: 2mm; }
+  .step {
+    display: flex; gap: 3.5mm; align-items: flex-start;
+    background: #FFFFFF; border: 1px solid var(--border); border-radius: 10px;
+    padding: 3.5mm 4mm; break-inside: avoid;
+  }
+  .step .num {
+    width: 26px; height: 26px; flex: none; border-radius: 50%;
+    background: var(--amber); color: #FFFFFF;
+    font-family: var(--font-head); font-weight: 700; font-size: 10.5pt;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .step .num.green { background: var(--success); }
+  .step .num.teal { background: var(--teal); }
+  .step .num.dark { background: var(--amber-text); }
+  .step h3 { margin-bottom: 0.8mm; }
+  .step p { margin: 0; color: #44403C; }
+  .step .body { flex: 1; }
+  .step .icon-tile { margin-left: auto; }
+  .step.center { width: 80%; margin: 0 auto; }
+  .step.routine { border-color: #BFE3D3; background: #FBFEFC; }
+  .step.sensitive { border-color: #F6D78E; background: #FFFDF6; }
+  .chips { display: flex; flex-wrap: wrap; gap: 1.2mm; margin-top: 1.6mm; }
+  .chip { font-size: 7.8pt; font-weight: 500; padding: 1px 6px; border-radius: 999px; background: var(--panel); color: #57534E; border: 1px solid var(--border); }
+  .arrow-down { display: block; margin: 0.6mm auto; width: 14px; height: 20px; }
+  .branch { display: block; width: 100%; height: 12mm; }
+  .flow-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6mm; }
+  .end-tag { display: flex; justify-content: center; margin-top: 3mm; }
+  .loop-note { display: flex; align-items: center; gap: 2mm; justify-content: center; font-size: 9pt; color: var(--teal); margin-top: 2.5mm; }
+  .good-to-know { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5mm; }
+  .good-to-know h3 { display: flex; align-items: center; gap: 2mm; font-size: 10.5pt; margin-bottom: 1mm; }
+  .good-to-know h3 .icon { width: 16px; height: 16px; color: var(--amber-text); }
+  .good-to-know p { margin: 0; font-size: 9.3pt; line-height: 1.45; color: #44403C; }
+
+  /* ---------- Handles vs comes to you ---------- */
+  .split .card { padding: 0; overflow: hidden; }
+  .split .head { display: flex; align-items: center; gap: 3mm; padding: 3.5mm 4.5mm; border-bottom: 1px solid var(--border); }
+  .split .head h2 { margin: 0; font-size: 13pt; }
+  .split .head.green { background: var(--success-soft); }
+  .split .head.amber { background: var(--amber-soft); }
+  .split ul { padding: 2.5mm 4.5mm 3.5mm; }
+  .split li { border-bottom: 1px dashed var(--border); }
+  .split li:last-child { border-bottom: 0; }
+  .handover-steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4mm; }
+  .handover-steps .card { padding: 3.5mm 4mm; }
+  .handover-steps .n { font-family: var(--font-head); font-weight: 700; font-size: 18pt; line-height: 1; color: var(--amber); margin-bottom: 1.5mm; }
+  .handover-steps p { margin: 0; font-size: 9.5pt; color: #44403C; }
+
+  /* ---------- Chat mockups ---------- */
+  .chats { display: grid; grid-template-columns: 1fr 1fr; gap: 6mm; }
+  .chat { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; break-inside: avoid; background: #FFFFFF; display: flex; flex-direction: column; }
+  .chat-head { display: flex; align-items: center; gap: 2mm; padding: 3mm 4mm; background: var(--panel); border-bottom: 1px solid var(--border); font-size: 9pt; }
+  .chat-head .avatar { width: 22px; height: 22px; border-radius: 50%; background: #E7E5E4; color: #57534E; font-weight: 600; font-size: 8.5pt; display: flex; align-items: center; justify-content: center; }
+  .chat-head .who { font-weight: 600; }
+  .chat-head .chan { margin-left: auto; display: inline-flex; align-items: center; gap: 1.2mm; color: var(--muted); font-size: 8.5pt; }
+  .chat-head .chan .icon { width: 13px; height: 13px; }
+  .chat-body { padding: 5mm 4mm; display: flex; flex-direction: column; gap: 2.4mm; flex: 1; background: #FFFEFC; }
+  .bubble { max-width: 86%; padding: 2.6mm 3.4mm; font-size: 10pt; line-height: 1.45; }
+  .bubble.customer { max-width: 92%; align-self: flex-start; background: var(--panel); border-radius: 3px 14px 14px 14px; }
+  .bubble.assistant { align-self: flex-end; background: var(--teal-soft); border: 1px solid var(--teal-line); border-radius: 14px 3px 14px 14px; }
+  .bubble-label { align-self: flex-end; font-size: 7.5pt; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--teal); display: inline-flex; align-items: center; gap: 1mm; margin-bottom: -1mm; }
+  .bubble-label .icon { width: 11px; height: 11px; }
+  .system-note { align-self: stretch; display: flex; flex-direction: column; align-items: center; gap: 1.8mm; margin-top: 1mm; }
+  .system-note .line { display: flex; align-items: center; gap: 2mm; width: 100%; font-size: 8.5pt; color: var(--muted); }
+  .system-note .line::before, .system-note .line::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+  .handed { display: inline-flex; align-items: center; gap: 1.5mm; background: var(--danger-soft); color: var(--danger); border: 1px solid #F3C9C9; border-radius: 999px; padding: 1.4mm 3mm; font-size: 8.5pt; font-weight: 600; }
+  .handed .icon { width: 13px; height: 13px; }
+  .chat-foot { padding: 2.6mm 4mm; border-top: 1px solid var(--border); font-size: 8.5pt; color: var(--muted); display: flex; align-items: center; gap: 1.5mm; }
+  .chat-foot .icon { width: 13px; height: 13px; }
+
+  /* ---------- Features ---------- */
+  .features { display: grid; grid-template-columns: 1fr 1fr; gap: 4mm; }
+  .feature { display: flex; gap: 3.5mm; align-items: flex-start; }
+  .feature h3 { margin-bottom: 0.8mm; }
+  .feature p { margin: 0; font-size: 9.8pt; color: #44403C; }
+
+  /* ---------- Roadmap ---------- */
+  .timeline { position: relative; margin: 3mm 0 6mm; padding: 0 4mm; }
+  .timeline .track { position: absolute; left: 25%; right: 25%; top: 13px; height: 3px; background: linear-gradient(90deg, var(--success) 0%, var(--success) 20%, var(--amber) 80%, var(--amber) 100%); border-radius: 2px; }
+  .timeline .nodes { display: grid; grid-template-columns: repeat(2, 1fr); position: relative; }
+  .timeline .node { text-align: center; }
+  .timeline .dot { width: 29px; height: 29px; margin: 0 auto 2mm; border-radius: 50%; background: #FFFFFF; border: 3px solid var(--amber); display: flex; align-items: center; justify-content: center; font-family: var(--font-head); font-weight: 700; font-size: 10pt; color: var(--amber-text); }
+  .timeline .dot.done { background: var(--success); border-color: var(--success); color: #FFFFFF; }
+  .timeline .node b { display: block; font-family: var(--font-head); font-size: 10.5pt; font-weight: 600; line-height: 1.25; }
+  .timeline .node .pill { margin-top: 1.5mm; }
+  .phase { margin-bottom: 3.5mm; padding: 3.5mm 4.5mm 3mm; position: relative; }
+  .phase::before { content: ""; position: absolute; left: 0; top: 10px; bottom: 10px; width: 3px; border-radius: 0 3px 3px 0; background: var(--amber); }
+  .phase.p1::before { background: var(--success); }
+  .phase-head { display: flex; align-items: center; gap: 3mm; margin-bottom: 2mm; padding-bottom: 2mm; border-bottom: 1px dashed var(--border); }
+  .phase-head .tag { font-family: var(--font-head); font-size: 8.5pt; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--amber-text); white-space: nowrap; }
+  .phase.p1 .phase-head .tag { color: var(--success); }
+  .phase-head h3 { margin: 0; font-size: 12.5pt; white-space: nowrap; }
+  .phase-head .pill { margin-left: 1mm; }
+  .phase-head .dur { margin-left: auto; font-size: 9.3pt; color: var(--muted); display: inline-flex; align-items: center; gap: 1.5mm; white-space: nowrap; }
+  .phase-head .dur b { color: var(--text); }
+  .phase ul.items { list-style: none; margin: 0; padding: 0; columns: 2; column-gap: 7mm; }
+  .phase ul.items li { break-inside: avoid; padding: 0.7mm 0 0.7mm 4.5mm; position: relative; font-size: 9.6pt; line-height: 1.42; color: #292524; }
+  .phase ul.items li::before { content: ""; position: absolute; left: 0; top: 2.35mm; width: 5px; height: 5px; border-radius: 50%; background: var(--amber); }
+  .phase.p1 ul.items li::before { background: var(--success); }
+  .phase .duration { margin-top: 2mm; padding-top: 2mm; border-top: 1px dashed var(--border); font-size: 9.5pt; color: var(--muted); display: flex; align-items: center; gap: 2mm; }
+  .phase .duration b { color: var(--text); }
+
+  /* ---------- Needs checklist ---------- */
+  .checklist { list-style: none; margin: 0; padding: 0; }
+  .checklist li { display: flex; gap: 3.5mm; align-items: flex-start; padding: 2.6mm 0; border-bottom: 1px solid var(--border); break-inside: avoid; }
+  .checklist li:last-child { border-bottom: 0; }
+  .checkbox { width: 15px; height: 15px; flex: none; margin-top: 3px; border: 1.6px solid var(--amber-text); border-radius: 4px; background: #FFFFFF; }
+  .checklist b { display: block; font-weight: 600; }
+  .checklist span.why { display: block; font-size: 9.3pt; color: var(--muted); line-height: 1.45; }
+  .need-group h2 { display: flex; align-items: center; gap: 2.5mm; margin-top: 0; }
+
+  /* ---------- Investment table ---------- */
+  table.price { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 9.8pt; break-inside: avoid; }
+  table.price th, table.price td { text-align: left; vertical-align: top; padding: 1.7mm 3.5mm; border-bottom: 1px solid var(--border); }
+  table.price td.amt, table.price th.amt { text-align: right; white-space: nowrap; width: 50mm; vertical-align: middle; }
+  table.price tr.group th {
+    background: var(--panel); font-family: var(--font-head); font-size: 10.5pt; font-weight: 600;
+    padding-top: 2mm; padding-bottom: 2mm; border-bottom: 1px solid var(--border);
+  }
+  table.price tr.group th .muted { font-family: var(--font-body); font-weight: 400; font-size: 8.8pt; margin-left: 2mm; }
+  table.price tr.total td { background: var(--amber-soft); font-weight: 600; font-family: var(--font-head); font-size: 11pt; border-bottom: 0; }
+  table.price td .item { font-weight: 600; display: block; }
+  table.price td .desc { color: var(--muted); font-size: 8.8pt; line-height: 1.45; display: block; margin-top: 0.5mm; }
+  .table-wrap { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; break-inside: avoid; }
+  table.price tr:last-child td { border-bottom: 0; }
+  .terms { display: grid; grid-template-columns: 1fr; gap: 3mm; margin-top: 4mm; }
+  .terms .card { padding: 2.6mm 3.5mm; }
+  .terms .k { font-size: 8pt; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin-bottom: 1.2mm; }
+  .terms .v { font-size: 9.5pt; }
+
+  /* ---------- Gantt ---------- */
+  .gantt { padding: 4mm 4.5mm 3.5mm; }
+  .gantt-top { display: flex; justify-content: space-between; align-items: center; gap: 4mm; margin-bottom: 3.5mm; font-size: 9.5pt; }
+  .g-row { display: grid; grid-template-columns: 36mm 1fr 34mm; gap: 3mm; align-items: center; padding: 1.8mm 0; border-bottom: 1px dashed var(--border); }
+  .g-row:last-of-type { border-bottom: 0; }
+  .g-label { font-size: 9pt; line-height: 1.3; }
+  .g-label b { font-family: var(--font-head); font-size: 10pt; display: block; }
+  .g-track { position: relative; height: 22px; background-color: var(--panel); border-radius: 4px; }
+  .g-bar { position: absolute; top: 2px; bottom: 2px; border-radius: 5px; background: var(--amber); display: flex; align-items: center; padding: 0 2mm; color: #FFFFFF; font-size: 7.5pt; font-weight: 600; white-space: nowrap; overflow: hidden; }
+  .g-bar.p1 { background: var(--success); }
+  .g-bar.p2 { background: var(--amber); }
+  .g-bar.p3 { background: #D97706; }
+  .g-bar.p4 { background: var(--amber-text); }
+  .g-hatch { position: absolute; top: 2px; bottom: 2px; border-radius: 0 5px 5px 0; background: repeating-linear-gradient(135deg, rgba(255,255,255,0.55) 0 4px, rgba(255,255,255,0) 4px 8px); }
+  .g-weeks { font-size: 9pt; text-align: right; white-space: nowrap; }
+  .g-weeks .fill { padding: 0 1.6mm; }
+  .g-axis { display: grid; grid-template-columns: 36mm 1fr 34mm; gap: 3mm; margin-top: 2mm; font-size: 8pt; color: var(--muted); }
+  .g-axis .scale { display: flex; justify-content: space-between; }
+  .g-legend { display: flex; gap: 5mm; flex-wrap: wrap; margin-top: 3mm; font-size: 8.5pt; color: var(--muted); }
+  .g-legend span { display: inline-flex; align-items: center; gap: 1.5mm; }
+  .swatch { width: 14px; height: 9px; border-radius: 2px; display: inline-block; }
+  .milestone { position: absolute; top: 50%; width: 11px; height: 11px; background: var(--teal); transform: translate(-50%, -50%) rotate(45deg); border: 2px solid #FFFFFF; box-shadow: 0 0 0 1px var(--teal); }
+
+  /* ---------- Support & why ---------- */
+  .why-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 3mm; }
+  .why-item { display: flex; gap: 3mm; align-items: flex-start; background: var(--panel); border-radius: 10px; padding: 3mm 3.5mm; break-inside: avoid; }
+  .why-item h3 { font-size: 10.5pt; margin-bottom: 0.5mm; }
+  .why-item p { margin: 0; font-size: 9.3pt; color: #44403C; line-height: 1.45; }
+
+  /* ---------- Next steps & acceptance ---------- */
+  .next { display: grid; grid-template-columns: repeat(4, 1fr); gap: 3mm; position: relative; }
+  .next .card { padding: 3.5mm; }
+  .next .n { width: 26px; height: 26px; border-radius: 50%; background: var(--amber); color: #FFFFFF; font-family: var(--font-head); font-weight: 700; display: flex; align-items: center; justify-content: center; margin-bottom: 2mm; }
+  .next h3 { font-size: 10.5pt; }
+  .next p { margin: 0; font-size: 9pt; color: var(--muted); line-height: 1.45; }
+  .accept { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; break-inside: avoid; }
+  .accept-head { background: var(--panel); padding: 3mm 4.5mm; border-bottom: 1px solid var(--border); }
+  .accept-head p { margin: 0; font-size: 9.5pt; color: #44403C; }
+  .phase-ticks { display: flex; flex-wrap: wrap; gap: 3mm 7mm; padding: 3.5mm 4.5mm; border-bottom: 1px solid var(--border); font-size: 9.5pt; }
+  .phase-ticks span { display: inline-flex; align-items: center; gap: 2mm; }
+  .phase-ticks .checkbox { margin-top: 0; }
+  .sign-cols { display: grid; grid-template-columns: 1fr 1fr; }
+  .sign-col { padding: 4mm 4.5mm 5mm; }
+  .sign-col + .sign-col { border-left: 1px solid var(--border); }
+  .sign-col h3 { font-size: 11pt; margin-bottom: 3mm; }
+  .sign-line { display: grid; grid-template-columns: 20mm 1fr; align-items: end; gap: 2mm; margin-top: 8mm; font-size: 9pt; color: var(--muted); }
+  .sign-line .ln { border-bottom: 1px solid #A8A29E; height: 6mm; }
+  .contact { margin-top: 6mm; display: flex; align-items: center; justify-content: center; gap: 3mm; flex-wrap: wrap; font-size: 10.5pt; }
+  .contact .dot-sep { color: var(--muted); }
+  .thanks { text-align: center; margin-top: 8mm; }
+  .thanks svg { width: 9mm; height: 10.5mm; display: block; margin: 0 auto 2.5mm; }
+  .thanks p { font-family: var(--font-head); font-size: 13pt; font-weight: 500; margin: 0; }
+  .thanks .muted { font-family: var(--font-body); font-size: 9.5pt; margin-top: 1mm; }
+</style>
+</head>
+<body>
+
+<!-- ====================== ICON SPRITE ====================== -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="dropFill" x1="0" y1="0" x2="0.35" y2="1">
+      <stop offset="0" stop-color="#FCD34D"/>
+      <stop offset="0.55" stop-color="#F59E0B"/>
+      <stop offset="1" stop-color="#B45309"/>
+    </linearGradient>
+    <linearGradient id="dropWave" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#14B8A6"/>
+      <stop offset="1" stop-color="#0F766E"/>
+    </linearGradient>
+    <clipPath id="dropClip"><path d="M24 2C24 2 6 24.5 6 37a18 18 0 0 0 36 0C42 24.5 24 2 24 2Z"/></clipPath>
+  </defs>
+  <symbol id="drop" viewBox="0 0 48 56">
+    <path d="M24 2C24 2 6 24.5 6 37a18 18 0 0 0 36 0C42 24.5 24 2 24 2Z" fill="url(#dropFill)"/>
+    <g clip-path="url(#dropClip)">
+      <path d="M0 41c6-3.5 11 2.5 17-.5s10-4 16-.5 9 2.5 15-.5V60H0Z" fill="url(#dropWave)" opacity="0.92"/>
+      <path d="M0 41c6-3.5 11 2.5 17-.5s10-4 16-.5 9 2.5 15-.5" fill="none" stroke="#FFFFFF" stroke-width="1.6" stroke-linecap="round" opacity="0.95"/>
+    </g>
+    <ellipse cx="16.5" cy="31" rx="3" ry="5.5" fill="#FFFFFF" opacity="0.45" transform="rotate(18 16.5 31)"/>
+  </symbol>
+
+  <symbol id="i-chat" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></symbol>
+  <symbol id="i-zap" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8Z"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
+  <symbol id="i-phone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="20" x="5" y="2" rx="2.5"/><path d="M12 18h.01"/></symbol>
+  <symbol id="i-pause" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M10 15V9"/><path d="M14 15V9"/></symbol>
+  <symbol id="i-chart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></symbol>
+  <symbol id="i-history" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></symbol>
+  <symbol id="i-book" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></symbol>
+  <symbol id="i-check-circle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m8.5 12.2 2.4 2.4 4.8-5"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></symbol>
+  <symbol id="i-hand" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 11V6a2 2 0 0 0-4 0v1"/><path d="M14 10V4a2 2 0 0 0-4 0v2"/><path d="M10 10.5V6a2 2 0 0 0-4 0v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></symbol>
+  <symbol id="i-sparkle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.6L19.5 10.5 13.9 12.4 12 18l-1.9-5.6L4.5 10.5l5.6-1.9Z"/><path d="M19 3v4"/><path d="M21 5h-4"/></symbol>
+  <symbol id="i-send" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></symbol>
+  <symbol id="i-heart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></symbol>
+  <symbol id="i-activity" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-6 9H2"/></symbol>
+  <symbol id="i-wrench" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></symbol>
+  <symbol id="i-tag" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12.59 2.59A2 2 0 0 0 11.17 2H4a2 2 0 0 0-2 2v7.17a2 2 0 0 0 .59 1.42l8.7 8.7a2.43 2.43 0 0 0 3.42 0l6.58-6.58a2.43 2.43 0 0 0 0-3.42z"/><circle cx="7.5" cy="7.5" r="1.2" fill="currentColor"/></symbol>
+  <symbol id="i-file" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M9 13h6"/><path d="M9 17h4"/></symbol>
+  <symbol id="i-store" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9h18l-1.5-5h-15Z"/><path d="M4 9v11h16V9"/><path d="M9 20v-6h6v6"/></symbol>
+  <symbol id="i-insta" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="20" x="2" y="2" rx="5.5"/><circle cx="12" cy="12" r="4.2"/><path d="M17.5 6.5h.01"/></symbol>
+  <symbol id="i-wa" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/><path d="M9.2 8.6c.2 2.9 2.6 5.5 5.6 5.9l1-1.2-1.6-.9-.8.7c-1-.4-1.9-1.3-2.4-2.4l.7-.8-.9-1.6Z"/></symbol>
+  <symbol id="i-calendar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/></symbol>
+  <symbol id="i-arrow-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></symbol>
+  <symbol id="i-undo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></symbol>
+  <symbol id="i-headset" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3"/></symbol>
+</svg>
+
+<!-- ====================== 1. COVER ====================== -->
+<section class="cover">
+  <svg class="cover-art" viewBox="0 0 400 400" aria-hidden="true">
+    <defs>
+      <radialGradient id="coasterBase" cx="38%" cy="30%" r="80%">
+        <stop offset="0" stop-color="#FEF3C7"/>
+        <stop offset="0.35" stop-color="#FCD34D"/>
+        <stop offset="0.7" stop-color="#F59E0B"/>
+        <stop offset="1" stop-color="#C2680A"/>
+      </radialGradient>
+      <linearGradient id="sea1" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#2DD4BF"/>
+        <stop offset="1" stop-color="#0F766E"/>
+      </linearGradient>
+      <linearGradient id="sea2" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#0F766E"/>
+        <stop offset="1" stop-color="#134E4A"/>
+      </linearGradient>
+      <clipPath id="coasterClip"><circle cx="200" cy="200" r="186"/></clipPath>
+    </defs>
+    <circle cx="200" cy="200" r="198" fill="#FFFFFF" opacity="0.85"/>
+    <circle cx="200" cy="200" r="198" fill="none" stroke="#F3E3C3" stroke-width="1.5"/>
+    <g clip-path="url(#coasterClip)">
+      <rect width="400" height="400" fill="url(#coasterBase)"/>
+      <!-- gold veins -->
+      <path d="M40 120c50-30 90 10 140-15s80-40 150-10" fill="none" stroke="#FFF7E0" stroke-width="2" opacity="0.6"/>
+      <path d="M20 170c60-20 110 25 170 0s100-30 190 5" fill="none" stroke="#B45309" stroke-width="1.2" opacity="0.35"/>
+      <!-- sand band -->
+      <path d="M0 228c55-26 105 12 165-8s110-30 160-6 60 14 75 8V400H0Z" fill="#FDE9C4"/>
+      <!-- sea layers -->
+      <path d="M0 250c50-24 100 16 160-4s110-30 165-4 55 12 75 6V400H0Z" fill="url(#sea1)"/>
+      <path d="M0 300c60-22 110 14 170-4s105-26 160-2 50 12 70 6V400H0Z" fill="url(#sea2)" opacity="0.95"/>
+      <!-- foam lace -->
+      <path d="M0 250c50-24 100 16 160-4s110-30 165-4 55 12 75 6" fill="none" stroke="#FFFFFF" stroke-width="6" stroke-linecap="round" opacity="0.92"/>
+      <path d="M10 262c40-14 80 10 130-2s95-22 150-4 60 10 90 4" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-dasharray="1 7" stroke-linecap="round" opacity="0.9"/>
+      <path d="M0 300c60-22 110 14 170-4s105-26 160-2 50 12 70 6" fill="none" stroke="#FFFFFF" stroke-width="3.5" stroke-linecap="round" opacity="0.7"/>
+      <path d="M20 312c50-12 90 8 140-2s95-20 140-4" fill="none" stroke="#FFFFFF" stroke-width="1.6" stroke-dasharray="1 6" stroke-linecap="round" opacity="0.7"/>
+      <!-- gold specks -->
+      <g fill="#FFFFFF" opacity="0.85">
+        <circle cx="120" cy="90" r="2.2"/><circle cx="160" cy="70" r="1.4"/><circle cx="250" cy="110" r="1.8"/>
+        <circle cx="300" cy="80" r="1.2"/><circle cx="90" cy="150" r="1.3"/><circle cx="210" cy="160" r="2"/>
+        <circle cx="330" cy="150" r="1.5"/><circle cx="270" cy="190" r="1.1"/>
+      </g>
+      <g fill="#B45309" opacity="0.5">
+        <circle cx="140" cy="130" r="1.3"/><circle cx="230" cy="80" r="1"/><circle cx="310" cy="120" r="1.2"/><circle cx="180" cy="200" r="1"/>
+      </g>
+      <ellipse cx="140" cy="110" rx="70" ry="38" fill="#FFFFFF" opacity="0.18" transform="rotate(-28 140 110)"/>
+    </g>
+    <circle cx="200" cy="200" r="186" fill="none" stroke="#FFFFFF" stroke-width="3" opacity="0.6"/>
+  </svg>
+
+  <div class="brand">
+    <svg viewBox="0 0 48 56" aria-hidden="true"><use href="#drop"/></svg>
+    <div>
+      <div class="wordmark">Saba Art</div>
+      <div class="wordmark-sub">Handmade resin art · Coimbatore, Tamil Nadu</div>
+    </div>
+  </div>
+
+  <div class="cover-main">
+    <div class="cover-title">AI Messaging Assistant</div>
+    <p class="cover-sub">Proposal — instant, accurate replies on WhatsApp &amp; Instagram</p>
+    <div class="cover-line"></div>
+    <div class="cover-meta">
+      <div><div class="k">Prepared for</div><div class="v">Saba Art<span>Coimbatore, Tamil Nadu</span></div></div>
+      <div><div class="k">Prepared by</div><div class="v">Tecza<span>Development team</span></div></div>
+      <div><div class="k">Version</div><div class="v">1.1</div></div>
+      <div><div class="k">Date</div><div class="v">6 October 2026</div></div>
+    </div>
+  </div>
+
+  <div class="cover-foot">
+    <span>Confidential — prepared for Saba Art</span>
+    <span>Tecza</span>
+  </div>
+</section>
+
+<!-- ====================== 2. SUMMARY ====================== -->
+<section class="page">
+  <h1>Summary</h1>
+  <p class="lead">A friendly assistant that answers your customers straight away — so you can spend less time typing and more time making art.</p>
+
+  <h2 style="margin-top:2mm">The challenge</h2>
+  <div class="challenge">
+    <div>
+      <p>Every day, customers message Saba Art on WhatsApp and Instagram with the same questions. How much is this? Do you deliver to my area? How do I look after it? Can you add a name?</p>
+      <p>Many of these messages arrive late at night. When a reply takes hours, an interested buyer can easily move on.</p>
+      <p>And every hour spent typing the same answers is an hour away from your workbench.</p>
+    </div>
+    <div class="phone-mini" aria-label="Illustration of an evening of customer messages">
+      <div class="bar"><b style="color:var(--text)">A typical evening</b><span class="pill amber">4 waiting</span></div>
+      <div class="mini-msg"><span>How much is the wall clock?</span><time>9:48 pm</time></div>
+      <div class="mini-msg"><span>Can you add my daughter’s name?</span><time>10:15 pm</time></div>
+      <div class="mini-msg"><span>Do you ship to Chennai?</span><time>11:02 pm</time></div>
+      <div class="mini-msg" style="margin-bottom:0"><span>How do I clean resin coasters?</span><time>11:40 pm</time></div>
+    </div>
+  </div>
+
+  <h2>Our solution</h2>
+  <div class="solution">
+    <div class="row">
+      <div class="icon-tile"><svg class="icon"><use href="#i-zap"/></svg></div>
+      <p><b>An AI assistant that replies instantly</b>, using Saba Art’s own price list, delivery charges and policies.</p>
+    </div>
+    <div class="row">
+      <div class="icon-tile teal"><svg class="icon"><use href="#i-shield"/></svg></div>
+      <p><b>Anything sensitive is handed straight to you</b> — refunds, complaints, payment questions, or anything it isn’t sure about.</p>
+    </div>
+    <div class="row">
+      <div class="icon-tile green"><svg class="icon"><use href="#i-phone"/></svg></div>
+      <p><b>A simple dashboard on your phone</b> to see every chat, reply yourself, and stay in control.</p>
+    </div>
+  </div>
+
+  <p style="margin-top:5mm">A working demo is ready to show you today. This proposal explains how it works, what it will and won’t do on its own, the two-phase plan to take it live, and the investment involved.</p>
+
+  <div class="glance">
+    <div class="tile"><b>Replies in seconds</b><span>Day or night, weekends and holidays.</span></div>
+    <div class="tile"><b>Never makes up a price</b><span>Answers only from your price list.</span></div>
+    <div class="tile"><b>You stay in control</b><span>Sensitive chats always come to you.</span></div>
+    <div class="tile"><b>Works on your phone</b><span>Install it like an app, with alerts.</span></div>
+  </div>
+</section>
+
+<!-- ====================== 3. HOW IT WORKS ====================== -->
+<section class="page">
+  <h1>How it works</h1>
+  <p class="lead">Here is what happens each time a customer sends Saba Art a message.</p>
+
+  <div class="flow">
+    <div class="step center">
+      <div class="num">1</div>
+      <div class="body">
+        <h3>A customer messages you</h3>
+        <p>On WhatsApp or Instagram, at any time of day.</p>
+      </div>
+      <div class="icon-tile"><svg class="icon"><use href="#i-chat"/></svg></div>
+    </div>
+
+    <svg class="arrow-down" viewBox="0 0 14 24" aria-hidden="true"><path d="M7 1v19" stroke="#D6D3D1" stroke-width="2" stroke-linecap="round"/><path d="M2 16l5 6 5-6" fill="none" stroke="#D6D3D1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+
+    <div class="step center">
+      <div class="num">2</div>
+      <div class="body">
+        <h3>The assistant reads it</h3>
+        <p>It checks the message against your own information — nothing else.</p>
+        <div class="chips">
+          <span class="chip">Price list</span>
+          <span class="chip">Delivery charges</span>
+          <span class="chip">Policies</span>
+          <span class="chip">Your tone</span>
+        </div>
+      </div>
+      <div class="icon-tile"><svg class="icon"><use href="#i-book"/></svg></div>
+    </div>
+
+    <svg class="branch" viewBox="0 0 658 50" aria-hidden="true">
+      <path d="M329 2v18M329 20H160M329 20h169M160 20v22M498 20v22" fill="none" stroke="#D6D3D1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M154 38l6 8 6-8" fill="none" stroke="#047857" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M492 38l6 8 6-8" fill="none" stroke="#F59E0B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      <rect x="196" y="9" width="96" height="20" rx="10" fill="#FFFFFF"/>
+      <text x="244" y="23" text-anchor="middle" font-family="Inter, sans-serif" font-size="11" fill="#047857" font-weight="600">routine</text>
+      <rect x="366" y="9" width="96" height="20" rx="10" fill="#FFFFFF"/>
+      <text x="414" y="23" text-anchor="middle" font-family="Inter, sans-serif" font-size="11" fill="#B45309" font-weight="600">sensitive</text>
+    </svg>
+
+    <div class="flow-row">
+      <div>
+        <div class="step routine">
+          <div class="num green">3a</div>
+          <div class="body">
+            <h3>Routine question</h3>
+            <p>It replies in seconds, in your own friendly tone.</p>
+            <div class="chips">
+              <span class="chip">Prices</span><span class="chip">Delivery</span><span class="chip">Care</span><span class="chip">Custom orders</span>
+            </div>
+          </div>
+        </div>
+        <div class="end-tag"><span class="pill green"><svg class="icon" style="width:12px;height:12px"><use href="#i-check"/></svg> Customer has their answer</span></div>
+      </div>
+      <div>
+        <div class="step sensitive">
+          <div class="num">3b</div>
+          <div class="body">
+            <h3>Sensitive matter</h3>
+            <p>It alerts you and pauses itself for that chat. No automatic reply is sent.</p>
+            <div class="chips">
+              <span class="chip">Refunds</span><span class="chip">Complaints</span><span class="chip">Payments</span>
+            </div>
+          </div>
+        </div>
+        <svg class="arrow-down" viewBox="0 0 14 24" aria-hidden="true"><path d="M7 1v19" stroke="#D6D3D1" stroke-width="2" stroke-linecap="round"/><path d="M2 16l5 6 5-6" fill="none" stroke="#D6D3D1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <div class="step">
+          <div class="num teal">4</div>
+          <div class="body">
+            <h3>You or your helper reply</h3>
+            <p>From the dashboard. The assistant steps back until you hand the chat back to it.</p>
+          </div>
+        </div>
+        <div class="loop-note"><svg class="icon" style="width:14px;height:14px"><use href="#i-undo"/></svg> Mark it done — the assistant takes over again</div>
+      </div>
+    </div>
+  </div>
+
+  <h2 style="margin-top:6mm">Good to know</h2>
+  <div class="panel good-to-know">
+    <div>
+      <h3><svg class="icon"><use href="#i-chat"/></svg> Many messages, one reply</h3>
+      <p>If a customer sends a few short messages in a row, the assistant waits a moment and answers them together.</p>
+    </div>
+    <div>
+      <h3><svg class="icon"><use href="#i-hand"/></svg> Step in any time</h3>
+      <p>If you reply to a customer yourself, the assistant notices and stays out of that chat.</p>
+    </div>
+    <div>
+      <h3><svg class="icon"><use href="#i-history"/></svg> Nothing is lost</h3>
+      <p>Every message and reply is saved, so you can read the whole conversation at any time.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ====================== 4. HANDLES VS COMES TO YOU ====================== -->
+<section class="page">
+  <h1>What it handles — and what comes to you</h1>
+  <p class="lead">The assistant only answers what it can answer from your own information. Everything else is handed over to you (in technical terms, “escalated”).</p>
+
+  <div class="grid-2 split">
+    <div class="card">
+      <div class="head green">
+        <div class="icon-tile green" style="background:#FFFFFF"><svg class="icon"><use href="#i-zap"/></svg></div>
+        <h2>Handled automatically</h2>
+      </div>
+      <ul class="clean">
+        <li><svg class="icon" style="color:var(--success)"><use href="#i-check"/></svg><span>Prices of the products on your list</span></li>
+        <li><svg class="icon" style="color:var(--success)"><use href="#i-check"/></svg><span>Delivery time and charges by area</span></li>
+        <li><svg class="icon" style="color:var(--success)"><use href="#i-check"/></svg><span>Care instructions</span></li>
+        <li><svg class="icon" style="color:var(--success)"><use href="#i-check"/></svg><span>Custom-order options for listed products — for example, a name on a clock</span></li>
+        <li><svg class="icon" style="color:var(--success)"><use href="#i-check"/></svg><span>How many days each product takes to make</span></li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="head amber">
+        <div class="icon-tile" style="background:#FFFFFF"><svg class="icon"><use href="#i-hand"/></svg></div>
+        <h2>Always comes to you</h2>
+      </div>
+      <ul class="clean">
+        <li><svg class="icon" style="color:var(--amber-text)"><use href="#i-arrow-right"/></svg><span>Refunds, returns and cancellations</span></li>
+        <li><svg class="icon" style="color:var(--amber-text)"><use href="#i-arrow-right"/></svg><span>Complaints</span></li>
+        <li><svg class="icon" style="color:var(--amber-text)"><use href="#i-arrow-right"/></svg><span>Damaged or wrong items</span></li>
+        <li><svg class="icon" style="color:var(--amber-text)"><use href="#i-arrow-right"/></svg><span>Payment questions, “I’ve paid” or “Where is my order?”</span></li>
+        <li><svg class="icon" style="color:var(--amber-text)"><use href="#i-arrow-right"/></svg><span>Products that are not on your list</span></li>
+        <li><svg class="icon" style="color:var(--amber-text)"><use href="#i-arrow-right"/></svg><span>Anything it isn’t sure about</span></li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="callout" style="margin-top:5mm">
+    <p><b>The assistant never confirms a payment and never makes up a price</b> — if it isn’t in your price list, it hands over to you.</p>
+  </div>
+
+  <h2 style="margin-top:8mm">When a chat comes to you</h2>
+  <div class="handover-steps">
+    <div class="card">
+      <div class="n">1</div>
+      <h3>You get an alert</h3>
+      <p>A notification on your phone, with an email as a backup, saying which customer needs you and why.</p>
+    </div>
+    <div class="card">
+      <div class="n">2</div>
+      <h3>The assistant goes quiet</h3>
+      <p>It won’t reply in that chat while you or your helper are handling it.</p>
+    </div>
+    <div class="card">
+      <div class="n">3</div>
+      <h3>You hand it back</h3>
+      <p>When you mark the chat as done, the assistant looks after that customer again.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ====================== 5. EXAMPLE CONVERSATIONS ====================== -->
+<section class="page">
+  <h1>Example conversations</h1>
+  <p class="lead">These are real replies from the working demo. The demo uses a sample price list — once set up, the assistant will use your own prices, policies and tone.</p>
+
+  <div class="chats">
+    <!-- 1 -->
+    <div class="chat">
+      <div class="chat-head">
+        <div class="avatar">A</div><span class="who">Anjali</span>
+        <span class="chan"><svg class="icon"><use href="#i-wa"/></svg> WhatsApp</span>
+      </div>
+      <div class="chat-body">
+        <div class="bubble customer">How much is the ocean coaster set?</div>
+        <div class="bubble-label"><svg class="icon"><use href="#i-sparkle"/></svg> Assistant</div>
+        <div class="bubble assistant">Hi! 😊 The Ocean Coaster Set of 4 is ₹1,200. We can customise colours and add a name too! Lead time is about 5 days. Interested?</div>
+      </div>
+      <div class="chat-foot"><svg class="icon" style="color:var(--success)"><use href="#i-check-circle"/></svg> Price question — answered from the price list</div>
+    </div>
+    <!-- 2 -->
+    <div class="chat">
+      <div class="chat-head">
+        <div class="avatar">R</div><span class="who">Rahul</span>
+        <span class="chan"><svg class="icon"><use href="#i-insta"/></svg> Instagram</span>
+      </div>
+      <div class="chat-body">
+        <div class="bubble customer">Do you deliver to Bangalore?</div>
+        <div class="bubble-label"><svg class="icon"><use href="#i-sparkle"/></svg> Assistant</div>
+        <div class="bubble assistant">Yes, we deliver all over India! Bangalore takes 7-10 days, and shipping is ₹120. Want to place an order?</div>
+      </div>
+      <div class="chat-foot"><svg class="icon" style="color:var(--success)"><use href="#i-check-circle"/></svg> Delivery question — time and charge by area</div>
+    </div>
+    <!-- 3 -->
+    <div class="chat">
+      <div class="chat-head">
+        <div class="avatar">K</div><span class="who">Kavya</span>
+        <span class="chan"><svg class="icon"><use href="#i-wa"/></svg> WhatsApp</span>
+      </div>
+      <div class="chat-body">
+        <div class="bubble customer">I want a custom clock with my daughter’s name</div>
+        <div class="bubble-label"><svg class="icon"><use href="#i-sparkle"/></svg> Assistant</div>
+        <div class="bubble assistant">Of course! 💕 The 12 inch clock with her name is ₹2,800. Which colours does she like? I’ll send some options!</div>
+      </div>
+      <div class="chat-foot"><svg class="icon" style="color:var(--success)"><use href="#i-check-circle"/></svg> Custom order — options from your price list</div>
+    </div>
+    <!-- 4 -->
+    <div class="chat">
+      <div class="chat-head">
+        <div class="avatar">S</div><span class="who">Suresh</span>
+        <span class="chan"><svg class="icon"><use href="#i-insta"/></svg> Instagram</span>
+      </div>
+      <div class="chat-body">
+        <div class="bubble customer">I want a refund</div>
+        <div class="system-note">
+          <div class="line">No automatic reply sent</div>
+          <span class="handed"><svg class="icon"><use href="#i-alert"/></svg> Handed over to you — Refund request</span>
+          <span class="pill amber"><svg class="icon" style="width:11px;height:11px"><use href="#i-bell"/></svg> Alert sent to you</span>
+        </div>
+      </div>
+      <div class="chat-foot"><svg class="icon" style="color:var(--amber-text)"><use href="#i-hand"/></svg> Sensitive — the assistant pauses for this chat</div>
+    </div>
+  </div>
+
+  <div class="callout" style="margin-top:6mm">
+    <p><b>Your tone, your words.</b> Before going live, you share a few example replies written the way you normally talk to customers. The assistant follows that style — warm, short and friendly.</p>
+  </div>
+</section>
+
+<!-- ====================== 6. KEY FEATURES ====================== -->
+<section class="page">
+  <h1>Key features</h1>
+  <p class="lead">Everything you need to keep customers happy without being glued to your phone — and you can update your price list yourself, any time.</p>
+
+  <div class="features">
+    <div class="card feature">
+      <div class="icon-tile"><svg class="icon"><use href="#i-zap"/></svg></div>
+      <div><h3>Instant replies, 24/7</h3><p>Routine questions are answered in seconds — late at night, on Sundays and during festival rush.</p></div>
+    </div>
+    <div class="card feature">
+      <div class="icon-tile"><svg class="icon"><use href="#i-book"/></svg></div>
+      <div><h3>Uses only your information</h3><p>Answers come from your price list, delivery charges and policies. If it isn’t there, it hands over to you.</p></div>
+    </div>
+    <div class="card feature">
+      <div class="icon-tile"><svg class="icon"><use href="#i-shield"/></svg></div>
+      <div><h3>Knows when to hand over</h3><p>Refunds, complaints, payment claims and anything unclear come straight to you, with an alert.</p></div>
+    </div>
+    <div class="card feature">
+      <div class="icon-tile"><svg class="icon"><use href="#i-users"/></svg></div>
+      <div><h3>Your helpers can join</h3><p>Give helpers their own login. They see only the chats handed to them — nothing else.</p></div>
+    </div>
+    <div class="card feature">
+      <div class="icon-tile"><svg class="icon"><use href="#i-phone"/></svg></div>
+      <div><h3>Dashboard on your phone</h3><p>Install it on your home screen like an app, and get a notification for every new hand-over.</p></div>
+    </div>
+    <div class="card feature">
+      <div class="icon-tile"><svg class="icon"><use href="#i-pause"/></svg></div>
+      <div><h3>Pause any time</h3><p>One switch stops all automatic replies. New messages are still saved for you to answer.</p></div>
+    </div>
+    <div class="card feature">
+      <div class="icon-tile"><svg class="icon"><use href="#i-chart"/></svg></div>
+      <div><h3>See how it’s doing</h3><p>Messages received, how many were answered automatically, and how quickly customers got a reply.</p></div>
+    </div>
+    <div class="card feature">
+      <div class="icon-tile"><svg class="icon"><use href="#i-history"/></svg></div>
+      <div><h3>Full history</h3><p>A record of every reply — whether it came from you, a helper or the assistant — and when.</p></div>
+    </div>
+  </div>
+
+  <div class="panel" style="margin-top:6mm; display:flex; gap:3.5mm; align-items:flex-start">
+    <div class="icon-tile teal" style="background:#FFFFFF"><svg class="icon"><use href="#i-lock"/></svg></div>
+    <div>
+      <h3>Who sees what</h3>
+      <p class="small" style="margin:0">You (the owner) see everything: all chats, your price list, reports, settings and the full history. Helpers see only the chats handed over to them, so customer details stay private.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ====================== 7. ROADMAP ====================== -->
+<section class="page">
+  <h1>Roadmap — two phases</h1>
+  <p class="lead">We build in two clear steps: first the demo, then going live with your real customers — together with tools for orders and customers.</p>
+
+  <div class="timeline">
+    <div class="track"></div>
+    <div class="nodes">
+      <div class="node"><div class="dot done">1</div><b>Demo</b><span class="small muted" style="display:block">By 20 Oct 2026</span><span class="pill green">In progress</span></div>
+      <div class="node"><div class="dot">2</div><b>Go live, with orders &amp; customers</b><span class="small muted" style="display:block">By 30 Oct 2026</span><span class="pill amber">Next</span></div>
+    </div>
+  </div>
+
+  <div class="card phase p1">
+    <div class="phase-head"><span class="tag">Phase 1</span><h3>Demo</h3><span class="pill green">In progress</span><span class="dur"><svg class="icon" style="width:14px;height:14px"><use href="#i-calendar"/></svg><b>Target:</b> 20 Oct 2026</span></div>
+    <ul class="items">
+      <li>AI replies to routine questions</li>
+      <li>Hand-over to you or your helpers</li>
+      <li>Dashboard for owner and staff</li>
+      <li>Edit your price list yourself</li>
+      <li>Reports (analytics)</li>
+      <li>Activity history</li>
+      <li>Test mode — try it safely with pretend customers</li>
+    </ul>
+  </div>
+
+  <div class="card phase">
+    <div class="phase-head"><span class="tag">Phase 2</span><h3>Go live, with orders &amp; customers</h3><span class="pill amber">Next</span><span class="dur"><svg class="icon" style="width:14px;height:14px"><use href="#i-calendar"/></svg><b>Target:</b> 30 Oct 2026</span></div>
+    <ul class="items">
+      <li>Connect your real business WhatsApp number and Instagram account</li>
+      <li>Meta business verification and app approval (review time is set by Meta)</li>
+      <li>Replies sent to real customers</li>
+      <li>Alerts on your phone and by email</li>
+      <li>Order board: pending → confirmed → in production → dispatched → delivered</li>
+      <li>Customer lists: favourites, priority, repeat buyers</li>
+    </ul>
+  </div>
+
+  <div class="panel" style="margin-top:5mm; display:flex; gap:3.5mm; align-items:flex-start">
+    <div class="icon-tile teal" style="background:#FFFFFF"><svg class="icon"><use href="#i-headset"/></svg></div>
+    <div>
+      <h3>After go-live</h3>
+      <p class="small" style="margin:0">Support is included for the first 3 months — monitoring, fixes, small updates and help with your price list. After that, support is charged based on the issues that come up and any new requirements.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ====================== 8. WHAT WE NEED FROM YOU ====================== -->
+<section class="page">
+  <h1>What we need from you</h1>
+  <p class="lead">A short checklist to get Saba Art live. Don’t worry if some of this is new — we’ll guide you through each item during setup.</p>
+
+  <div class="grid-2" style="gap:6mm">
+    <div class="need-group">
+      <h2><span class="icon-tile" style="width:28px;height:28px"><svg class="icon" style="width:16px;height:16px"><use href="#i-store"/></svg></span> Accounts &amp; documents</h2>
+      <ul class="checklist">
+        <li><span class="checkbox"></span><div><b>Facebook Business (Meta Business) account</b><span class="why">In the business name. WhatsApp and Instagram are connected through it.</span></div></li>
+        <li><span class="checkbox"></span><div><b>Instagram as a Professional account</b><span class="why">A free switch in Instagram settings. Needed for automatic replies.</span></div></li>
+        <li><span class="checkbox"></span><div><b>A phone number for WhatsApp</b><span class="why">One that isn’t already being used on the WhatsApp app.</span></div></li>
+        <li><span class="checkbox"></span><div><b>Business documents for Meta verification</b><span class="why">For example, your business registration certificate or PAN.</span></div></li>
+        <li><span class="checkbox"></span><div><b>A short privacy-policy page</b><span class="why">Meta asks for one. We can help you prepare it.</span></div></li>
+      </ul>
+    </div>
+    <div class="need-group">
+      <h2><span class="icon-tile" style="width:28px;height:28px"><svg class="icon" style="width:16px;height:16px"><use href="#i-file"/></svg></span> Your business details</h2>
+      <ul class="checklist">
+        <li><span class="checkbox"></span><div><b>Your price list, delivery charges and policies</b><span class="why">Confirm what’s correct today — this is what the assistant will use to reply.</span></div></li>
+        <li><span class="checkbox"></span><div><b>A few example replies in your tone</b><span class="why">How you’d normally answer a price or delivery question.</span></div></li>
+        <li><span class="checkbox"></span><div><b>Names and emails of your helpers</b><span class="why">Anyone who should get their own login to the dashboard.</span></div></li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="panel" style="margin-top:6mm; display:flex; gap:3.5mm; align-items:flex-start">
+    <div class="icon-tile" style="background:#FFFFFF"><svg class="icon"><use href="#i-calendar"/></svg></div>
+    <div>
+      <h3>When we need it</h3>
+      <p class="small" style="margin:0">The accounts and documents are needed before Phase 2 (going live) — please share them as early as possible, because Meta’s review takes time. Your price list, policies and example replies can be shared any time — the sooner the better, so the demo can show your real details.</p>
+    </div>
+  </div>
+
+  <div class="callout" style="margin-top:4mm">
+    <p><b>Your accounts stay in your name.</b> The WhatsApp number, Instagram account and Meta Business account all belong to Saba Art. We only connect the assistant to them.</p>
+  </div>
+</section>
+
+<!-- ====================== 9. INVESTMENT ====================== -->
+<section class="page">
+  <h1>Investment</h1>
+  <p class="lead">A one-time cost for each phase, support included for the first three months after go-live, and small running costs paid to the services the assistant uses.</p>
+
+  <div class="table-wrap">
+    <table class="price">
+      <tbody>
+        <tr class="group"><th colspan="2">One-time</th></tr>
+        <tr>
+          <td><span class="item">Phase 1 — Demo</span><span class="desc">AI replies, hand-over, dashboard for you and your helpers, price-list editing, reports, activity history and test mode. Paid as the advance.</span></td>
+          <td class="amt"><b>₹15,000</b></td>
+        </tr>
+        <tr>
+          <td><span class="item">Phase 2 — Go live, with orders &amp; customers</span><span class="desc">Connect WhatsApp &amp; Instagram, Meta verification, replies to real customers, phone and email alerts, order board and customer lists.</span></td>
+          <td class="amt"><b>₹20,000</b></td>
+        </tr>
+        <tr class="total">
+          <td>Total one-time</td>
+          <td class="amt">₹35,000</td>
+        </tr>
+
+        <tr class="group"><th colspan="2">Support &amp; maintenance</th></tr>
+        <tr>
+          <td><span class="item">First 3 months after go-live</span><span class="desc">Monitoring, fixes, small updates, price-list help and renewing connections.</span></td>
+          <td class="amt"><b>Included</b></td>
+        </tr>
+        <tr>
+          <td><span class="item">After 3 months</span><span class="desc">Charged based on the issues that come up and any new requirements.</span></td>
+          <td class="amt">Cost may vary</td>
+        </tr>
+
+        <tr class="group"><th colspan="2">Running costs <span class="muted">Paid to service providers — billed by them directly or passed through at cost</span></th></tr>
+        <tr>
+          <td><span class="item">AI usage (Google Gemini)</span><span class="desc">Grows with the number of messages answered.</span></td>
+          <td class="amt">Under process</td>
+        </tr>
+        <tr>
+          <td><span class="item">Server hosting &amp; database</span><span class="desc">Keeps the assistant and dashboard running, and your chats stored.</span></td>
+          <td class="amt">Under process</td>
+        </tr>
+        <tr>
+          <td><span class="item">WhatsApp messaging (Meta)</span><span class="desc">Replies within 24 hours of a customer’s message are currently free; other messages are charged by Meta per message.</span></td>
+          <td class="amt">Based on usage</td>
+        </tr>
+        <tr>
+          <td><span class="item">Email notifications</span><span class="desc">Hand-over alerts and helper welcome emails.</span></td>
+          <td class="amt">Free</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="terms">
+    <div class="card"><div class="k">Payment terms</div><div class="v"><b>Two payments</b> — ₹15,000 advance to start the demo phase, and ₹20,000 at go-live.</div></div>
+  </div>
+</section>
+
+<!-- ====================== 10. TIMELINE + 11. SUPPORT ====================== -->
+<section class="page">
+  <h1>Timeline</h1>
+  <p class="lead">The two phases run one after another, each with a target date.</p>
+
+  <div class="card gantt">
+    <div class="g-row">
+      <div class="g-label"><b>Phase 1</b>Demo</div>
+      <div class="g-track"><div class="g-bar p1" style="left:0;width:58.3%">Demo</div></div>
+      <div class="g-weeks">By <b>20 Oct 2026</b></div>
+    </div>
+    <div class="g-row">
+      <div class="g-label"><b>Phase 2</b>Go live, with orders &amp; customers</div>
+      <div class="g-track">
+        <div class="g-bar p2" style="left:58.3%;width:41.7%">Go live</div>
+        <div class="g-hatch" style="left:79.2%;width:20.8%"></div>
+        <div class="milestone" style="left:100%"></div>
+      </div>
+      <div class="g-weeks">By <b>30 Oct 2026</b></div>
+    </div>
+
+    <div class="g-legend">
+      <span><i class="swatch" style="background:repeating-linear-gradient(135deg,#FBBF24 0 3px,#F59E0B 3px 6px)"></i> Waiting for Meta’s review</span>
+      <span><i class="milestone" style="position:static;transform:rotate(45deg);display:inline-block;width:9px;height:9px"></i> Live with real customers</span>
+    </div>
+  </div>
+
+  <div class="callout" style="margin-top:4mm">
+    <p><b>Meta’s review is outside our control.</b> Meta (the company behind WhatsApp and Instagram) must verify your business and approve the app before we can go live. We prepare everything in advance and keep you updated, but how long the review takes is decided by Meta — so the 30 October go-live date depends on Meta’s approval.</p>
+  </div>
+
+  <h1 style="margin-top:9mm">Support &amp; why Tecza</h1>
+  <div class="grid-2" style="gap:5mm; align-items:stretch">
+    <div class="card">
+      <h2 style="margin-top:0">What support covers</h2>
+      <p class="small muted" style="margin:0 0 1mm">Included for the first 3 months after go-live.</p>
+      <ul class="clean">
+        <li><svg class="icon" style="color:var(--teal)"><use href="#i-activity"/></svg><span>Round-the-clock monitoring, with automatic alerts if anything goes down</span></li>
+        <li><svg class="icon" style="color:var(--teal)"><use href="#i-wrench"/></svg><span>Fixing any issues that come up</span></li>
+        <li><svg class="icon" style="color:var(--teal)"><use href="#i-refresh"/></svg><span>Keeping your WhatsApp and Instagram connections renewed</span></li>
+        <li><svg class="icon" style="color:var(--teal)"><use href="#i-tag"/></svg><span>Help updating your prices and products</span></li>
+        <li><svg class="icon" style="color:var(--teal)"><use href="#i-chart"/></svg><span>A monthly summary of how the assistant is used</span></li>
+      </ul>
+    </div>
+    <div class="card">
+      <h2 style="margin-top:0">Why Tecza</h2>
+      <ul class="clean why">
+        <li><svg class="icon" style="color:var(--amber-text)"><use href="#i-heart"/></svg><span><b>Built for Saba Art</b> — around your products, prices and customers, not a generic chatbot.</span></li>
+        <li><svg class="icon" style="color:var(--amber-text)"><use href="#i-phone"/></svg><span><b>Simple to use</b> — one dashboard on your phone for every chat.</span></li>
+        <li><svg class="icon" style="color:var(--amber-text)"><use href="#i-shield"/></svg><span><b>Safety first</b> — sensitive matters always come to you. It never guesses.</span></li>
+        <li><svg class="icon" style="color:var(--amber-text)"><use href="#i-lock"/></svg><span><b>You own your data</b> — your customers, chats and price list belong to Saba Art.</span></li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ====================== 12. NEXT STEPS & ACCEPTANCE ====================== -->
+<section class="page">
+  <h1>Next steps</h1>
+  <p class="lead">Four simple steps from here to your assistant answering real customers.</p>
+
+  <div class="next">
+    <div class="card"><div class="n">1</div><h3>Review this proposal</h3><p>Take your time and note any questions.</p></div>
+    <div class="card"><div class="n">2</div><h3>Live demo walkthrough</h3><p>See the working demo answer real-style messages.</p></div>
+    <div class="card"><div class="n">3</div><h3>Confirm phases and sign</h3><p>Choose the phases you want and sign below.</p></div>
+    <div class="card"><div class="n">4</div><h3>Advance &amp; we begin</h3><p>With the ₹15,000 advance, we complete the demo, then take you live.</p></div>
+  </div>
+
+  <h2 style="margin-top:9mm">Acceptance</h2>
+  <div class="accept">
+    <div class="accept-head"><p>By signing below, both parties agree to go ahead with the selected phases on the prices and terms in this proposal.</p></div>
+    <div class="phase-ticks">
+      <b style="margin-right:2mm">Phases confirmed:</b>
+      <span><i class="checkbox"></i> Phase 1 — Demo</span>
+      <span><i class="checkbox"></i> Phase 2 — Go live, with orders &amp; customers</span>
+    </div>
+    <div class="sign-cols">
+      <div class="sign-col">
+        <h3>Accepted by — Saba Art</h3>
+        <div class="sign-line"><span>Name</span><span class="ln"></span></div>
+        <div class="sign-line"><span>Signature</span><span class="ln"></span></div>
+        <div class="sign-line"><span>Date</span><span class="ln"></span></div>
+      </div>
+      <div class="sign-col">
+        <h3>For Tecza</h3>
+        <div class="sign-line"><span>Name</span><span class="ln"></span></div>
+        <div class="sign-line"><span>Signature</span><span class="ln"></span></div>
+        <div class="sign-line"><span>Date</span><span class="ln"></span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="contact">
+    <b>Tecza</b>
+    <span class="dot-sep">·</span>
+    <span><span class="fill">______________</span> (phone)</span>
+    <span class="dot-sep">·</span>
+    <span><span class="fill">____________________</span> (email)</span>
+  </div>
+
+  <div class="thanks">
+    <svg viewBox="0 0 48 56" aria-hidden="true"><use href="#drop"/></svg>
+    <p>Thank you for considering Tecza.</p>
+    <p class="muted">We’d love to help Saba Art spend less time typing and more time creating.</p>
+  </div>
+</section>
+
+</body>
+</html>

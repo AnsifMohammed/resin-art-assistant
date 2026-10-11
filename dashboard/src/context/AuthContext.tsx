@@ -1,16 +1,21 @@
-import { createContext, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router-dom";
 import * as Sentry from "@sentry/react";
+import { toast } from "sonner";
 import * as authApi from "../api/auth.ts";
 import { clearToken, getToken, isApiError, setToken, setUnauthorizedHandler } from "../api/client.ts";
 import type { AuthUser, JwtPayload, Role } from "../types/index.ts";
 
+export type { AuthUser, Role };
 export type AuthStatus = "loading" | "authenticated" | "anonymous";
 
 export interface AuthContextValue {
   status: AuthStatus;
+  isAuthenticated: boolean;
+  /** The signed-in user, as returned by the backend (POST /auth/login or GET /auth/me). */
   user: AuthUser | null;
+  /** Role from the backend user/JWT only. Never set client-side. */
   role: Role | null;
   isAdmin: boolean;
   /** Throws ApiError on failure (401 invalid credentials, 403 deactivated, 429 rate limited). */
@@ -58,6 +63,9 @@ async function purgeDeviceState(): Promise<void> {
   await Promise.all(tasks);
 }
 
+/** Legacy key from the mock-data prototype; removed so no fake session lingers on this device. */
+const LEGACY_MOCK_USER_KEY = "saba_art_auth_user";
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -68,6 +76,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Latest location for the 401 handler without re-registering it each navigation.
   const locationRef = useRef(location);
   locationRef.current = location;
+
+  useEffect(() => {
+    try {
+      localStorage.removeItem(LEGACY_MOCK_USER_KEY);
+      localStorage.removeItem("saba_art_ai_paused");
+    } catch {
+      /* storage unavailable */
+    }
+  }, []);
 
   const clearSession = useCallback(() => {
     clearToken();
@@ -140,12 +157,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await authApi.logout().catch(() => undefined);
     clearSession();
     await purgeDeviceState();
+    toast.info("Logged out");
     navigate("/login", { replace: true });
   }, [clearSession, navigate]);
 
   const value = useMemo<AuthContextValue>(
     () => ({
       status,
+      isAuthenticated: status === "authenticated" && user !== null,
       user,
       role: user?.role ?? null,
       isAdmin: user?.role === "admin",
@@ -156,4 +175,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
+
+export function useAuth(): AuthContextValue {
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error("useAuth must be used inside <AuthProvider>");
+  return ctx;
 }

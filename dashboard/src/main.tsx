@@ -9,8 +9,9 @@ import {
   useLocation,
   useNavigationType,
 } from "react-router-dom";
+import { Toaster } from "sonner";
 import App from "./App.tsx";
-import { ToastProvider } from "./components/ui/Toast.tsx";
+import { ThemeProvider } from "./context/ThemeContext.tsx";
 import { AuthProvider } from "./context/AuthContext.tsx";
 import { RealtimeProvider } from "./context/RealtimeContext.tsx";
 import { queryClient } from "./lib/queryClient.ts";
@@ -21,8 +22,6 @@ Sentry.init({
   environment: import.meta.env.MODE,
   enabled: import.meta.env.PROD && Boolean(import.meta.env.VITE_SENTRY_DSN),
   integrations: [
-    // Deprecated alias of reactRouterBrowserTracingIntegration in @sentry/react 11; kept to match CLAUDE.md.
-    // eslint-disable-next-line @typescript-eslint/no-deprecated
     Sentry.reactRouterV7BrowserTracingIntegration({
       useEffect: React.useEffect,
       useLocation,
@@ -41,13 +40,15 @@ ReactDOM.createRoot(root).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
-        <ToastProvider>
+        <ThemeProvider>
           <AuthProvider>
+            {/* One shared realtime connection (socket status, cache updates, 5s polling fallback). */}
             <RealtimeProvider>
               <App />
             </RealtimeProvider>
+            <Toaster richColors duration={4000} position="bottom-right" />
           </AuthProvider>
-        </ToastProvider>
+        </ThemeProvider>
       </BrowserRouter>
     </QueryClientProvider>
   </React.StrictMode>,

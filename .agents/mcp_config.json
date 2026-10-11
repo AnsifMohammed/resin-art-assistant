@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "lovable": {
+      "serverUrl": "https://mcp.lovable.dev",
+      "oauth": {
+        "clientId": "6d465f583e1e4ce5801b1616f735670c"
+      }
+    }
+  }
+}

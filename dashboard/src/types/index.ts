@@ -415,6 +415,8 @@ export interface KnowledgeBaseData {
     note: string;
     lead_time_extra_days: number;
     items_not_in_catalogue: string;
+    bulk_discount_qty?: number;
+    bulk_discount_percent?: number;
   };
   delivery: {
     zones: KbDeliveryZone[];

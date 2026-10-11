@@ -1,0 +1,11 @@
+{
+  "servers": {
+    "lovable": {
+      "type": "http",
+      "url": "https://mcp.lovable.dev",
+      "auth": {
+        "CLIENT_ID": "6d465f583e1e4ce5801b1616f735670c"
+      }
+    }
+  }
+}
