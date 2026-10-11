@@ -29,9 +29,11 @@ function Section({
       {items.length === 0 ? (
         <p className="rounded-xl border border-dashed border-gray-200 px-4 py-6 text-center text-sm text-gray-500">{empty}</p>
       ) : (
-        <ul className="grid gap-3 md:grid-cols-2">
+        // <ul className="grid gap-3 md:grid-cols-2">
+        <ul className="mx-auto grid w-full max-w-3xl grid-cols-1 justify-items-center gap-4">
+
           {items.map((e) => (
-            <li key={e.id} className="min-w-0">
+            <li key={e.id} className="w-full min-w-0">
               <EscalationCard escalation={e} currentUserId={userId} isAdmin={false} />
             </li>
           ))}
