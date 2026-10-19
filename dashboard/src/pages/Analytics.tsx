@@ -866,78 +866,125 @@ export default function Analytics() {
         </div>
       </div>
 
-      {/* ─── Section 3: Bottom 2×2 Grid (All 4 Cards Matched to 390px with Inside Scroll) ── */}
+      {/* ─── Section 3: Bottom 2×2 Grid ──────────────────────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-stretch">
         {/* Card 1: Revenue by Channel */}
-        <div className="p-5 rounded-xl border border-border bg-surface flex flex-col justify-between h-[390px]">
-          <div className="h-[44px] shrink-0 mb-3 flex items-center justify-between">
-            <SectionHeading title="Revenue by channel" sample />
-            <span className="text-12 text-text-muted shrink-0">Proportion split</span>
+        <div className="p-5 rounded-xl border border-border bg-surface flex flex-col justify-between">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <SectionHeading title="Revenue by channel" sample />
+              <p className="text-11 text-text-muted mt-0.5">Sales contribution by messaging channel</p>
+            </div>
+            <span className="text-12 text-text-muted font-medium bg-surface-muted px-2.5 py-1 rounded-full border border-border/50 shrink-0">
+              Proportion split
+            </span>
           </div>
 
-          <div className="flex-1 flex flex-col justify-between min-h-0 space-y-3">
-            {/* Stat Cards Pair */}
-            <div className="grid grid-cols-2 gap-3 shrink-0">
-              <div className="p-3.5 rounded-lg border border-border/60 bg-surface-muted">
-                <div className="flex items-center justify-between gap-1 mb-1">
+          <div className="space-y-3.5 flex-1 flex flex-col justify-between">
+            {/* Top: Stat Cards Pair */}
+            <div className="grid grid-cols-2 gap-3.5">
+              <div className="p-3.5 rounded-xl border border-border/60 bg-surface-muted">
+                <div className="flex items-center justify-between gap-1 mb-1.5">
                   <div className="flex items-center gap-1.5">
                     <ChannelIcon channel="whatsapp" size={14} />
-                    <span className="text-12 text-text-muted font-medium">WhatsApp</span>
+                    <span className="text-12 text-text font-semibold">WhatsApp</span>
                   </div>
-                  <span className="text-11 font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">
+                  <span className="text-11 font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">
                     {sample.channelSplit.whatsapp.percentage}%
                   </span>
                 </div>
                 <p className="text-22 font-bold font-outfit text-text tabular-nums">
                   ₹{sample.channelSplit.whatsapp.revenue.toLocaleString("en-IN")}
                 </p>
-                <p className="text-11 text-text-muted mt-0.5">
+                <p className="text-11 text-text-muted mt-1">
                   {sample.channelSplit.whatsapp.orders} orders · ₹2,111 avg
                 </p>
               </div>
 
-              <div className="p-3.5 rounded-lg border border-border/60 bg-surface-muted">
-                <div className="flex items-center justify-between gap-1 mb-1">
+              <div className="p-3.5 rounded-xl border border-border/60 bg-surface-muted">
+                <div className="flex items-center justify-between gap-1 mb-1.5">
                   <div className="flex items-center gap-1.5">
                     <ChannelIcon channel="instagram" size={14} />
-                    <span className="text-12 text-text-muted font-medium">Instagram</span>
+                    <span className="text-12 text-text font-semibold">Instagram</span>
                   </div>
-                  <span className="text-11 font-medium text-amber-600 dark:text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded">
+                  <span className="text-11 font-bold text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full">
                     {sample.channelSplit.instagram.percentage}%
                   </span>
                 </div>
                 <p className="text-22 font-bold font-outfit text-text tabular-nums">
                   ₹{sample.channelSplit.instagram.revenue.toLocaleString("en-IN")}
                 </p>
-                <p className="text-11 text-text-muted mt-0.5">
+                <p className="text-11 text-text-muted mt-1">
                   {sample.channelSplit.instagram.orders} orders · ₹2,100 avg
                 </p>
               </div>
             </div>
 
-            {/* Proportion Bar */}
-            <div className="space-y-1.5 shrink-0">
-              <div className="h-3.5 w-full bg-border/40 rounded-full overflow-hidden flex">
+            {/* Middle: Proportion Bar Graph */}
+            <div className="space-y-2 p-3 rounded-xl border border-border/40 bg-surface-muted/30">
+              <div className="flex justify-between text-12 font-medium">
+                <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-semibold">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500" /> WhatsApp ({sample.channelSplit.whatsapp.percentage}%)
+                </span>
+                <span className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400 font-semibold">
+                  <span className="w-2 h-2 rounded-full bg-amber-500" /> Instagram ({sample.channelSplit.instagram.percentage}%)
+                </span>
+              </div>
+              <div className="h-4 w-full bg-border/40 rounded-full overflow-hidden flex p-0.5 shadow-inner">
                 <div
                   style={{ width: `${sample.channelSplit.whatsapp.percentage}%` }}
-                  className="bg-emerald-500 h-full transition-all duration-500"
+                  className="bg-emerald-500 h-full rounded-full transition-all duration-500 flex items-center justify-center text-[10px] text-white font-bold"
                   title={`WhatsApp: ${sample.channelSplit.whatsapp.percentage}%`}
-                />
+                >
+                  {sample.channelSplit.whatsapp.percentage >= 15 && `${sample.channelSplit.whatsapp.percentage}%`}
+                </div>
                 <div
                   style={{ width: `${sample.channelSplit.instagram.percentage}%` }}
-                  className="bg-amber-500 h-full transition-all duration-500"
+                  className="bg-amber-500 h-full rounded-full transition-all duration-500 flex items-center justify-center text-[10px] text-white font-bold"
                   title={`Instagram: ${sample.channelSplit.instagram.percentage}%`}
-                />
+                >
+                  {sample.channelSplit.instagram.percentage >= 15 && `${sample.channelSplit.instagram.percentage}%`}
+                </div>
               </div>
-              <div className="flex justify-between text-11 text-text-muted font-medium">
-                <span>WhatsApp ({sample.channelSplit.whatsapp.percentage}%)</span>
-                <span>Instagram ({sample.channelSplit.instagram.percentage}%)</span>
+              <div className="flex justify-between text-11 text-text-muted pt-0.5">
+                <span>₹{sample.channelSplit.whatsapp.revenue.toLocaleString("en-IN")} total volume</span>
+                <span>₹{sample.channelSplit.instagram.revenue.toLocaleString("en-IN")} total volume</span>
               </div>
             </div>
 
-            {/* Channel Insights Footer */}
-            <div className="p-2.5 rounded-lg border border-border/40 bg-surface-muted/50 text-12 text-text-muted flex items-center justify-between shrink-0">
-              <span className="inline-flex items-center gap-1 text-text font-medium">
+            {/* Bottom: Channel Orders Breakdown */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between text-11">
+                <p className="font-semibold text-text">
+                  Channel conversion details:
+                </p>
+                <span className="text-text-muted">Order distribution</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-12 font-medium">
+                <div className="flex items-center justify-between p-2 rounded-lg bg-surface-muted/60 border border-border/50">
+                  <span className="flex items-center gap-1.5 text-text truncate pr-1">
+                    <ChannelIcon channel="whatsapp" size={13} />
+                    <span className="truncate">WhatsApp Orders</span>
+                  </span>
+                  <span className="text-emerald-600 dark:text-emerald-400 font-bold tabular-nums shrink-0">
+                    {sample.channelSplit.whatsapp.orders} ({sample.channelSplit.whatsapp.percentage}%)
+                  </span>
+                </div>
+                <div className="flex items-center justify-between p-2 rounded-lg bg-surface-muted/60 border border-border/50">
+                  <span className="flex items-center gap-1.5 text-text truncate pr-1">
+                    <ChannelIcon channel="instagram" size={13} />
+                    <span className="truncate">Instagram Orders</span>
+                  </span>
+                  <span className="text-amber-600 dark:text-amber-400 font-bold tabular-nums shrink-0">
+                    {sample.channelSplit.instagram.orders} ({sample.channelSplit.instagram.percentage}%)
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer: Channel Insights */}
+            <div className="p-2.5 rounded-lg border border-border/40 bg-surface-muted/50 text-12 text-text-muted flex items-center justify-between">
+              <span className="inline-flex items-center gap-1.5 text-text font-medium">
                 <TrendingUp className="w-3.5 h-3.5 text-primary" /> Key Channel Trend:
               </span>
               <span>WhatsApp leads repeat conversions (92%)</span>
@@ -946,8 +993,8 @@ export default function Analytics() {
         </div>
 
         {/* Card 2: AI Performance */}
-        <div className="p-5 rounded-xl border border-border bg-surface flex flex-col justify-between h-[390px]">
-          <div className="h-[44px] shrink-0 mb-3 flex items-center justify-between">
+        <div className="p-5 rounded-xl border border-border bg-surface flex flex-col justify-between">
+          <div className="flex items-center justify-between mb-4">
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-16 font-semibold font-outfit text-text">
@@ -955,68 +1002,120 @@ export default function Analytics() {
                 </h2>
                 <SampleDataBadge />
               </div>
-              <p className="text-11 text-text-muted">
+              <p className="text-11 text-text-muted mt-0.5">
                 Auto-replied vs escalated inbound inquiries
               </p>
             </div>
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-11 font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 shrink-0">
-              <Bot className="w-3.5 h-3.5" /> {effectiveAutoPct}% automation
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-12 font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 shrink-0">
+              <Bot className="w-4 h-4" /> {effectiveAutoPct}% automation
             </span>
           </div>
 
-          <div className="flex-1 flex flex-col justify-between min-h-0 space-y-3">
-            {/* Stacked Horizontal Bar */}
-            <div className="space-y-2 shrink-0">
-              <div className="flex justify-between text-12 font-medium">
-                <span className="text-emerald-600 dark:text-emerald-400">
-                  Auto-replied {effectiveAutoPct}% ({effectiveAutoReplies})
-                </span>
-                <span className="text-danger">
-                  Escalated {effectiveEscPct}% ({effectiveEscalations})
-                </span>
+          <div className="space-y-3.5 flex-1 flex flex-col justify-between">
+            {/* Top: Stat Cards Pair matching Card 1 */}
+            <div className="grid grid-cols-2 gap-3.5">
+              <div className="p-3.5 rounded-xl border border-border/60 bg-surface-muted">
+                <div className="flex items-center justify-between gap-1 mb-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <Bot className="w-3.5 h-3.5 text-emerald-500" />
+                    <span className="text-12 text-text font-semibold">Auto-replied</span>
+                  </div>
+                  <span className="text-11 font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">
+                    {effectiveAutoPct}%
+                  </span>
+                </div>
+                <p className="text-22 font-bold font-outfit text-text tabular-nums">
+                  {effectiveAutoReplies.toLocaleString("en-IN")}
+                </p>
+                <p className="text-11 text-text-muted mt-1">
+                  Resolved autonomously
+                </p>
               </div>
-              <div className="h-3.5 w-full bg-border/40 rounded-full overflow-hidden flex">
-                <div
-                  style={{ width: `${Math.min(100, effectiveAutoPct)}%` }}
-                  className="bg-emerald-500 h-full transition-all duration-500"
-                  title="Auto-replied"
-                />
-                <div
-                  style={{ width: `${Math.max(0, Math.min(100 - Math.min(100, effectiveAutoPct), effectiveEscPct))}%` }}
-                  className="bg-red-500 h-full transition-all duration-500"
-                  title="Escalated to human"
-                />
+
+              <div className="p-3.5 rounded-xl border border-border/60 bg-surface-muted">
+                <div className="flex items-center justify-between gap-1 mb-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <AlertTriangle className="w-3.5 h-3.5 text-rose-500" />
+                    <span className="text-12 text-text font-semibold">Escalated</span>
+                  </div>
+                  <span className="text-11 font-bold text-rose-600 dark:text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded-full">
+                    {effectiveEscPct}%
+                  </span>
+                </div>
+                <p className="text-22 font-bold font-outfit text-text tabular-nums">
+                  {effectiveEscalations.toLocaleString("en-IN")}
+                </p>
+                <p className="text-11 text-text-muted mt-1">
+                  Handed over to staff
+                </p>
               </div>
             </div>
 
-            {/* Escalation Reasons Breakdown */}
-            <div className="pt-2 border-t border-border/40 shrink-0">
-              <p className="text-12 font-medium text-text mb-2">
-                Escalation reasons breakdown:
-              </p>
-              <div className="flex flex-wrap gap-2">
+            {/* Middle: Proportion Bar Graph (IN THE MIDDLE!) */}
+            <div className="space-y-2 p-3 rounded-xl border border-border/40 bg-surface-muted/30">
+              <div className="flex justify-between text-12 font-medium">
+                <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-semibold">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500" /> Auto-replied ({effectiveAutoPct}%)
+                </span>
+                <span className="flex items-center gap-1.5 text-rose-600 dark:text-rose-400 font-semibold">
+                  <span className="w-2 h-2 rounded-full bg-rose-500" /> Escalated ({effectiveEscPct}%)
+                </span>
+              </div>
+              <div className="h-4 w-full bg-border/40 rounded-full overflow-hidden flex p-0.5 shadow-inner">
+                <div
+                  style={{ width: `${Math.min(100, effectiveAutoPct)}%` }}
+                  className="bg-emerald-500 h-full rounded-full transition-all duration-500 flex items-center justify-center text-[10px] text-white font-bold"
+                  title="Auto-replied"
+                >
+                  {effectiveAutoPct >= 15 && `${effectiveAutoPct}%`}
+                </div>
+                <div
+                  style={{ width: `${Math.max(0, Math.min(100 - Math.min(100, effectiveAutoPct), effectiveEscPct))}%` }}
+                  className="bg-red-500 h-full rounded-full transition-all duration-500 flex items-center justify-center text-[10px] text-white font-bold"
+                  title="Escalated to human"
+                >
+                  {effectiveEscPct >= 15 && `${effectiveEscPct}%`}
+                </div>
+              </div>
+              <div className="flex justify-between text-11 text-text-muted pt-0.5">
+                <span>{effectiveAutoReplies.toLocaleString("en-IN")} total automated replies</span>
+                <span>{effectiveEscalations.toLocaleString("en-IN")} total escalations</span>
+              </div>
+            </div>
+
+            {/* Bottom: Escalation Reasons Breakdown */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between text-11">
+                <p className="font-semibold text-text">
+                  Escalation reasons breakdown:
+                </p>
+                <span className="text-text-muted">{effectiveReasons.length} categories</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
                 {effectiveReasons.map((r) => (
-                  <span
+                  <div
                     key={r.reason}
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-11 font-medium bg-surface-muted border border-border/60 text-text"
+                    className="flex items-center justify-between p-2 rounded-lg bg-surface-muted/60 border border-border/50 text-12 font-medium"
                     title={`${r.reason}: ${r.percentage}%`}
                   >
-                    <span
-                      className="w-2 h-2 rounded-full"
-                      style={{ backgroundColor: r.color }}
-                    />
-                    <span>{r.reason}</span>
-                    <span className="text-text-muted tabular-nums">
+                    <span className="flex items-center gap-1.5 truncate pr-1">
+                      <span
+                        className="w-2 h-2 rounded-full shrink-0"
+                        style={{ backgroundColor: r.color }}
+                      />
+                      <span className="truncate text-text">{r.reason}</span>
+                    </span>
+                    <span className="text-text-muted tabular-nums shrink-0 font-semibold">
                       {r.percentage}%
                     </span>
-                  </span>
+                  </div>
                 ))}
               </div>
             </div>
 
-            {/* Automation Summary note */}
-            <div className="p-2.5 rounded-lg border border-border/40 bg-surface-muted/50 text-12 text-text-muted flex items-center justify-between shrink-0">
-              <span className="inline-flex items-center gap-1 text-text font-medium">
+            {/* Footer: Automation Summary note */}
+            <div className="p-2.5 rounded-lg border border-border/40 bg-surface-muted/50 text-12 text-text-muted flex items-center justify-between">
+              <span className="inline-flex items-center gap-1.5 text-text font-medium">
                 <Bot className="w-3.5 h-3.5 text-violet-500" /> Resolution Health:
               </span>
               <span>Routine orders resolved without human intervention</span>

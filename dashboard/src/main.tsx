@@ -46,7 +46,12 @@ ReactDOM.createRoot(root).render(
             <RealtimeProvider>
               <App />
             </RealtimeProvider>
-            <Toaster richColors duration={4000} position="bottom-right" />
+            <Toaster
+              richColors
+              duration={4000}
+              position="top-right"
+              mobileOffset={{ top: 12, right: 12, left: 12 }}
+            />
           </AuthProvider>
         </ThemeProvider>
       </BrowserRouter>

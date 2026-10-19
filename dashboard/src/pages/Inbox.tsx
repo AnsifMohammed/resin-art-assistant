@@ -21,6 +21,7 @@ import {
   PanelRightClose,
   PanelRightOpen,
   Filter,
+  ArrowLeft,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "../context/AuthContext.tsx";
@@ -45,13 +46,27 @@ export default function Inbox() {
   const selectedConvId = searchParams.get("c") || mockConversations[0]?.id;
   const channelParam = searchParams.get("channel");
 
+  // Mobile responsive view: either shows conversation list or chat pane
+  const [mobileView, setMobileView] = useState<"list" | "chat">(() => {
+    if (typeof window !== "undefined" && window.innerWidth < 768) {
+      return searchParams.has("c") ? "chat" : "list";
+    }
+    return "list";
+  });
+
   const [conversations, setConversations] = useState<Conversation[]>(mockConversations);
   const [filterState, setFilterState] = useState<FilterState>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [messageText, setMessageText] = useState("");
   const [showWhyId, setShowWhyId] = useState<string | null>(null);
   const [isTyping, setIsTyping] = useState(false);
-  const [showCustomerPanel, setShowCustomerPanel] = useState(true);
+  // Default customer panel open only on xl+ screens (>= 1280px) to prevent crushing chat on tablet/mobile
+  const [showCustomerPanel, setShowCustomerPanel] = useState<boolean>(() => {
+    if (typeof window !== "undefined") {
+      return window.innerWidth >= 1280;
+    }
+    return false;
+  });
   const [showTemplatePicker, setShowTemplatePicker] = useState(false);
   const [templateSearch, setTemplateSearch] = useState("");
   const [showResolveModal, setShowResolveModal] = useState(false);
@@ -157,6 +172,7 @@ export default function Inbox() {
     setConversations((prev) =>
       prev.map((c) => (c.id === id ? { ...c, unread: false } : c))
     );
+    setMobileView("chat");
   };
 
   const handleSendMessage = () => {
@@ -266,10 +282,13 @@ export default function Inbox() {
   };
 
   return (
-    <div className="flex h-full w-full overflow-hidden bg-bg">
-      {/* ─── Pane 1: Conversation List (340px) ─────────────────────────────────── */}
-      <div className="w-full sm:w-[340px] shrink-0 border-r border-border bg-surface flex flex-col h-full z-10">
-        <div className="p-3.5 border-b border-border/70 space-y-2.5 shrink-0">
+    <div className="flex h-full w-full overflow-hidden bg-bg relative">
+      {/* ─── Pane 1: Conversation List (Responsive width) ─────────────────────────── */}
+      <div
+        className={`${mobileView === "list" ? "flex" : "hidden md:flex"
+          } w-full md:w-[300px] lg:w-[320px] xl:w-[340px] shrink-0 border-r border-border bg-surface flex-col h-full z-10`}
+      >
+        <div className="p-3 sm:p-3.5 border-b border-border/70 space-y-2 shrink-0">
           <div className="relative">
             <Search className="absolute left-3 top-2.5 w-4 h-4 text-text-muted" />
             <input
@@ -284,61 +303,55 @@ export default function Inbox() {
           <div className="flex items-center gap-1.5 overflow-x-auto custom-scrollbar pb-1 text-12 font-medium">
             <button
               onClick={() => setFilterState("all")}
-              className={`px-2.5 py-1 rounded-md transition-colors shrink-0 cursor-pointer ${
-                filterState === "all"
+              className={`px-2.5 py-1 rounded-md transition-colors shrink-0 cursor-pointer ${filterState === "all"
                   ? "bg-primary text-primary-foreground font-semibold"
                   : "bg-surface-muted text-text-muted hover:text-text"
-              }`}
+                }`}
             >
               All ({conversations.length})
             </button>
             <button
               onClick={() => setFilterState("unread")}
-              className={`px-2.5 py-1 rounded-md transition-colors shrink-0 cursor-pointer ${
-                filterState === "unread"
+              className={`px-2.5 py-1 rounded-md transition-colors shrink-0 cursor-pointer ${filterState === "unread"
                   ? "bg-primary text-primary-foreground font-semibold"
                   : "bg-surface-muted text-text-muted hover:text-text"
-              }`}
+                }`}
             >
               Unread
             </button>
             <button
               onClick={() => setFilterState("ai_active")}
-              className={`px-2.5 py-1 rounded-md transition-colors shrink-0 cursor-pointer ${
-                filterState === "ai_active"
+              className={`px-2.5 py-1 rounded-md transition-colors shrink-0 cursor-pointer ${filterState === "ai_active"
                   ? "bg-primary text-primary-foreground font-semibold"
                   : "bg-surface-muted text-text-muted hover:text-text"
-              }`}
+                }`}
             >
               AI active
             </button>
             <button
               onClick={() => setFilterState("escalated")}
-              className={`px-2.5 py-1 rounded-md transition-colors shrink-0 cursor-pointer ${
-                filterState === "escalated"
+              className={`px-2.5 py-1 rounded-md transition-colors shrink-0 cursor-pointer ${filterState === "escalated"
                   ? "bg-danger text-white font-semibold"
                   : "bg-surface-muted text-danger hover:bg-danger/10"
-              }`}
+                }`}
             >
               Escalated
             </button>
             <button
               onClick={() => setFilterState("owner_handling")}
-              className={`px-2.5 py-1 rounded-md transition-colors shrink-0 cursor-pointer ${
-                filterState === "owner_handling"
+              className={`px-2.5 py-1 rounded-md transition-colors shrink-0 cursor-pointer ${filterState === "owner_handling"
                   ? "bg-primary text-primary-foreground font-semibold"
                   : "bg-surface-muted text-text-muted hover:text-text"
-              }`}
+                }`}
             >
               Human handling
             </button>
             <button
               onClick={() => setFilterState("paused")}
-              className={`px-2.5 py-1 rounded-md transition-colors shrink-0 cursor-pointer ${
-                filterState === "paused"
+              className={`px-2.5 py-1 rounded-md transition-colors shrink-0 cursor-pointer ${filterState === "paused"
                   ? "bg-primary text-primary-foreground font-semibold"
                   : "bg-surface-muted text-text-muted hover:text-text"
-              }`}
+                }`}
             >
               Paused
             </button>
@@ -359,13 +372,12 @@ export default function Inbox() {
                 <div
                   key={c.id}
                   onClick={() => selectConversation(c.id)}
-                  className={`p-3.5 transition-all cursor-pointer relative ${
-                    isSelected
-                      ? "bg-primary/10 border-l-4 border-l-primary"
-                      : c.isPriority
-                        ? "border-l-4 border-l-red-500 bg-surface hover:bg-surface-muted"
-                        : "border-l-4 border-l-transparent bg-surface hover:bg-surface-muted"
-                  }`}
+                  className={`p-3.5 transition-all cursor-pointer relative ${isSelected
+                    ? "bg-primary/10 border-l-4 border-l-primary"
+                    : c.isPriority
+                      ? "border-l-4 border-l-red-500 bg-surface hover:bg-surface-muted"
+                      : "border-l-4 border-l-transparent bg-surface hover:bg-surface-muted"
+                    }`}
                 >
                   <div className="flex items-start justify-between gap-2 mb-1">
                     <div className="flex items-center gap-2 min-w-0">
@@ -439,65 +451,88 @@ export default function Inbox() {
       </div>
 
       {/* ─── Pane 2: Middle Chat Area (Flex-1) ─────────────────────────────────── */}
-      <div className="flex-1 flex flex-col h-full bg-surface-muted/30 min-w-0">
+      <div
+        className={`${mobileView === "chat" ? "flex" : "hidden md:flex"
+          } flex-1 flex-col h-full bg-surface-muted/30 min-w-0 relative`}
+      >
         {activeConv ? (
-          <div className="p-3.5 border-b border-border bg-surface flex items-center justify-between gap-3 shrink-0">
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="w-9 h-9 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center font-bold text-14 font-outfit text-primary-text shrink-0">
+          <div className="p-3 sm:p-3.5 border-b border-border bg-surface flex items-center justify-between gap-2 sm:gap-3 shrink-0">
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+              {/* Back to conversations button on mobile */}
+              <button
+                type="button"
+                onClick={() => setMobileView("list")}
+                className="md:hidden p-1.5 -ml-1 rounded-lg text-text-muted hover:text-text hover:bg-surface-muted transition shrink-0 cursor-pointer"
+                title="Back to conversations"
+                aria-label="Back to conversations"
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </button>
+
+              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center font-bold text-13 sm:text-14 font-outfit text-primary-text shrink-0">
                 {activeConv.customerName[0]}
               </div>
               <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <h2 className="text-15 font-semibold text-text truncate">
+                <div className="flex items-center gap-1.5 sm:gap-2">
+                  <h2 className="text-14 sm:text-15 font-semibold text-text truncate">
                     {activeConv.customerName}
                   </h2>
-                  <ChannelIcon channel={activeConv.channel} size={14} />
+                  <ChannelIcon channel={activeConv.channel} size={14} className="shrink-0" />
                   {activeConv.state === "escalated" && (
-                    <span className="px-2 py-0.5 rounded-full text-11 font-medium bg-red-500/10 text-red-600 dark:text-red-400 shrink-0">
-                      Escalated: {activeConv.escalationReason || "Human requested"}
+                    <span className="px-1.5 sm:px-2 py-0.5 rounded-full text-[10px] sm:text-11 font-medium bg-red-500/10 text-red-600 dark:text-red-400 shrink-0">
+                      <span className="hidden sm:inline">Escalated: {activeConv.escalationReason || "Human requested"}</span>
+                      <span className="sm:hidden">Escalated</span>
                     </span>
                   )}
                 </div>
-                <div className="flex items-center gap-2 text-11 text-text-muted mt-0.5">
-                  <span>{activeConv.customerHandle}</span>
-                  <span>·</span>
-                  <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400 font-medium">
-                    <Clock className="w-3 h-3" /> 24h window: 18h remaining
+                <div className="flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-11 text-text-muted mt-0.5 truncate">
+                  <span className="truncate">{activeConv.customerHandle}</span>
+                  <span className="hidden xs:inline">·</span>
+                  <span className="hidden xs:flex items-center gap-1 text-amber-600 dark:text-amber-400 font-medium shrink-0">
+                    <Clock className="w-3 h-3" /> 24h window: 18h
                   </span>
                 </div>
               </div>
             </div>
 
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
               <button
+                type="button"
                 onClick={togglePauseAI}
-                className="px-2.5 py-1.5 rounded-lg border border-border bg-surface hover:bg-surface-muted text-12 font-medium text-text flex items-center gap-1.5 transition-colors cursor-pointer"
+                className="px-2 sm:px-2.5 py-1.5 rounded-lg border border-border bg-surface hover:bg-surface-muted text-xs font-medium text-text flex items-center gap-1 sm:gap-1.5 transition-colors cursor-pointer"
                 title="Pause or resume AI automation for this customer"
               >
                 {activeConv.state === "paused" ? (
                   <>
-                    <PlayCircle className="w-3.5 h-3.5 text-emerald-500" /> Resume AI
+                    <PlayCircle className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                    <span className="hidden sm:inline">Resume AI</span>
                   </>
                 ) : (
                   <>
-                    <PauseCircle className="w-3.5 h-3.5 text-amber-500" /> Pause AI
+                    <PauseCircle className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                    <span className="hidden sm:inline">Pause AI</span>
                   </>
                 )}
               </button>
 
               <button
+                type="button"
                 onClick={() => setShowResolveModal(true)}
-                className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-12 font-medium flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer"
+                className="px-2.5 sm:px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium flex items-center gap-1 sm:gap-1.5 transition-colors shadow-xs cursor-pointer"
+                title="Mark conversation resolved"
               >
-                <CheckCircle2 className="w-3.5 h-3.5" /> Mark resolved
+                <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                <span className="hidden sm:inline">Mark resolved</span>
+                <span className="sm:hidden">Resolve</span>
               </button>
 
               <button
+                type="button"
                 onClick={() => setShowCustomerPanel(!showCustomerPanel)}
-                className={`p-1.5 rounded-lg border border-border transition-colors cursor-pointer ${
-                  showCustomerPanel ? "bg-surface-muted text-text" : "bg-surface text-text-muted hover:text-text"
-                }`}
+                className={`p-1.5 rounded-lg border border-border transition-colors cursor-pointer ${showCustomerPanel ? "bg-surface-muted text-text ring-1 ring-primary/20" : "bg-surface text-text-muted hover:text-text"
+                  }`}
                 title="Toggle customer details panel"
+                aria-label="Toggle customer details panel"
               >
                 {showCustomerPanel ? (
                   <PanelRightClose className="w-4 h-4" />
@@ -548,13 +583,12 @@ export default function Inbox() {
                 </div>
 
                 <div
-                  className={`max-w-[78%] md:max-w-[65%] rounded-2xl p-3.5 shadow-xs text-13 leading-relaxed relative ${
-                    isCustomer
-                      ? "bg-surface border border-border text-text rounded-tl-sm"
-                      : isAI
-                        ? "bg-gradient-to-br from-violet-600/90 to-violet-700 text-white rounded-tr-sm"
-                        : "bg-primary text-primary-foreground rounded-tr-sm font-medium"
-                  }`}
+                  className={`max-w-[85%] sm:max-w-[78%] md:max-w-[65%] rounded-2xl p-3 sm:p-3.5 shadow-xs text-13 leading-relaxed relative ${isCustomer
+                    ? "bg-surface border border-border text-text rounded-tl-sm"
+                    : isAI
+                      ? "bg-gradient-to-br from-violet-600/90 to-violet-700 text-white rounded-tr-sm"
+                      : "bg-primary text-primary-foreground rounded-tr-sm font-medium"
+                    }`}
                 >
                   <p className="whitespace-pre-wrap">{m.text}</p>
 
@@ -567,9 +601,8 @@ export default function Inbox() {
                         <Sparkles className="w-3 h-3" />
                         <span>AI reasoning: {m.aiReasoning.intent}</span>
                         <ChevronDown
-                          className={`w-3 h-3 transition-transform ${
-                            showWhyId === m.id ? "rotate-180" : ""
-                          }`}
+                          className={`w-3 h-3 transition-transform ${showWhyId === m.id ? "rotate-180" : ""
+                            }`}
                         />
                       </button>
 
@@ -630,38 +663,43 @@ export default function Inbox() {
               className="w-full bg-transparent resize-none border-none text-13 text-text placeholder:text-text-muted focus:outline-none"
             />
 
-            <div className="flex items-center justify-between pt-2 border-t border-border/40 text-12">
-              <div className="flex items-center gap-2">
+            <div className="flex items-center justify-between pt-2 border-t border-border/40 text-12 gap-2">
+              <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
                 <button
+                  type="button"
                   onClick={() => setShowTemplatePicker(true)}
-                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface border border-border/80 hover:bg-surface-muted text-text font-medium transition-colors cursor-pointer"
+                  className="inline-flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-lg bg-surface border border-border/80 hover:bg-surface-muted text-text font-medium transition-colors cursor-pointer shrink-0 text-11 sm:text-12"
                 >
-                  <FileText className="w-3.5 h-3.5 text-primary" />
-                  <span>Use template</span>
+                  <FileText className="w-3.5 h-3.5 text-primary shrink-0" />
+                  <span className="hidden sm:inline">Use template</span>
+                  <span className="sm:hidden">Template</span>
                 </button>
 
                 <button
+                  type="button"
                   onClick={() => toast.info("Image attachment dialog simulated")}
-                  className="p-1.5 rounded-lg text-text-muted hover:text-text hover:bg-surface transition-colors cursor-pointer"
+                  className="p-1 sm:p-1.5 rounded-lg text-text-muted hover:text-text hover:bg-surface transition-colors cursor-pointer shrink-0"
                   title="Attach reference image or catalogue item"
                 >
                   <Paperclip className="w-4 h-4" />
                 </button>
 
                 <button
+                  type="button"
                   onClick={() => setIsTyping(!isTyping)}
-                  className="text-11 text-text-muted hover:underline cursor-pointer"
+                  className="text-11 text-text-muted hover:underline cursor-pointer hidden md:inline truncate"
                 >
                   {isTyping ? "Stop typing" : "Simulate customer typing"}
                 </button>
               </div>
 
-              <div className="flex items-center gap-2">
-                <span className="text-11 text-text-muted hidden sm:inline">⌘+Enter</span>
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="text-11 text-text-muted hidden lg:inline">⌘+Enter</span>
                 <button
+                  type="button"
                   onClick={handleSendMessage}
                   disabled={!messageText.trim()}
-                  className="px-3.5 py-1.5 rounded-lg bg-primary text-primary-foreground font-semibold text-12 inline-flex items-center gap-1.5 hover:bg-amber-600 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-xs"
+                  className="px-3 sm:px-3.5 py-1.5 rounded-lg bg-primary text-primary-foreground font-semibold text-12 inline-flex items-center gap-1.5 hover:bg-amber-600 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-xs shrink-0"
                 >
                   <span>Send</span>
                   <Send className="w-3.5 h-3.5" />
@@ -672,131 +710,145 @@ export default function Inbox() {
         </div>
       </div>
 
-      {/* ─── Pane 3: Collapsible Customer Panel (300px) ─────────────────────────── */}
+      {/* ─── Pane 3: Collapsible Customer Profile Panel ─────────────────────────── */}
       {showCustomerPanel && activeCustomer && (
-        <div className="w-[300px] shrink-0 border-l border-border bg-surface flex flex-col h-full overflow-y-auto custom-scrollbar p-4 space-y-4">
-          <div className="flex items-center justify-between pb-3 border-b border-border/60">
-            <h3 className="text-14 font-semibold font-outfit text-text">Customer Profile</h3>
-            <button
-              onClick={() => setShowCustomerPanel(false)}
-              className="p-1 rounded-md text-text-muted hover:text-text hover:bg-surface-muted cursor-pointer"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
+        <>
+          {/* Backdrop on screens < xl to allow full width for chat */}
+          <div
+            className="fixed inset-0 bg-black/40 backdrop-blur-xs z-40 xl:hidden animate-in fade-in duration-200"
+            onClick={() => setShowCustomerPanel(false)}
+            aria-hidden="true"
+          />
 
-          <div className="text-center p-3 rounded-xl border border-border/60 bg-surface-muted">
-            <div className="w-14 h-14 rounded-full bg-primary/20 border-2 border-primary mx-auto flex items-center justify-center font-bold text-20 font-outfit text-primary-text mb-2">
-              {activeCustomer.name[0]}
-            </div>
-            <h4 className="text-15 font-bold font-outfit text-text">{activeCustomer.name}</h4>
-            <div className="flex items-center justify-center gap-1 text-12 text-text-muted mt-0.5">
-              <ChannelIcon channel={activeCustomer.channel} size={12} />
-              <span>{activeCustomer.handleOrPhone}</span>
-            </div>
-            <p className="text-11 text-text-muted mt-1">{activeCustomer.city}</p>
-          </div>
-
-          <div className="grid grid-cols-2 gap-2 text-center">
-            <div className="p-2.5 rounded-lg border border-border/60 bg-surface-muted">
-              <p className="text-11 text-text-muted font-medium">Total Spend</p>
-              <p className="text-16 font-bold font-outfit text-text mt-0.5 tabular-nums">
-                ₹{activeCustomer.totalSpend.toLocaleString("en-IN")}
-              </p>
-            </div>
-            <div className="p-2.5 rounded-lg border border-border/60 bg-surface-muted">
-              <p className="text-11 text-text-muted font-medium">Orders</p>
-              <p className="text-16 font-bold font-outfit text-text mt-0.5 tabular-nums">
-                {activeCustomer.ordersCount}
-              </p>
-            </div>
-          </div>
-
-          <div className="space-y-1.5">
-            <p className="text-11 font-semibold uppercase tracking-wider text-text-muted">
-              Customer Segments
-            </p>
-            <div className="flex flex-wrap gap-1.5">
-              {activeCustomer.isFavourite && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-11 font-medium bg-amber-500/15 text-amber-600 dark:text-amber-400">
-                  <Star className="w-3 h-3 fill-amber-500" /> Favourite
-                </span>
-              )}
-              {activeCustomer.isPriority && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-11 font-medium bg-red-500/15 text-red-600 dark:text-red-400">
-                  Priority
-                </span>
-              )}
-              {activeCustomer.isRecentOrder && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-11 font-medium bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
-                  Recent buyer
-                </span>
-              )}
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-11 font-medium bg-surface-muted text-text-muted border border-border/60">
-                Tamil & English
-              </span>
-            </div>
-          </div>
-
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between">
-              <p className="text-11 font-semibold uppercase tracking-wider text-text-muted">
-                Studio Notes
-              </p>
-              <span className="text-[10px] text-text-muted">Auto-saves</span>
-            </div>
-            <textarea
-              rows={3}
-              defaultValue={activeCustomer.notes}
-              onChange={() => toast.success("Customer notes saved", { duration: 1500 })}
-              className="w-full p-2 rounded-lg border border-border bg-surface-muted text-12 text-text focus:outline-none focus:ring-1 focus:ring-primary"
-            />
-          </div>
-
-          <div className="space-y-2 pt-2 border-t border-border/60">
-            <div className="flex items-center justify-between">
-              <p className="text-11 font-semibold uppercase tracking-wider text-text-muted">
-                Order History
-              </p>
+          <aside
+            className="fixed inset-y-0 right-0 z-50 w-full sm:w-[340px] max-w-[88vw] xl:relative xl:inset-auto xl:z-auto xl:w-[300px] 2xl:w-[320px] shrink-0 border-l border-border bg-surface flex flex-col h-full overflow-y-auto custom-scrollbar p-4 space-y-4 shadow-2xl xl:shadow-none animate-in slide-in-from-right duration-200"
+            aria-label="Customer Profile"
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-border/60">
+              <h3 className="text-14 font-semibold font-outfit text-text">Customer Profile</h3>
               <button
-                onClick={() => navigate("/orders")}
-                className="text-11 text-primary-text font-medium hover:underline cursor-pointer"
+                type="button"
+                onClick={() => setShowCustomerPanel(false)}
+                className="p-1 rounded-md text-text-muted hover:text-text hover:bg-surface-muted cursor-pointer"
+                aria-label="Close customer profile"
               >
-                All orders →
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            {customerOrders.length === 0 ? (
-              <div className="p-3 rounded-lg border border-border/40 bg-surface-muted text-center text-11 text-text-muted">
-                No confirmed orders yet
+            <div className="text-center p-3 rounded-xl border border-border/60 bg-surface-muted">
+              <div className="w-14 h-14 rounded-full bg-primary/20 border-2 border-primary mx-auto flex items-center justify-center font-bold text-20 font-outfit text-primary-text mb-2">
+                {activeCustomer.name[0]}
               </div>
-            ) : (
-              customerOrders.map((o) => (
-                <div
-                  key={o.id}
+              <h4 className="text-15 font-bold font-outfit text-text">{activeCustomer.name}</h4>
+              <div className="flex items-center justify-center gap-1 text-12 text-text-muted mt-0.5">
+                <ChannelIcon channel={activeCustomer.channel} size={12} />
+                <span>{activeCustomer.handleOrPhone}</span>
+              </div>
+              <p className="text-11 text-text-muted mt-1">{activeCustomer.city}</p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 text-center">
+              <div className="p-2.5 rounded-lg border border-border/60 bg-surface-muted">
+                <p className="text-11 text-text-muted font-medium">Total Spend</p>
+                <p className="text-16 font-bold font-outfit text-text mt-0.5 tabular-nums">
+                  ₹{activeCustomer.totalSpend.toLocaleString("en-IN")}
+                </p>
+              </div>
+              <div className="p-2.5 rounded-lg border border-border/60 bg-surface-muted">
+                <p className="text-11 text-text-muted font-medium">Orders</p>
+                <p className="text-16 font-bold font-outfit text-text mt-0.5 tabular-nums">
+                  {activeCustomer.ordersCount}
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <p className="text-11 font-semibold uppercase tracking-wider text-text-muted">
+                Customer Segments
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {activeCustomer.isFavourite && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-11 font-medium bg-amber-500/15 text-amber-600 dark:text-amber-400">
+                    <Star className="w-3 h-3 fill-amber-500" /> Favourite
+                  </span>
+                )}
+                {activeCustomer.isPriority && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-11 font-medium bg-red-500/15 text-red-600 dark:text-red-400">
+                    Priority
+                  </span>
+                )}
+                {activeCustomer.isRecentOrder && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-11 font-medium bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
+                    Recent buyer
+                  </span>
+                )}
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-11 font-medium bg-surface-muted text-text-muted border border-border/60">
+                  Tamil & English
+                </span>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <p className="text-11 font-semibold uppercase tracking-wider text-text-muted">
+                  Studio Notes
+                </p>
+                <span className="text-[10px] text-text-muted">Auto-saves</span>
+              </div>
+              <textarea
+                rows={3}
+                defaultValue={activeCustomer.notes}
+                onChange={() => toast.success("Customer notes saved", { duration: 1500 })}
+                className="w-full p-2 rounded-lg border border-border bg-surface-muted text-12 text-text focus:outline-none focus:ring-1 focus:ring-primary"
+              />
+            </div>
+
+            <div className="space-y-2 pt-2 border-t border-border/60">
+              <div className="flex items-center justify-between">
+                <p className="text-11 font-semibold uppercase tracking-wider text-text-muted">
+                  Order History
+                </p>
+                <button
                   onClick={() => navigate("/orders")}
-                  className="p-2.5 rounded-lg border border-border/60 bg-surface-muted hover:bg-surface transition-colors cursor-pointer space-y-1"
+                  className="text-11 text-primary-text font-medium hover:underline cursor-pointer"
                 >
-                  <div className="flex items-center justify-between">
-                    <span className="text-12 font-bold font-outfit text-text">{o.orderNumber}</span>
-                    <span className="text-11 font-semibold tabular-nums text-text">
-                      ₹{o.total.toLocaleString("en-IN")}
-                    </span>
-                  </div>
-                  <p className="text-11 text-text-muted truncate">
-                    {o.items.map((i) => i.name).join(", ")}
-                  </p>
-                  <div className="flex items-center justify-between pt-1 text-[10px]">
-                    <span className="px-1.5 py-0.2 rounded font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 capitalize">
-                      {o.status.replace("_", " ")}
-                    </span>
-                    <span className="text-text-muted">{o.createdAt}</span>
-                  </div>
+                  All orders →
+                </button>
+              </div>
+
+              {customerOrders.length === 0 ? (
+                <div className="p-3 rounded-lg border border-border/40 bg-surface-muted text-center text-11 text-text-muted">
+                  No confirmed orders yet
                 </div>
-              ))
-            )}
-          </div>
-        </div>
+              ) : (
+                customerOrders.map((o) => (
+                  <div
+                    key={o.id}
+                    onClick={() => navigate("/orders")}
+                    className="p-2.5 rounded-lg border border-border/60 bg-surface-muted hover:bg-surface transition-colors cursor-pointer space-y-1"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-12 font-bold font-outfit text-text">{o.orderNumber}</span>
+                      <span className="text-11 font-semibold tabular-nums text-text">
+                        ₹{o.total.toLocaleString("en-IN")}
+                      </span>
+                    </div>
+                    <p className="text-11 text-text-muted truncate">
+                      {o.items.map((i) => i.name).join(", ")}
+                    </p>
+                    <div className="flex items-center justify-between pt-1 text-[10px]">
+                      <span className="px-1.5 py-0.2 rounded font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 capitalize">
+                        {o.status.replace("_", " ")}
+                      </span>
+                      <span className="text-text-muted">{o.createdAt}</span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </aside>
+        </>
       )}
 
       {showTemplatePicker && (

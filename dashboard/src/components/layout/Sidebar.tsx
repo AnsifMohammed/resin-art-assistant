@@ -115,36 +115,61 @@ export function Sidebar() {
       }`}
     >
       {/* Brand Header */}
-      <div className="h-14 flex items-center justify-between px-3.5 border-b border-border">
+      <div
+        className={`h-14 flex items-center border-b border-border transition-all ${
+          collapsed ? "justify-center px-2" : "justify-between px-3.5"
+        }`}
+      >
         {!collapsed ? (
-          <div className="flex items-center gap-2.5 min-w-0">
-            {/* Saba Resin Drop Mark */}
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-amber-600 to-amber-400 flex items-center justify-center text-white font-bold shadow-xs shrink-0">
-              <span className="text-sm">S</span>
+          <>
+            <div className="flex items-center gap-2.5 min-w-0">
+              {/* Saba Resin Drop Mark */}
+              <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-amber-600 to-amber-400 flex items-center justify-center text-white font-bold shadow-xs shrink-0 aspect-square">
+                <span className="text-sm">S</span>
+              </div>
+              <div className="flex flex-col min-w-0">
+                <span className="font-display font-bold text-sm tracking-tight text-text truncate">
+                  Saba Art
+                </span>
+                <span className="text-[10px] text-text-muted truncate">Coimbatore</span>
+              </div>
             </div>
-            <div className="flex flex-col min-w-0">
-              <span className="font-display font-bold text-sm tracking-tight text-text truncate">
-                Saba Art
-              </span>
-              <span className="text-[10px] text-text-muted truncate">Coimbatore</span>
-            </div>
-          </div>
-        ) : (
-          <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-amber-600 to-amber-400 flex items-center justify-center text-white font-bold shadow-xs mx-auto">
-            <span className="text-sm">S</span>
-          </div>
-        )}
 
-        {/* Collapse toggle button */}
-        <button
-          type="button"
-          onClick={toggleCollapsed}
-          className="p-1 rounded-md text-text-muted hover:text-text hover:bg-surface-muted transition"
-          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-        >
-          {collapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
-        </button>
+            {/* Collapse toggle button */}
+            <button
+              type="button"
+              onClick={toggleCollapsed}
+              className="p-1 rounded-md text-text-muted hover:text-text hover:bg-surface-muted transition shrink-0 cursor-pointer"
+              title="Collapse sidebar"
+              aria-label="Collapse sidebar"
+            >
+              <PanelLeftClose size={16} />
+            </button>
+          </>
+        ) : (
+          <button
+            type="button"
+            onClick={toggleCollapsed}
+            className="group relative flex items-center justify-center w-9 h-9 rounded-lg hover:bg-surface-muted transition cursor-pointer"
+            title="Expand sidebar"
+            aria-label="Expand sidebar"
+          >
+            {/* Saba Resin Drop Mark - fixed dimensions & aspect ratio, never squished */}
+            <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-amber-600 to-amber-400 flex items-center justify-center text-white font-bold shadow-xs shrink-0 aspect-square group-hover:scale-105 transition-transform">
+              <span className="text-sm font-bold">S</span>
+            </div>
+
+            {/* Expand indicator icon overlay badge */}
+            <span className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-surface border border-border flex items-center justify-center text-text-muted group-hover:text-primary transition-colors shadow-2xs">
+              <PanelLeftOpen size={10} />
+            </span>
+
+            {/* Floating tooltip on collapsed rail */}
+            <span className="absolute left-full ml-2 px-2 py-1 rounded bg-stone-900 text-white text-xs whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition z-50 shadow-md font-normal">
+              Expand sidebar
+            </span>
+          </button>
+        )}
       </div>
 
       {/* Nav items list */}
