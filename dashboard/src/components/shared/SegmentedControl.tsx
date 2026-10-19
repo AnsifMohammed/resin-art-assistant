@@ -3,6 +3,7 @@ import React from "react";
 export interface SegmentOption<T extends string> {
   value: T;
   label: string | React.ReactNode;
+  title?: string;
 }
 
 interface SegmentedControlProps<T extends string> {
@@ -23,7 +24,7 @@ export function SegmentedControl<T extends string>({
   disabled = false,
 }: SegmentedControlProps<T>) {
   const sizeClasses = size === "sm" ? "p-0.5 text-xs" : "p-1 text-xs";
-  const itemPadding = size === "sm" ? "px-2.5 py-1" : "px-3 py-1.5";
+  const itemPadding = size === "sm" ? "px-2 sm:px-2.5 py-1" : "px-2.5 sm:px-3 py-1.5";
 
   return (
     <div
@@ -33,12 +34,15 @@ export function SegmentedControl<T extends string>({
     >
       {options.map((opt) => {
         const isSelected = opt.value === value;
+        const optTitle = opt.title ?? (typeof opt.label === "string" ? opt.label : undefined);
         return (
           <button
             key={opt.value}
             type="button"
             role="radio"
             aria-checked={isSelected}
+            aria-label={optTitle}
+            title={optTitle}
             disabled={disabled}
             onClick={() => onChange(opt.value)}
             className={`relative flex items-center justify-center font-medium rounded-md transition-all duration-150 select-none ${itemPadding} ${

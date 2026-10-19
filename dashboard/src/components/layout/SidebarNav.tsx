@@ -6,7 +6,7 @@ import type { NavItem } from "./nav.ts";
 export function Brand({ className }: { className?: string }) {
   return (
     <div className={cn("flex items-center gap-2.5", className)}>
-      <img src="/favicon.svg" alt="" className="h-8 w-8 rounded-lg" />
+      <img src="/favicon.svg" alt="" className="h-8 w-8 rounded-lg shrink-0 aspect-square" />
       <div className="leading-tight">
         <p className="text-sm font-semibold text-gray-900">Resin Art</p>
         <p className="text-xs text-gray-500">Assistant</p>

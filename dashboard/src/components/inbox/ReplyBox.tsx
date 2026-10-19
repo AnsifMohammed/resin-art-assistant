@@ -52,7 +52,7 @@ export function ReplyBox({ onSend, onResolve, canResolve, sending, resolving, wi
   };
 
   return (
-    <form onSubmit={onSubmit} className="border-t border-gray-200 bg-white px-3 py-3 pb-safe sm:px-4">
+    <form onSubmit={onSubmit} className="border-t border-border bg-surface px-3 py-3 pb-safe sm:px-4">
       {windowClosed && (
         <p
           id={warningId}

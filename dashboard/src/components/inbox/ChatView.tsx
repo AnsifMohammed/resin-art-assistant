@@ -106,17 +106,17 @@ export function ChatView({ conversation, onBack, backOnlyOnMobile = false, onRes
   const name = customerLabel(conversation.customer);
 
   return (
-    <section className="flex h-full min-h-0 flex-col bg-white" aria-label={`Conversation with ${name}`}>
+    <section className="flex h-full min-h-0 flex-col bg-surface" aria-label={`Conversation with ${name}`}>
       {/* Header */}
-      <header className="border-b border-gray-200 px-3 py-2.5 sm:px-4">
+      <header className="border-b border-border bg-surface px-3 py-2.5 sm:px-4">
         <div className="flex items-center gap-2">
           {onBack && (
             <button
               type="button"
               onClick={onBack}
               className={
-                "-ml-1 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-gray-600 hover:bg-gray-100 " +
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500" +
+                "-ml-1 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-text hover:bg-surface-muted transition " +
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" +
                 (backOnlyOnMobile ? " md:hidden" : "")
               }
               aria-label="Back"
@@ -124,12 +124,12 @@ export function ChatView({ conversation, onBack, backOnlyOnMobile = false, onRes
               <ArrowLeft className="h-5 w-5" />
             </button>
           )}
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gray-100 text-sm font-semibold text-gray-600">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-surface-muted text-sm font-semibold text-text">
             {name.charAt(0).toUpperCase() || <UserRound className="h-5 w-5" aria-hidden />}
           </div>
           <div className="min-w-0 flex-1">
-            <h2 className="truncate text-sm font-semibold text-gray-900 sm:text-base">{name}</h2>
-            <p className="flex min-w-0 items-center gap-1 text-xs text-gray-500">
+            <h2 className="truncate text-sm font-semibold text-text sm:text-base">{name}</h2>
+            <p className="flex min-w-0 items-center gap-1 text-xs text-text-muted">
               <ChannelIcon channel={conversation.channelType} className="h-3.5 w-3.5" />
               <span className="truncate">
                 {channelLabels[conversation.channelType]}
@@ -145,7 +145,7 @@ export function ChatView({ conversation, onBack, backOnlyOnMobile = false, onRes
           {esc && (
             <>
               <EscalationBadge reason={esc.reason} />
-              <span className="text-xs text-gray-500">
+              <span className="text-xs text-text-muted">
                 {esc.assignedTo
                   ? `Assigned to ${esc.assignedTo.id === user?.id ? "you" : esc.assignedTo.name}`
                   : "Unassigned"}
@@ -159,7 +159,7 @@ export function ChatView({ conversation, onBack, backOnlyOnMobile = false, onRes
       <div
         ref={scrollRef}
         onScroll={onScroll}
-        className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-gray-50/60 px-3 py-4 sm:px-4"
+        className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-surface-muted/30 px-3 py-4 sm:px-4"
         role="log"
         aria-live="polite"
         aria-label="Messages"
@@ -174,7 +174,7 @@ export function ChatView({ conversation, onBack, backOnlyOnMobile = false, onRes
               return (
                 <Fragment key={m.id}>
                   {showDay && (
-                    <div className="my-2 self-center rounded-full bg-white px-3 py-0.5 text-xs font-medium text-gray-500 shadow-sm ring-1 ring-gray-200">
+                    <div className="my-2 self-center rounded-full bg-surface px-3 py-0.5 text-xs font-medium text-text-muted shadow-sm ring-1 ring-border">
                       {formatDayLabel(m.createdAt)}
                     </div>
                   )}
