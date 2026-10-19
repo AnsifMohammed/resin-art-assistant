@@ -40,10 +40,17 @@ async function seed() {
     ])
     .onConflictDoNothing();
 
+  const kbData = JSON.parse(readFileSync(KB_PATH, "utf-8"));
   await db
     .insert(knowledgeBase)
-    .values({ businessId, data: JSON.parse(readFileSync(KB_PATH, "utf-8")) })
-    .onConflictDoNothing();
+    .values({ businessId, data: kbData })
+    .onConflictDoUpdate({
+      target: [knowledgeBase.businessId],
+      set: {
+        data: kbData,
+        updatedAt: new Date(),
+      },
+    });
 
   console.log(`Seed complete for business ${businessId}`);
 }
