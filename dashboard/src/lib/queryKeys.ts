@@ -35,6 +35,12 @@ export const queryKeys = {
     all: ["analytics"] as const,
     range: (params: AnalyticsParams) => [...queryKeys.analytics.all, params] as const,
   },
+  orders: {
+    all: ["orders"] as const,
+    list: (params?: { status?: string | undefined; search?: string | undefined }) =>
+      [...queryKeys.orders.all, "list", params] as const,
+    detail: (id: string) => [...queryKeys.orders.all, "detail", id] as const,
+  },
   auditLog: {
     all: ["audit-log"] as const,
     list: (params: AuditLogParams) => [...queryKeys.auditLog.all, params] as const,
