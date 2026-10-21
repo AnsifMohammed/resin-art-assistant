@@ -22,12 +22,12 @@ import {
 } from "lucide-react";
 import { InstagramIcon } from "../shared/InstagramIcon.tsx";
 import { ChannelIcon } from "../shared/ChannelIcon.tsx";
-import { SampleDataBadge } from "../shared/SampleDataBadge.tsx";
+
 import { useAuth } from "../../context/AuthContext.tsx";
 import { useTheme } from "../../context/ThemeContext.tsx";
 import { useConversations } from "../../hooks/useConversations.ts";
 import { customerLabel, humanize } from "../../lib/format.ts";
-import { mockOrders } from "../../data/mockData.ts";
+import { useOrders } from "../../hooks/useOrders.ts";
 import type { AutomationControl } from "./AppShell.tsx";
 
 interface CommandPaletteProps {
@@ -75,6 +75,7 @@ export function CommandPalette({ open, setOpen, automation }: CommandPaletteProp
 
   // Admin only (the endpoint is 403 for staff), and only while the palette is open.
   const conversations = useConversations({ limit: CONVERSATION_SEARCH_LIMIT }, { enabled: isAdmin && open });
+  const ordersQuery = useOrders();
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -201,28 +202,29 @@ export function CommandPalette({ open, setOpen, automation }: CommandPaletteProp
               </Command.Group>
             )}
 
-            {/* Orders: no backend yet (sample data) */}
+            {/* Real Orders */}
             {isAdmin && (
               <Command.Group
-                heading={
+                heading="Recent Orders"
+                /*
                   <span className="inline-flex items-center gap-2">
                     Recent Orders <SampleDataBadge />
                   </span>
-                }
+                */
                 className="text-xs font-semibold text-text-muted px-2 py-1 mt-2"
               >
-                {mockOrders.slice(0, 4).map((o) => (
+                {(ordersQuery.data?.orders || []).slice(0, 4).map((o) => (
                   <Command.Item
                     key={o.id}
-                    value={`${o.orderNumber} ${o.customerName}`}
+                    value={`${o.orderNo} ${o.customerName}`}
                     onSelect={() => runCommand(() => navigate("/orders"))}
                     className={ROW_CLASS}
                   >
                     <div className="flex items-center gap-2">
-                      <span className="font-mono text-xs font-semibold">{o.orderNumber}</span>
+                      <span className="font-mono text-xs font-semibold">#{o.orderNo}</span>
                       <span className="text-xs text-text-muted">{o.customerName}</span>
                     </div>
-                    <span className="text-xs font-medium">₹{o.total.toLocaleString("en-IN")}</span>
+                    <span className="text-xs font-medium">₹{Number(o.totalAmount).toLocaleString("en-IN")}</span>
                   </Command.Item>
                 ))}
               </Command.Group>

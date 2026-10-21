@@ -1,6 +1,7 @@
 import {
   pgTable, pgEnum, text, boolean,
-  jsonb, timestamp, uniqueIndex, index
+  jsonb, timestamp, uniqueIndex, index,
+  integer, numeric, date, check, unique, foreignKey
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { nanoid } from "nanoid";
@@ -52,6 +53,11 @@ export const templateChannelEnum = pgEnum("template_channel", ["whatsapp", "inst
 
 export const metaTemplateStatusEnum = pgEnum("meta_template_status", [
   "not_submitted", "pending", "approved", "rejected"
+]);
+
+export const orderStatusEnum = pgEnum("order_status", [
+  "pending", "confirmed", "in_production", "ready",
+  "dispatched", "delivered", "cancelled"
 ]);
 
 // ─── Tables ───────────────────────────────────────────────────────────────────
@@ -258,3 +264,82 @@ export const messageTemplates = pgTable("message_templates", {
   uniqueIndex("templates_business_name_idx").on(t.businessId, t.name),
   index("templates_business_category_idx").on(t.businessId, t.category),
 ]);
+
+// Customer orders
+export const orders = pgTable("orders", {
+  id: text("id").primaryKey().default(sql`(gen_random_uuid())::text`),
+  businessId: businessId(),
+  customerId: text("customer_id"),
+  orderNo: text("order_no").notNull(),
+  customerName: text("customer_name").notNull(),
+  customerPhone: text("customer_phone"),
+  customerEmail: text("customer_email"),
+  channel: text("channel").notNull().default("whatsapp"),
+  status: orderStatusEnum("status").notNull().default("pending"),
+  subtotal: numeric("subtotal", { precision: 12, scale: 2 }).notNull().default("0"),
+  deliveryCharge: numeric("delivery_charge", { precision: 12, scale: 2 }).notNull().default("0"),
+  discountAmount: numeric("discount_amount", { precision: 12, scale: 2 }).notNull().default("0"),
+  totalAmount: numeric("total_amount", { precision: 12, scale: 2 }).notNull().default("0"),
+  currency: text("currency").notNull().default("INR"),
+  shippingAddress: text("shipping_address"),
+  courier: text("courier"),
+  trackingId: text("tracking_id"),
+  customerNotes: text("customer_notes"),
+  internalNotes: text("internal_notes"),
+  expectedDeliveryDate: date("expected_delivery_date"),
+  dispatchedAt: timestamp("dispatched_at"),
+  deliveredAt: timestamp("delivered_at"),
+  isDeleted: boolean("is_deleted").notNull().default(false),
+  deletedAt: timestamp("deleted_at"),
+  deletedBy: text("deleted_by"),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, (t) => [
+  unique("uq_orders_business_order_no").on(t.businessId, t.orderNo),
+  foreignKey({
+    name: "orders_customer_id_fkey",
+    columns: [t.customerId],
+    foreignColumns: [customers.id],
+  }),
+  foreignKey({
+    name: "orders_business_id_fkey",
+    columns: [t.businessId],
+    foreignColumns: [businesses.id],
+  }),
+  check("orders_delivery_charge_check", sql`${t.deliveryCharge} >= (0)::numeric`),
+  check("orders_discount_amount_check", sql`${t.discountAmount} >= (0)::numeric`),
+  check("orders_subtotal_check", sql`${t.subtotal} >= (0)::numeric`),
+  check("orders_total_amount_check", sql`${t.totalAmount} >= (0)::numeric`),
+  index("idx_orders_business_status").on(t.businessId, t.status).where(sql`${t.isDeleted} = false`),
+  index("idx_orders_created_at").on(t.createdAt.desc()).where(sql`${t.isDeleted} = false`),
+  index("idx_orders_customer").on(t.customerId).where(sql`${t.isDeleted} = false`),
+]);
+
+// Items inside an order
+export const orderItems = pgTable("order_items", {
+  id: text("id").primaryKey().default(sql`(gen_random_uuid())::text`),
+  orderId: text("order_id").notNull(),
+  productId: text("product_id"),
+  productName: text("product_name").notNull(),
+  productDescription: text("product_description"),
+  quantity: integer("quantity").notNull().default(1),
+  unitPrice: numeric("unit_price", { precision: 12, scale: 2 }).notNull(),
+  lineTotal: numeric("line_total", { precision: 12, scale: 2 })
+    .generatedAlwaysAs(sql`(((quantity)::numeric * unit_price))`),
+  customizations: jsonb("customizations").notNull().default({}),
+  isDeleted: boolean("is_deleted").notNull().default(false),
+  deletedAt: timestamp("deleted_at"),
+  deletedBy: text("deleted_by"),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, (t) => [
+  foreignKey({
+    name: "order_items_order_id_fkey",
+    columns: [t.orderId],
+    foreignColumns: [orders.id],
+  }),
+  check("order_items_quantity_check", sql`${t.quantity} > 0`),
+  check("order_items_unit_price_check", sql`${t.unitPrice} >= (0)::numeric`),
+  index("idx_order_items_order").on(t.orderId).where(sql`${t.isDeleted} = false`),
+]);
+
