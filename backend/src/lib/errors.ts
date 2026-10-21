@@ -7,6 +7,8 @@ export class AppError extends Error {
     public readonly statusCode: number,
     message: string,
     public readonly code: string = "APP_ERROR",
+    /** Optional structured detail, e.g. [{ path, message }] for validation errors. */
+    public readonly details?: unknown,
   ) {
     super(message);
     this.name = "AppError";
@@ -33,7 +35,9 @@ export function errorHandler(
 ): FastifyReply {
   if (err instanceof AppError) {
     if (err.statusCode >= 500) request.log.error({ err }, err.message);
-    return reply.status(err.statusCode).send({ error: err.message, code: err.code });
+    const body: ErrorBody = { error: err.message, code: err.code };
+    if (err.details !== undefined) body.details = err.details;
+    return reply.status(err.statusCode).send(body);
   }
 
   if (err instanceof ZodError) {

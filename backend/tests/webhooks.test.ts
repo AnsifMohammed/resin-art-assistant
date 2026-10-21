@@ -239,6 +239,7 @@ describe("Meta Webhooks", () => {
       // Existing conversation: window bumped.
       const convUpdate = h.state.updates.find((u) => u.table === "conversations");
       expect(convUpdate?.vals.windowClosesAt).toBeInstanceOf(Date);
+      expect(convUpdate?.vals.lastMessageAt).toBe(convUpdate?.vals.lastCustomerMessageAt);
     });
 
     it("rejects a wrong signature with 403", async () => {
@@ -340,7 +341,8 @@ describe("Meta Webhooks", () => {
 
       const convUpdates = h.state.updates.filter((u) => u.table === "conversations");
       expect(convUpdates).toHaveLength(1);
-      expect(convUpdates[0]!.vals).toEqual({ state: "owner_handling" });
+      // Same update bumps the inbox sort key; the customer window is untouched.
+      expect(convUpdates[0]!.vals).toEqual({ state: "owner_handling", lastMessageAt: expect.any(Date) });
 
       const audits = insertsInto("audit_log");
       expect(audits).toHaveLength(1);
@@ -434,7 +436,10 @@ describe("Meta Webhooks", () => {
         senderType: "owner",
         direction: "inbound",
       });
-      expect(h.state.updates.filter((u) => u.table === "conversations")[0]?.vals).toEqual({ state: "owner_handling" });
+      expect(h.state.updates.filter((u) => u.table === "conversations")[0]?.vals).toEqual({
+        state: "owner_handling",
+        lastMessageAt: expect.any(Date),
+      });
       expect(insertsInto("audit_log")[0]).toMatchObject({
         details: { from: "escalated", to: "owner_handling", reason: "echo" },
       });

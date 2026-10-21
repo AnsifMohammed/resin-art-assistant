@@ -27,11 +27,18 @@ Every endpoint below is implemented in `backend/src/routes`; shapes are copied f
 User        { id, businessId, name, email, role: "admin"|"staff", active, lastLoginAt|null, createdAt, updatedAt }
 Channel     { id, businessId, type: "instagram"|"whatsapp", identifier, tokenExpiresAt|null, status, createdAt, updatedAt }
 Customer    { id, businessId, channelId, name|null, handleOrPhone, language|null, notes|null, createdAt, updatedAt }
-Conversation{ id, businessId, customerId, channelId, state, tag|null, lastCustomerMessageAt|null, windowClosesAt|null, createdAt, updatedAt }
+Conversation{ id, businessId, customerId, channelId, state, tag|null, lastCustomerMessageAt|null, windowClosesAt|null,
+              lastMessageAt|null, adminLastReadAt|null, createdAt, updatedAt }
 Message     { id, conversationId, businessId, direction, senderType, senderId|null, content|null, mediaUrls: string[],
               metaMessageId|null, deliveryStatus|null, metadata: object, createdAt }
 Escalation  { id, businessId, conversationId, reason, assignedToUserId|null, assignedByUserId|null, assignedAt|null,
               alertedAt|null, remindedAt|null, resolvedAt|null, resolvedByUserId|null, createdAt }
+MessageTemplate { id, name, category: "delivery"|"festive"|"custom_order"|"payment"|"general",
+              channel: "whatsapp"|"instagram"|"both", body, variables: string[], isActive,
+              metaTemplateName|null, metaStatus: "not_submitted"|"pending"|"approved"|"rejected",
+              createdByUserId|null, updatedByUserId|null, createdAt, updatedAt }
+AiDecisionSummary { intent, escalate, escalateReason|null, factsUsed: string[], missingFacts: string[],
+              languageDetected|null, suggestedTag|null, sent, createdAt }
 AuditLogEntry { id, businessId, actorId|null, actorType, action, conversationId|null, escalationId|null,
                 targetUserId|null, details: object, createdAt, actorName?: string|null }
 
@@ -62,8 +69,13 @@ Deactivated user → `403 ACCOUNT_DEACTIVATED`; every authenticated route perfor
 ## Conversations
 
 ### GET /conversations (admin only; staff → 403)
-Query: `state?`, `tag?`, `channel?` (`instagram|whatsapp`), `page?`, `limit?`
-Sort: most recent activity first (`lastCustomerMessageAt`/last message desc).
+Query: `state?`, `tag?`, `channel?` (`instagram|whatsapp`), `page?`, `limit?`,
+`search?` (trimmed, max 100; empty is ignored; case-insensitive substring of customer name, customer handle/phone or the
+last message's content; `%`/`_` match literally), `unread?` (`"true"|"false"`; `"true"` → unread only, `"false"` → no filter).
+Sort: `lastMessageAt desc nulls last`, then `createdAt desc`.
+`lastMessageAt` is set on every stored message (customer, AI, owner/staff reply, echo); existing rows were backfilled
+by migration 0002.
+`unread` = `lastCustomerMessageAt` is set AND (`adminLastReadAt` is null OR `lastCustomerMessageAt > adminLastReadAt`).
 ```ts
 200 {
   conversations: Array<Conversation & {
@@ -71,10 +83,12 @@ Sort: most recent activity first (`lastCustomerMessageAt`/last message desc).
     channelType: "instagram"|"whatsapp";
     lastMessage: MessagePreview | null;
     openEscalation: { id, reason, assignedToUserId, createdAt } | null;
+    unread: boolean;
   }>;
   pagination: { page, limit, total };
 }
 ```
+Errors: `400 VALIDATION_ERROR` (bad enum, `search` > 100 chars, ...).
 
 ### GET /conversations/:id
 Admin: any conversation in the business. Staff: only when an **open** escalation exists for it that is assigned to them
@@ -84,20 +98,60 @@ or unassigned, else `403 "Not assigned to you"`. Unknown/other business → `404
   conversation: Conversation & {
     customer: Customer;
     channelType: "instagram"|"whatsapp";
-    messages: Message[];                                   // oldest first
+    messages: Array<Message & { aiDecision?: AiDecisionSummary }>;   // oldest first
     openEscalation: (Escalation & { assignedTo: UserRef | null }) | null;
   }
 }
 ```
+`aiDecision` (admin only, never for staff): present on inbound `customer` messages that have an `ai_decisions` row with
+that `messageId` (latest row wins). The AI links its decision to the **last** message of a batch, so earlier messages of
+the same batch have none.
+
+### POST /conversations/:id/read (admin only)
+Sets `adminLastReadAt = now()`. `204` (no body). Errors: `403 FORBIDDEN` (staff), `404 NOT_FOUND`.
+
+### POST /conversations/:id/pause (admin only)
+`ai_active` | `owner_handling` → `paused` (the AI worker skips any conversation that is not `ai_active`).
+Already `paused` → returned unchanged (no audit, no event). Audit `conversation_paused` `{ from, to }`, emits
+`conversation:updated`.
+`200 { conversation: { id, state: "paused", tag } }`
+Errors: `409 ESCALATION_OPEN` ("Resolve the escalation before pausing") when `escalated`, `409 STATE_CONFLICT` if the
+state changed concurrently, `403` staff, `404 NOT_FOUND`.
+
+### POST /conversations/:id/resume (admin only)
+`paused` → `ai_active`. Audit `conversation_resumed` `{ from, to }`, emits `conversation:updated`.
+Messages that arrived while paused are not re-processed; the AI answers the next customer message.
+`200 { conversation: { id, state: "ai_active", tag } }`
+Errors: `409 NOT_PAUSED` when the conversation is not paused, `403` staff, `404 NOT_FOUND`.
 
 ### POST /conversations/:id/reply
-Same access rule as GET /conversations/:id. Body `{ text }` (1..4096 chars).
-Effects: inserts outbound message (`senderType` = `"owner"` for admin, `"staff"` for staff; `senderId` = user id),
-sends via `send.ts`, sets `state = "owner_handling"`, writes `audit_log` `reply_sent`.
+Same access rule as GET /conversations/:id. Body is exactly one of:
+- `{ text }` (1..4096 chars), or
+- `{ templateId, variables?: Record<string, string> }` — renders an **active** template of the business.
+  `customerName` is pre-filled with the customer's name (or handle/phone); values in `variables` win.
+
+Sending both or neither (or extra keys) → `400 VALIDATION_ERROR`.
+Effects: inserts outbound message (`senderType` = `"owner"` for admin, `"staff"` for staff; `senderId` = user id;
+template replies also store `metadata: { templateId, templateName }`), sends via `send.ts` (templates are sent as their
+rendered text; live mode will send the approved Meta template by `metaTemplateName`), sets `state = "owner_handling"`
+and `lastMessageAt`, writes `audit_log` `reply_sent` `{ messageId, preview }` or `template_reply_sent`
+`{ messageId, templateId, preview }`.
 ```ts
 201 { message: Message, conversation: { id, state } }
 ```
-Errors: `409 WINDOW_CLOSED` if `windowClosesAt` has passed (template required).
+Errors (in check order):
+- `400 VALIDATION_ERROR` — bad body.
+- `404 NOT_FOUND` — conversation; `403 FORBIDDEN` — staff not assigned.
+- `404 TEMPLATE_NOT_FOUND` — unknown, inactive or other business's template.
+- `400 TEMPLATE_CHANNEL_MISMATCH` — template `channel` is `whatsapp`/`instagram` and differs from the conversation's.
+- `409 WINDOW_CLOSED` — `windowClosesAt` has passed: always for `text`; for a template unless it has
+  `metaTemplateName` set **and** `metaStatus = "approved"` (message "Only approved WhatsApp templates can be sent
+  after 24 hours").
+- `409 CHANNEL_NOT_FOUND` — conversation has no channel/customer.
+- `400 TEMPLATE_VARIABLES_MISSING` — `error: "Missing template variables: a, b"`,
+  `details: [{ path: "<variable>", message: "required" }]` (empty/blank values count as missing).
+- `400 TEMPLATE_TOO_LONG` — rendered text over the conversation channel's limit (WhatsApp 1024, Instagram 1000).
+- `501`/`502` send failures as before.
 
 ### POST /conversations/:id/resolve
 Same access rule. Sets `state = "ai_active"`, sets `resolvedAt/resolvedByUserId` on the open escalation, writes
@@ -105,6 +159,49 @@ Same access rule. Sets `state = "ai_active"`, sets `resolvedAt/resolvedByUserId`
 ```ts
 200 { conversation: { id, state: "ai_active" }, escalation: Escalation | null }
 ```
+
+## Message templates
+
+Ready-made messages inserted into replies. `{variableName}` placeholders (`\w+`); `variables` is always computed from
+`body` on the server (unique, first-seen order; a client-sent `variables` is ignored). Body length limit per channel:
+`whatsapp` 1024, `instagram` 1000, `both` 1000. All routes are scoped to the caller's business.
+Not-found anywhere below → `404 TEMPLATE_NOT_FOUND`. Validation errors → `400 VALIDATION_ERROR` with
+`details: [{ path, message }]`.
+
+### GET /templates (admin + staff)
+Query: `category?`, `channel?` (`whatsapp|instagram` → templates for that channel **or** `both`),
+`active?` (`true|false|all`, default `all`). Staff always get active templates only (`active` is ignored).
+Sort: `category`, then `name`.
+`200 { templates: MessageTemplate[] }`
+
+### GET /templates/:id (admin + staff)
+`200 { template: MessageTemplate }`. Staff get `404` for an inactive template.
+
+### POST /templates (admin only)
+Body `{ name, category, channel?, body, isActive?, metaTemplateName?, metaStatus? }`
+- `name` trimmed 1..80, unique per business (`409 TEMPLATE_NAME_TAKEN`)
+- `channel` default `"both"`; `body` trimmed, 1..limit for `channel`
+- `isActive` default `true`; `metaTemplateName` `null` or `/^[a-z0-9_]{1,512}$/` (default `null`);
+  `metaStatus` default `"not_submitted"`
+
+Sets `createdByUserId`/`updatedByUserId`. Audit `template_created` `{ templateId, name }`.
+`201 { template: MessageTemplate }`
+
+### PATCH /templates/:id (admin only)
+Body: any subset of the POST fields. `variables` recomputed when `body` changes; the resulting body is re-checked
+against the resulting channel's limit. Renaming onto another template's name → `409 TEMPLATE_NAME_TAKEN`.
+Sets `updatedByUserId`. Audit `template_updated` `{ templateId, name }`.
+`200 { template: MessageTemplate }`
+
+### DELETE /templates/:id (admin only)
+Hard delete. Audit `template_deleted` `{ templateId, name }`. `204` (no body).
+
+### POST /templates/:id/duplicate (admin only)
+Copies the template as `"<name> (Copy)"`, or `"(Copy 2)"`, `"(Copy 3)"`… (first free name), with
+`metaTemplateName: null`, `metaStatus: "not_submitted"`. Audit `template_duplicated` `{ templateId, name }` (the copy).
+`201 { template: MessageTemplate }`
+
+Staff calling POST/PATCH/DELETE/duplicate → `403 FORBIDDEN`.
 
 ## Escalations
 
@@ -246,7 +343,7 @@ queries every 5 s (polling fallback), and it refetches once after a reconnect.
 |---|---|---|---|
 | `message:new` | admins | `{ conversationId, message: Message }` | every stored message: inbound customer (simulate, webhook), AI auto-reply (incl. a failed send, `deliveryStatus: "failed"`), owner/staff reply (incl. failed), owner echo from the phone app (a `system` message would go through the same helper; none are created today) |
 | `message:new:<conversationId>` | subscribers of that topic (staff re-authorized at delivery) | same as `message:new` | same as `message:new` |
-| `conversation:updated` | admins | `{ conversationId, state, tag }` | escalation (AI rule, window closed, processing failure), auto-reply (tag), owner/staff reply (`owner_handling`), resolve (`ai_active`), echo (`owner_handling`) |
+| `conversation:updated` | admins | `{ conversationId, state, tag }` | escalation (AI rule, window closed, processing failure), auto-reply (tag), owner/staff reply (`owner_handling`), resolve (`ai_active`), echo (`owner_handling`), pause (`paused`) / resume (`ai_active`) |
 | `escalation:new` | admins + all staff | `{ escalationId, conversationId, reason, customerName }` | every escalation creation path (AI decision, `window_closed`, `parse_error` after failures / dead letter) |
 | `escalation:assigned` | admins | `{ escalationId, conversationId, assignedToUserId: string\|null }` | `POST /escalations/:id/assign` (assign, reassign, unassign) |
 | `escalation:assigned:<userId>` | that staff member only | same as `escalation:assigned` | when they become the assignee, and when they stop being it (reassign/unassign) |

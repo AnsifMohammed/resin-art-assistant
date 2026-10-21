@@ -111,6 +111,7 @@ export const simulateRoutes: FastifyPluginAsync = async (app: FastifyInstance) =
           channelId,
           state: "ai_active",
           lastCustomerMessageAt: now,
+          lastMessageAt: now,
           windowClosesAt,
         })
         .returning();
@@ -120,6 +121,7 @@ export const simulateRoutes: FastifyPluginAsync = async (app: FastifyInstance) =
         .update(conversations)
         .set({
           lastCustomerMessageAt: now,
+          lastMessageAt: now,
           windowClosesAt,
         })
         .where(eq(conversations.id, conv.id));

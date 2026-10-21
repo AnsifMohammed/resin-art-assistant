@@ -259,6 +259,8 @@ describe("processMessageJob: outcomes", () => {
     expect(state.updates).toContainEqual({ table: "messages", vals: { deliveryStatus: "sent" } });
     expect(state.inserted.audit_log?.[0]).toMatchObject({ action: "auto_reply_sent", actorType: "ai" });
     expect(state.conv.tag).toBe("new_lead");
+    // The claim update also bumps the inbox sort key.
+    expect(state.conv.lastMessageAt).toBeInstanceOf(Date);
     // Realtime: the AI reply (as sent) and the tag change.
     expect(rt.emitMessageNew).toHaveBeenCalledTimes(1);
     expect(rt.emitMessageNew.mock.calls[0]![0]).toMatchObject({ senderType: "ai", deliveryStatus: "sent", content: autoReply.reply });

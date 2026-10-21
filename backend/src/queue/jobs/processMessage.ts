@@ -350,7 +350,10 @@ async function runPipeline(params: ProcessMessageParams): Promise<AiDecision | n
   const committed = await db.transaction(async (tx) => {
     const [claimed] = await tx
       .update(conversations)
-      .set(decision.suggested_tag ? { tag: decision.suggested_tag } : { state: "ai_active" })
+      .set({
+        lastMessageAt: new Date(),
+        ...(decision.suggested_tag ? { tag: decision.suggested_tag } : {}),
+      })
       .where(
         and(
           eq(conversations.id, conversationId),

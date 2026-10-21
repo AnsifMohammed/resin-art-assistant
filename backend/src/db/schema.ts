@@ -44,6 +44,16 @@ export const escalationReasonEnum = pgEnum("escalation_reason", [
   "intent_off_topic", "intent_payment", "window_closed"
 ]);
 
+export const templateCategoryEnum = pgEnum("template_category", [
+  "delivery", "festive", "custom_order", "payment", "general"
+]);
+
+export const templateChannelEnum = pgEnum("template_channel", ["whatsapp", "instagram", "both"]);
+
+export const metaTemplateStatusEnum = pgEnum("meta_template_status", [
+  "not_submitted", "pending", "approved", "rejected"
+]);
+
 // ─── Tables ───────────────────────────────────────────────────────────────────
 
 // One row per business (SaaS-ready)
@@ -114,11 +124,14 @@ export const conversations = pgTable("conversations", {
   tag: convTagEnum("tag"),
   lastCustomerMessageAt: timestamp("last_customer_message_at"),
   windowClosesAt: timestamp("window_closes_at"),       // 24h after lastCustomerMessageAt
+  lastMessageAt: timestamp("last_message_at"),         // any direction; inbox sort key
+  adminLastReadAt: timestamp("admin_last_read_at"),    // unread = customer message after this
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 }, (t) => [
   index("conversations_business_state_idx").on(t.businessId, t.state),
   index("conversations_customer_idx").on(t.customerId),
+  index("conversations_business_last_msg_idx").on(t.businessId, t.lastMessageAt),
 ]);
 
 // Every message in every conversation
@@ -223,4 +236,25 @@ export const pushSubscriptions = pgTable("push_subscriptions", {
   createdAt: createdAt(),
 }, (t) => [
   uniqueIndex("push_user_endpoint_idx").on(t.userId, t.endpoint),
+]);
+
+// Ready-made messages admin/staff insert into replies. {variable} placeholders.
+export const messageTemplates = pgTable("message_templates", {
+  id: id(),
+  businessId: businessId(),
+  name: text("name").notNull(),
+  category: templateCategoryEnum("category").notNull(),
+  channel: templateChannelEnum("channel").notNull().default("both"),
+  body: text("body").notNull(),
+  variables: jsonb("variables").$type<string[]>().notNull().default([]),  // derived from body
+  isActive: boolean("is_active").notNull().default(true),
+  metaTemplateName: text("meta_template_name"),        // approved WhatsApp template name
+  metaStatus: metaTemplateStatusEnum("meta_status").notNull().default("not_submitted"),
+  createdByUserId: text("created_by_user_id"),
+  updatedByUserId: text("updated_by_user_id"),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, (t) => [
+  uniqueIndex("templates_business_name_idx").on(t.businessId, t.name),
+  index("templates_business_category_idx").on(t.businessId, t.category),
 ]);

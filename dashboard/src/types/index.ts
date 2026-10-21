@@ -67,6 +67,15 @@ export type LanguageDetected = "english" | "malayalam" | "manglish";
 
 export type ActorType = "admin" | "staff" | "ai" | "system";
 
+export const TEMPLATE_CATEGORIES = ["delivery", "festive", "custom_order", "payment", "general"] as const;
+export type TemplateCategory = (typeof TEMPLATE_CATEGORIES)[number];
+
+export const TEMPLATE_CHANNELS = ["whatsapp", "instagram", "both"] as const;
+export type TemplateChannel = (typeof TEMPLATE_CHANNELS)[number];
+
+export const META_TEMPLATE_STATUSES = ["not_submitted", "pending", "approved", "rejected"] as const;
+export type MetaTemplateStatus = (typeof META_TEMPLATE_STATUSES)[number];
+
 // ─── Errors ──────────────────────────────────────────────────────────────────
 
 /** Every backend error body: { error, code } (+ details on validation errors). */
@@ -182,8 +191,25 @@ export interface Conversation {
   tag: ConvTag | null;
   lastCustomerMessageAt: ISODateString | null;
   windowClosesAt: ISODateString | null;
+  /** Set on every stored message (customer, AI, human reply, echo). */
+  lastMessageAt: ISODateString | null;
+  /** Last time an admin opened the thread (POST /conversations/:id/read). */
+  adminLastReadAt: ISODateString | null;
   createdAt: ISODateString;
   updatedAt: ISODateString;
+}
+
+/** Summary of the AI decision linked to the last customer message of a batch (admin only). */
+export interface AiDecisionSummary {
+  intent: AiIntent | string;
+  escalate: boolean;
+  escalateReason: EscalationReason | string | null;
+  factsUsed: string[];
+  missingFacts: string[];
+  languageDetected: LanguageDetected | string | null;
+  suggestedTag: ConvTag | string | null;
+  sent: boolean;
+  createdAt: ISODateString;
 }
 
 export interface Message {
@@ -199,6 +225,8 @@ export interface Message {
   deliveryStatus: DeliveryStatus | null;
   metadata: Record<string, unknown>;
   createdAt: ISODateString;
+  /** Admin only: present on inbound customer messages the AI decided on. */
+  aiDecision?: AiDecisionSummary;
 }
 
 export interface AiDecisionRecord {
@@ -216,6 +244,24 @@ export interface AiDecisionRecord {
   languageDetected: LanguageDetected | null;
   sent: boolean;
   createdAt: ISODateString;
+}
+
+export interface MessageTemplate {
+  id: string;
+  name: string;
+  category: TemplateCategory;
+  channel: TemplateChannel;
+  body: string;
+  /** Computed server-side from body: unique {variable} names, first-seen order. */
+  variables: string[];
+  isActive: boolean;
+  /** Approved WhatsApp template name (lowercase_underscore). Needed to message after 24h. */
+  metaTemplateName: string | null;
+  metaStatus: MetaTemplateStatus;
+  createdByUserId: string | null;
+  updatedByUserId: string | null;
+  createdAt: ISODateString;
+  updatedAt: ISODateString;
 }
 
 export interface Escalation {
@@ -272,6 +318,10 @@ export interface ConversationListParams extends PageParams {
   state?: ConvState;
   tag?: ConvTag;
   channel?: ChannelType;
+  /** Case-insensitive substring of customer name, handle/phone or last message (max 100). */
+  search?: string;
+  /** "true" = unread only. */
+  unread?: "true" | "false";
 }
 
 export interface ConversationListItem extends Conversation {
@@ -280,6 +330,8 @@ export interface ConversationListItem extends Conversation {
   lastMessage: MessagePreview | null;
   /** Open (unresolved) escalation, if any. */
   openEscalation: Pick<Escalation, "id" | "reason" | "assignedToUserId" | "createdAt"> | null;
+  /** Customer wrote after the admin last opened the thread. */
+  unread: boolean;
 }
 
 export interface ConversationListResponse {
@@ -299,19 +351,54 @@ export interface ConversationDetailResponse {
   conversation: ConversationDetail;
 }
 
-export interface ReplyRequest {
-  text: string;
-}
+/** Body is exactly one of { text } or { templateId, variables? }. */
+export type ReplyRequest =
+  | { text: string }
+  | { templateId: string; variables?: Record<string, string> };
 
 export interface ReplyResponse {
   message: Message;
   conversation: Pick<Conversation, "id" | "state">;
 }
 
+export interface ConversationStateResponse {
+  conversation: Pick<Conversation, "id" | "state" | "tag">;
+}
+
 export interface ResolveResponse {
   conversation: Pick<Conversation, "id" | "state">;
   escalation: Escalation | null;
 }
+
+// ─── Message templates ─────────────────────────────────────────────
+
+export interface TemplateListParams {
+  category?: TemplateCategory;
+  /** whatsapp | instagram → that channel's templates plus "both". */
+  channel?: ChannelType;
+  /** Default "all". Staff always get active only. */
+  active?: "true" | "false" | "all";
+}
+
+export interface TemplateListResponse {
+  templates: MessageTemplate[];
+}
+
+export interface TemplateResponse {
+  template: MessageTemplate;
+}
+
+export interface CreateTemplateRequest {
+  name: string;
+  category: TemplateCategory;
+  channel?: TemplateChannel;
+  body: string;
+  isActive?: boolean;
+  metaTemplateName?: string | null;
+  metaStatus?: MetaTemplateStatus;
+}
+
+export type UpdateTemplateRequest = Partial<CreateTemplateRequest>;
 
 // ─── Escalations ──────────────────────────────────────────────────
 

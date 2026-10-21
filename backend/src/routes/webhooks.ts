@@ -118,6 +118,7 @@ async function handleCustomerMessage(m: InboundCustomerMessage): Promise<void> {
         channelId: chan.id,
         state: "ai_active",
         lastCustomerMessageAt: now,
+        lastMessageAt: now,
         windowClosesAt,
       })
       .returning();
@@ -147,7 +148,7 @@ async function handleCustomerMessage(m: InboundCustomerMessage): Promise<void> {
   if (!isNewConv) {
     await db
       .update(conversations)
-      .set({ lastCustomerMessageAt: now, windowClosesAt })
+      .set({ lastCustomerMessageAt: now, lastMessageAt: now, windowClosesAt })
       .where(eq(conversations.id, conv.id));
   }
 
@@ -212,12 +213,14 @@ async function handleEcho(m: EchoMessage): Promise<void> {
 
   emitMessageNew(inserted);
 
-  if (conv.state !== "owner_handling") {
-    await db
-      .update(conversations)
-      .set({ state: "owner_handling" })
-      .where(eq(conversations.id, conv.id));
+  // One update bumps the inbox sort key and, if needed, hands the conversation to the owner.
+  const stateChanged = conv.state !== "owner_handling";
+  await db
+    .update(conversations)
+    .set({ lastMessageAt: new Date(), ...(stateChanged ? { state: "owner_handling" as const } : {}) })
+    .where(eq(conversations.id, conv.id));
 
+  if (stateChanged) {
     await db.insert(auditLog).values({
       businessId: config.BUSINESS_ID,
       actorId: null,

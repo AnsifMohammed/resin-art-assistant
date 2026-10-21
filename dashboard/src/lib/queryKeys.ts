@@ -3,6 +3,7 @@ import type {
   AuditLogParams,
   ConversationListParams,
   EscalationListParams,
+  TemplateListParams,
 } from "../types/index.ts";
 
 /**
@@ -24,6 +25,12 @@ export const queryKeys = {
   },
   users: {
     all: ["users"] as const,
+  },
+  templates: {
+    all: ["templates"] as const,
+    lists: () => [...queryKeys.templates.all, "list"] as const,
+    list: (params: TemplateListParams) => [...queryKeys.templates.lists(), params] as const,
+    detail: (id: string) => [...queryKeys.templates.all, "detail", id] as const,
   },
   settings: {
     all: ["settings"] as const,
