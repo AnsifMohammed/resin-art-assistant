@@ -211,8 +211,11 @@ export default function KnowledgeBase() {
   } | null>(null);
 
   const update = useCallback((fn: (d: KnowledgeBaseData) => KnowledgeBaseData) => {
-    setDraft((cur) => (cur ? fn(cur) : cur));
-  }, []);
+    setDraft((cur) => {
+      const current = cur ?? (base ? normalizeKb(base) : normalizeKb({}));
+      return fn(current);
+    });
+  }, [base]);
 
   const d = draft || (base ? normalizeKb(base) : normalizeKb({}));
 
@@ -292,11 +295,14 @@ export default function KnowledgeBase() {
 
   // Tone example helpers
   const handleAddToneExample = () => {
-    if (!newToneCustomer.trim() || !newToneReply.trim()) return;
+    if (!newToneCustomer.trim() || !newToneReply.trim()) {
+      toast.error("Please fill in both the customer question and your reply");
+      return;
+    }
     update((cur) => ({
       ...cur,
       tone_examples: [
-        ...cur.tone_examples,
+        ...(cur.tone_examples ?? []),
         { customer: newToneCustomer.trim(), reply: newToneReply.trim() },
       ],
     }));
@@ -309,7 +315,7 @@ export default function KnowledgeBase() {
   const handleDeleteTone = (index: number) => {
     update((cur) => ({
       ...cur,
-      tone_examples: cur.tone_examples.filter((_, i) => i !== index),
+      tone_examples: (cur.tone_examples ?? []).filter((_, i) => i !== index),
     }));
   };
 
@@ -876,13 +882,80 @@ export default function KnowledgeBase() {
 
               <button
                 type="button"
-                onClick={() => setShowAddTone(true)}
+                onClick={() => setShowAddTone((prev) => !prev)}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-surface-muted text-text text-12 font-semibold hover:bg-surface transition-colors cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5" />
-                <span>Add pair</span>
+                <span>{showAddTone ? "Close" : "Add pair"}</span>
               </button>
             </div>
+
+            {/* Add Tone Form - Placed right at top so clicking Add pair is immediately visible */}
+            {showAddTone && (
+              <div className="p-4 rounded-xl border border-primary/30 bg-primary-soft/10 space-y-3 animate-in fade-in">
+                <h4 className="text-13 font-semibold text-text">Add Customer ↔ AI Pair</h4>
+                <div className="space-y-1.5">
+                  <label className="block text-12 font-medium text-text-muted">
+                    Customer asks:
+                  </label>
+                  <input
+                    type="text"
+                    autoFocus
+                    value={newToneCustomer}
+                    onChange={(e) => setNewToneCustomer(e.target.value)}
+                    placeholder="e.g. Do you make geode style coasters?"
+                    className="w-full px-3 py-1.5 text-13 rounded-lg bg-surface border border-border text-text focus:outline-none focus:ring-2 focus:ring-primary/40"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="block text-12 font-medium text-text-muted">
+                    You reply:
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={newToneReply}
+                    onChange={(e) => setNewToneReply(e.target.value)}
+                    placeholder="e.g. Yes! 💕 Our geode pieces with quartz crystals are super popular..."
+                    className="w-full px-3 py-1.5 text-13 rounded-lg bg-surface border border-border text-text focus:outline-none focus:ring-2 focus:ring-primary/40"
+                  />
+                </div>
+                <div className="flex justify-end gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowAddTone(false);
+                      setNewToneCustomer("");
+                      setNewToneReply("");
+                    }}
+                    className="px-3 py-1.5 rounded-lg border border-border text-12 text-text hover:bg-surface cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleAddToneExample}
+                    className="px-3.5 py-1.5 rounded-lg bg-primary text-primary-foreground font-semibold text-12 cursor-pointer shadow-xs hover:bg-primary-hover"
+                  >
+                    Add Example
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Empty state when no tone examples */}
+            {d.tone_examples.length === 0 && !showAddTone && (
+              <div className="text-center py-8 px-4 rounded-xl border border-dashed border-border bg-surface-muted/20 space-y-3">
+                <p className="text-13 text-text-muted">No tone examples added yet.</p>
+                <button
+                  type="button"
+                  onClick={() => setShowAddTone(true)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-12 font-semibold cursor-pointer shadow-xs hover:bg-primary-hover"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Add your first example</span>
+                </button>
+              </div>
+            )}
 
             {/* List of pairs */}
             <div className="space-y-4">
@@ -928,8 +1001,8 @@ export default function KnowledgeBase() {
                 </div>
               ))}
             </div>
-
-            {/* Add Tone Form Modal/Inline */}
+          </section>
+    {/* Add Tone Form Modal/Inline */}
             {showAddTone && (
               <div className="p-4 rounded-xl border border-primary/30 bg-primary-soft/10 space-y-3 animate-in fade-in">
                 <h4 className="text-13 font-semibold text-text">Add Customer ↔ AI Pair</h4>
@@ -975,8 +1048,6 @@ export default function KnowledgeBase() {
                 </div>
               </div>
             )}
-          </section>
-
           {/* 5. Always Hand Over */}
           <section
             id="always-escalate"

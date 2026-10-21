@@ -15,6 +15,20 @@
       "when": 1790595876085,
       "tag": "0001_whole_cassandra_nova",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792430559133,
+      "tag": "0002_silky_mother_askani",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1792472920402,
+      "tag": "0003_bizarre_fantastic_four",
+      "breakpoints": true
     }
   ]
 }

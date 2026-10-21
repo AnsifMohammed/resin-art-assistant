@@ -587,3 +587,130 @@ export interface SocketEventMap {
 }
 
 export type SocketEventName = keyof SocketEventMap;
+
+// ─── Orders ──────────────────────────────────────────────────────────────────
+
+export const ORDER_STATUSES = [
+  "pending",
+  "confirmed",
+  "in_production",
+  "ready",
+  "dispatched",
+  "delivered",
+  "cancelled",
+] as const;
+export type OrderStatus = (typeof ORDER_STATUSES)[number];
+
+export interface DbOrderItem {
+  id: string;
+  orderId: string;
+  productId?: string | null;
+  productName: string;
+  productDescription?: string | null;
+  quantity: number;
+  unitPrice: string | number;
+  lineTotal?: string | number;
+  customizations?: Record<string, unknown>;
+  createdAt: ISODateString;
+}
+
+export interface DbOrder {
+  id: string;
+  businessId: string;
+  customerId?: string | null;
+  orderNo: string;
+  customerName: string;
+  customerPhone?: string | null;
+  customerEmail?: string | null;
+  channel: "whatsapp" | "instagram";
+  status: OrderStatus;
+  subtotal: string | number;
+  deliveryCharge: string | number;
+  discountAmount: string | number;
+  totalAmount: string | number;
+  currency: string;
+  shippingAddress?: string | null;
+  courier?: string | null;
+  trackingId?: string | null;
+  customerNotes?: string | null;
+  internalNotes?: string | null;
+  expectedDeliveryDate?: string | null;
+  dispatchedAt?: ISODateString | null;
+  deliveredAt?: ISODateString | null;
+  isDeleted: boolean;
+  createdAt: ISODateString;
+  updatedAt: ISODateString;
+  items: DbOrderItem[];
+}
+
+export interface OrderListResponse {
+  orders: DbOrder[];
+  statusCounts: {
+    all: number;
+    pending: number;
+    confirmed: number;
+    in_production: number;
+    ready: number;
+    dispatched: number;
+    delivered: number;
+    cancelled: number;
+  };
+  total: number;
+}
+
+export interface OrderResponse {
+  ok: boolean;
+  order: DbOrder;
+}
+
+export interface CreateOrderItemInput {
+  productId?: string | null | undefined;
+  productName: string;
+  productDescription?: string | null | undefined;
+  quantity: number;
+  unitPrice: number;
+  customizations?: Record<string, unknown> | undefined;
+}
+
+export interface CreateOrderRequest {
+  orderNo?: string | undefined;
+  customerName: string;
+  customerPhone?: string | null | undefined;
+  customerEmail?: string | null | undefined;
+  customerId?: string | null | undefined;
+  channel?: "whatsapp" | "instagram" | undefined;
+  status?: OrderStatus | undefined;
+  shippingAddress?: string | null | undefined;
+  courier?: string | null | undefined;
+  trackingId?: string | null | undefined;
+  expectedDeliveryDate?: string | null | undefined;
+  customerNotes?: string | null | undefined;
+  internalNotes?: string | null | undefined;
+  deliveryCharge?: number | undefined;
+  discountAmount?: number | undefined;
+  items: CreateOrderItemInput[];
+}
+
+export interface UpdateOrderRequest {
+  customerName?: string | undefined;
+  customerPhone?: string | null | undefined;
+  customerEmail?: string | null | undefined;
+  channel?: "whatsapp" | "instagram" | undefined;
+  status?: OrderStatus | undefined;
+  shippingAddress?: string | null | undefined;
+  courier?: string | null | undefined;
+  trackingId?: string | null | undefined;
+  expectedDeliveryDate?: string | null | undefined;
+  customerNotes?: string | null | undefined;
+  internalNotes?: string | null | undefined;
+  deliveryCharge?: number | undefined;
+  discountAmount?: number | undefined;
+  items?: CreateOrderItemInput[] | undefined;
+}
+
+export interface UpdateOrderStatusRequest {
+  status: OrderStatus;
+  trackingId?: string | null | undefined;
+  courier?: string | null | undefined;
+  sendNotification?: boolean | undefined;
+}
