@@ -31,6 +31,11 @@ export const queryKeys = {
   knowledgeBase: {
     all: ["knowledge-base"] as const,
   },
+  products: {
+    all: ["products"] as const,
+    list: (active?: string) => [...queryKeys.products.all, "list", active ?? "active"] as const,
+    detail: (id: string) => [...queryKeys.products.all, "detail", id] as const,
+  },
   analytics: {
     all: ["analytics"] as const,
     range: (params: AnalyticsParams) => [...queryKeys.analytics.all, params] as const,
@@ -39,4 +44,9 @@ export const queryKeys = {
     all: ["audit-log"] as const,
     list: (params: AuditLogParams) => [...queryKeys.auditLog.all, params] as const,
   },
+  payments: {
+    all: ["payments"] as const,
+    byOrder: (orderId: string) => [...queryKeys.payments.all, "order", orderId] as const,
+  },
 };
+

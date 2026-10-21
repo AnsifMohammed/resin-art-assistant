@@ -1,7 +1,7 @@
 import type { Content } from "@google/genai";
-import { eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { db } from "../db/index.ts";
-import { knowledgeBase } from "../db/schema.ts";
+import { knowledgeBase, products } from "../db/schema.ts";
 import { redis } from "../lib/redis.ts";
 
 export const KB_CACHE_KEY = (businessId: string) => `kb:${businessId}`;
@@ -20,7 +20,27 @@ export async function getKnowledgeBase(businessId: string): Promise<Record<strin
     throw new Error(`No knowledge base found for business ${businessId}`);
   }
 
-  const data = row.data as Record<string, unknown>;
+  const productRows = await db
+    .select()
+    .from(products)
+    .where(and(eq(products.businessId, businessId), eq(products.isActive, true)))
+    .orderBy(asc(products.sortOrder), asc(products.name));
+
+  const mappedProducts = productRows.map((p) => ({
+    id: p.slug,
+    name: p.name,
+    description: p.description,
+    sizes: p.sizes,
+    lead_time_days: p.leadTimeDays,
+    customizable: p.customizable,
+    custom_options: p.customOptions,
+  }));
+
+  const data: Record<string, unknown> = {
+    ...(row.data as Record<string, unknown>),
+    products: mappedProducts,
+  };
+
   await redis.setex(KB_CACHE_KEY(businessId), KB_CACHE_TTL, JSON.stringify(data));
   return data;
 }
@@ -111,9 +131,15 @@ DO NOT include any markdown formatting, backticks (\`\`\`), or explanations. Out
 1. OUTPUT FORMAT: Return ONLY the raw JSON object. No intro, no outro, no markdown blocks.
 2. LANGUAGE: If the customer writes in Malayalam or Manglish, reply in that language matching tone examples.
 3. AUTO-REPLIES: Answer directly for 'price', 'delivery', 'care', or 'custom_order' ONLY IF the item exists in the knowledge base.
-4. MISSING FACTS: If an item is NOT in the knowledge base, do not invent facts; list it in "missing_facts" and set escalate: true with escalate_reason: "missing_facts".
-5. ESCALATIONS: Always escalate if the intent is complaint, refund, unknown, payment, or off_topic.
-6. TONE: Warm, personal, friendly, polite, like a helpful small artisan business owner.
-7. The latest user turn may contain several customer messages sent in quick succession (one per line). Answer them together in a single reply.
-8. Earlier assistant turns prefixed with "[Owner]: " or "[Staff]: " were written by a human at the business, not by you. Stay consistent with them.`;
+4. SIZES & PRICING:
+   - Each size has its own price.
+   - When a customer does not name a size, list every size with its price.
+   - When they name a size, quote only that one.
+   - Never invent a size or price that is not listed.
+   - Format facts_used for product prices as "products.<slug>.sizes.<size name>.price: <price>".
+5. MISSING FACTS: If an item or requested size is NOT in the knowledge base, do not invent facts; list it in "missing_facts" and set escalate: true with escalate_reason: "missing_facts".
+6. ESCALATIONS: Always escalate if the intent is complaint, refund, unknown, payment, or off_topic.
+7. TONE: Warm, personal, friendly, polite, like a helpful small artisan business owner.
+8. The latest user turn may contain several customer messages sent in quick succession (one per line). Answer them together in a single reply.
+9. Earlier assistant turns prefixed with "[Owner]: " or "[Staff]: " were written by a human at the business, not by you. Stay consistent with them.`;
 }

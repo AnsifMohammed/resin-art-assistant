@@ -14,10 +14,40 @@ import {
 import { toast } from "sonner";
 import { ChannelIcon } from "../components/shared/ChannelIcon.tsx";
 import { SampleDataBadge } from "../components/shared/SampleDataBadge.tsx";
+import { PaymentsPanel } from "../components/orders/PaymentsPanel.tsx";
+import { useOrderPayments } from "../hooks/usePayments.ts";
 import {
   mockOrders,
   type Order,
 } from "../data/mockData.ts";
+
+function OrderPaymentChip({ orderId, orderTotal }: { orderId: string; orderTotal: number }) {
+  const { data } = useOrderPayments(orderId);
+  const summary = data?.summary;
+
+  if (!summary || summary.totalPaid === 0) {
+    const bal = summary?.balanceDue ?? orderTotal;
+    return (
+      <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-stone-500/10 text-stone-600 dark:text-stone-400 border border-stone-500/20 tabular-nums">
+        Bal: ₹{bal.toLocaleString("en-IN")}
+      </span>
+    );
+  }
+
+  if (summary.paymentState === "fully_paid") {
+    return (
+      <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
+        Fully Paid
+      </span>
+    );
+  }
+
+  return (
+    <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 tabular-nums">
+      Advance Paid · Bal: ₹{summary.balanceDue.toLocaleString("en-IN")}
+    </span>
+  );
+}
 
 type OrderStatus = Order["status"];
 
@@ -224,9 +254,12 @@ export default function Orders() {
                         </div>
 
                         <div className="flex items-center justify-between pt-2 border-t border-border/40">
-                          <span className="text-13 font-bold font-outfit text-text tabular-nums">
-                            ₹{o.total.toLocaleString("en-IN")}
-                          </span>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-13 font-bold font-outfit text-text tabular-nums">
+                              ₹{o.total.toLocaleString("en-IN")}
+                            </span>
+                            <OrderPaymentChip orderId={o.id} orderTotal={o.total} />
+                          </div>
 
                           {o.trackingId ? (
                             <button
@@ -421,6 +454,11 @@ export default function Orders() {
                   </span>
                 </div>
               </div>
+            </div>
+
+            {/* Payments & Invoicing Panel */}
+            <div className="pt-2 border-t border-border/40">
+              <PaymentsPanel orderId={activeOrder.id} orderTotal={activeOrder.total} />
             </div>
           </div>
         </div>

@@ -57,3 +57,12 @@ export function emitSettingsUpdated(businessId: string, payload: SettingsUpdated
 export function disconnectUserEverywhere(businessId: string, userId: string): void {
   publish({ kind: "user:disconnect", businessId, userId });
 }
+
+/** An order or payment was updated. */
+export function emitOrderUpdated(
+  businessId: string,
+  payload: { orderId: string; [key: string]: unknown },
+): void {
+  (publish as (env: unknown) => void)({ kind: "order:updated", businessId, payload });
+}
+
