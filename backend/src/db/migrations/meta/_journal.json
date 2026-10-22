@@ -43,6 +43,13 @@
       "when": 1792606984684,
       "tag": "0005_customers_broadcasts",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1792694577033,
+      "tag": "0006_products_payments",
+      "breakpoints": true
     }
   ]
 }
