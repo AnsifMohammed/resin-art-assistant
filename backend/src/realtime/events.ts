@@ -1,6 +1,8 @@
 import { publish } from "./bus.ts";
 import type {
+  BroadcastUpdatedPayload,
   ConversationUpdatedPayload,
+  CustomerUpdatedPayload,
   EscalationAssignedPayload,
   EscalationNewPayload,
   MessageRow,
@@ -51,6 +53,16 @@ export function emitConversationAccessChanged(businessId: string, conversationId
 /** Business settings changed (pause/resume). Admin only. */
 export function emitSettingsUpdated(businessId: string, payload: SettingsUpdatedPayload): void {
   publish({ kind: "settings:updated", businessId, payload });
+}
+
+/** A customer's profile, segment flags or opt-out changed. Admin only. */
+export function emitCustomerUpdated(businessId: string, payload: CustomerUpdatedPayload): void {
+  publish({ kind: "customer:updated", businessId, payload });
+}
+
+/** A broadcast changed status or made sending progress. Admin only. */
+export function emitBroadcastUpdated(businessId: string, payload: BroadcastUpdatedPayload): void {
+  publish({ kind: "broadcast:updated", businessId, payload });
 }
 
 /** Close a user's sockets on every API process (deactivation). */

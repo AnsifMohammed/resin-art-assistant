@@ -425,6 +425,16 @@ describe("selectBatch / normalizeReason", () => {
     expect(selectBatch(all, new Set(["d"])).batch.map((m) => m.id)).toEqual(["e"]);
   });
 
+  it("does not treat a broadcast as a reply boundary", () => {
+    const all = [
+      msg({ id: "a", content: "is the clock available?" }),
+      msg({ id: "b", direction: "outbound", senderType: "system", content: "Diwali offer", metadata: { kind: "broadcast" } }),
+      msg({ id: "c", content: "in blue?" }),
+    ] as any[];
+
+    expect(selectBatch(all, new Set()).batch.map((m) => m.id)).toEqual(["a", "c"]);
+  });
+
   it("stores enum reasons as-is (incl. window_closed, intent_payment, intent_off_topic)", () => {
     expect(normalizeReason("window_closed")).toBe("window_closed");
     expect(normalizeReason("intent_payment")).toBe("intent_payment");

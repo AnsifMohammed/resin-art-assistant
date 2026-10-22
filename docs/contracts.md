@@ -26,7 +26,9 @@ Every endpoint below is implemented in `backend/src/routes`; shapes are copied f
 ```ts
 User        { id, businessId, name, email, role: "admin"|"staff", active, lastLoginAt|null, createdAt, updatedAt }
 Channel     { id, businessId, type: "instagram"|"whatsapp", identifier, tokenExpiresAt|null, status, createdAt, updatedAt }
-Customer    { id, businessId, channelId, name|null, handleOrPhone, language|null, notes|null, createdAt, updatedAt }
+Customer    { id, businessId, channelId, name|null, handleOrPhone, language|null, notes|null, city|null,
+              isFavourite, isPriority, optedOut, optedOutAt|null, optOutSource: "keyword"|"admin"|null,
+              createdAt, updatedAt }
 Conversation{ id, businessId, customerId, channelId, state, tag|null, lastCustomerMessageAt|null, windowClosesAt|null,
               lastMessageAt|null, adminLastReadAt|null, createdAt, updatedAt }
 Message     { id, conversationId, businessId, direction, senderType, senderId|null, content|null, mediaUrls: string[],
@@ -203,6 +205,184 @@ Copies the template as `"<name> (Copy)"`, or `"(Copy 2)"`, `"(Copy 3)"`… (firs
 
 Staff calling POST/PATCH/DELETE/duplicate → `403 FORBIDDEN`.
 
+## Customers (admin only)
+
+Staff calling any route below → `403 FORBIDDEN`. All routes are scoped to the caller's business.
+
+### Segments (shared with broadcasts, `backend/src/lib/segments.ts`)
+
+"Orders" = the customer's `orders` rows with `isDeleted = false` and `status <> "cancelled"`.
+
+| Segment | Rule |
+|---|---|
+| `all` | every customer |
+| `favourites` | `isFavourite` |
+| `priority` | `isPriority` |
+| `previous_buyers` | ≥ 1 order |
+| `repeat_buyers` | ≥ 2 orders |
+| `new` | customer `createdAt` within the last 14 days (`NEW_DAYS`) |
+| `never_ordered` | 0 orders |
+| `inactive` | ≥ 1 order and the latest order is older than 90 days (`INACTIVE_DAYS`) |
+
+Filters (AND-ed with the segment): `city` (trimmed, case-insensitive exact match), `language` (exact),
+`excludeComplaints` (drop customers with **any** escalation, open or resolved, whose reason is `intent_complaint` or
+`intent_refund`).
+
+```ts
+CustomerSegment = "favourites"|"priority"|"previous_buyers"|"repeat_buyers"|"new"|"never_ordered"|"inactive"
+Segment         = "all" | CustomerSegment
+
+CustomerListItem {
+  id, name|null, handleOrPhone, channel: "whatsapp"|"instagram", city|null, language|null, notes|null,
+  isFavourite, isPriority, optedOut, optedOutAt|null, createdAt,
+  conversationId|null,            // latest conversation (by lastMessageAt, then createdAt)
+  conversationState|null,         // its state
+  lastMessageAt|null,             // its lastMessageAt
+  ordersCount: number, totalSpend: number /* rupees */, lastOrderAt|null,
+  segments: CustomerSegment[]     // every segment (except "all") this customer is in
+}
+```
+
+### GET /customers
+Query: `segment?` (default `all`), `search?` (trimmed, ≤ 100; ILIKE on name, handleOrPhone and city; `%`, `_`, `\`
+match literally; empty = ignored), `city?`, `language?`, `channel?` (`whatsapp|instagram`),
+`sort?` (`recent` = latest conversation's `lastMessageAt` desc, nulls last — default; `spend` = totalSpend desc;
+`orders` = ordersCount desc; `name` = name asc, nulls last), `page?` (default 1), `limit?` (default **24**, max 100).
+
+`200 { customers: CustomerListItem[], pagination: { page, limit, total }, counts: Record<Segment, number> }`
+
+`counts` are per segment for the **whole business**; `search`, `city`, `language` and `channel` are not applied to
+them. `total` is the filtered total. Invalid query → `400 VALIDATION_ERROR` (`details`).
+
+### GET /customers/:id
+`200 { customer: CustomerListItem }`. Unknown / other business → `404 NOT_FOUND`.
+
+### PATCH /customers/:id
+Body (strict, all optional): `name` (trimmed 1..100 | null), `city` (trimmed ≤ 80 | null; `""` → null),
+`notes` (trimmed ≤ 2000 | null; `""` → null), `isFavourite`, `isPriority`, `optedOut`.
+- `optedOut: true` → `optedOutAt = now`, `optOutSource = "admin"`; `false` → both cleared.
+- Fields equal to the current value are ignored; nothing changed → no write, no audit, no event.
+- Audit `customer_updated` `{ customerId, fields: string[] }` (profile/flag fields) and `customer_opted_out` /
+  `customer_opted_in` `{ customerId, source: "admin" }` when `optedOut` changes. Emits `customer:updated`.
+
+`200 { customer: CustomerListItem }`. Errors: `400 VALIDATION_ERROR` (incl. unknown keys), `404 NOT_FOUND`.
+
+### GET /customers/:id/orders
+Newest first, deleted orders excluded (cancelled orders are included).
+`200 { orders: [{ id, orderNo, status, totalAmount: number, createdAt, itemsCount: number }] }`. `404 NOT_FOUND`.
+
+### Opt-out by message (STOP / START)
+Inbound customer messages (Meta webhook on WhatsApp **and** Instagram, and `POST /simulate/message`) are checked after
+being stored. The text is trimmed, lowercased, inner whitespace collapsed and trailing punctuation stripped; only a
+message that is **exactly** a keyword counts.
+- `stop`, `unsubscribe`, `stop all`, `நிறுத்து` → `optedOut = true`, `optedOutAt = now`, `optOutSource = "keyword"`
+  (a repeated STOP keeps the original time), audit `customer_opted_out` (`actorType: "system"`,
+  `details: { customerId, source: "keyword", messageId }`), `customer:updated`, and an outbound **system** message
+  `"You won't receive offers from us anymore. Reply START to subscribe again."` (`metadata.kind = "opt_out_ack"`).
+- `start` from an **opted-out** customer → opt-out cleared, audit `customer_opted_in`, ack `"You're subscribed again 😊"`
+  (`metadata.kind = "opt_in_ack"`). From a subscribed customer `start` is a normal message.
+- In both cases the AI is **not** queued for that message. The ack is a normal `message:new`.
+
+## Broadcasts (admin only)
+
+One WhatsApp template sent to a customer segment. Staff → `403 FORBIDDEN`. Business-scoped.
+Not found / other business → `404 NOT_FOUND`.
+
+Audience = customers matching `segment` + `filters` whose channel is **whatsapp** and `optedOut = false`.
+Limit: `BROADCAST_MAX_RECIPIENTS` (env, default 250). Sending pace: `BROADCAST_RATE_PER_SEC` (env, default 10).
+
+Status flow: `draft → scheduled → sending → sent | failed`; `scheduled | sending → cancelled`.
+`failed` = every recipient failed, or the job could not start (`error` says why: `template_not_approved`,
+`template_variables_missing`, `empty_audience`, `audience_too_large`, `all_recipients_failed`).
+
+```ts
+BroadcastStatus  = "draft"|"scheduled"|"sending"|"sent"|"cancelled"|"failed"
+BroadcastFilters { city?: string, language?: string, excludeComplaints?: boolean }
+BroadcastStats   { pending, sent, delivered, read, failed }   // recipient counts by status
+BroadcastSummary {
+  id, name, templateId, templateName|null, segment: Segment, filters: BroadcastFilters,
+  variables: Record<string, string>, status: BroadcastStatus, scheduledAt|null, startedAt|null, completedAt|null,
+  recipientCount,            // audience snapshot size (0 until sending starts)
+  error|null, stats: BroadcastStats, createdAt, createdByUserId|null
+}
+BroadcastRecipient {
+  id, customerId, customerName|null, phone,
+  status: "pending"|"sent"|"delivered"|"read"|"failed",
+  error|null,                // e.g. "opted_out", "customer_not_found", send error, Meta error "131026: …"
+  sentAt|null, deliveredAt|null, readAt|null
+}
+```
+
+### GET /broadcasts/audience
+Query: `segment?` (default `all`), `city?`, `language?`, `excludeComplaints?` (`true|false`).
+`200 { count: number, max: number }` (`max` = `BROADCAST_MAX_RECIPIENTS`).
+
+### GET /broadcasts
+Query: `status?`, `page?` (default 1), `limit?` (default 20, max 100). Newest first.
+`200 { broadcasts: BroadcastSummary[], pagination: { page, limit, total } }`
+
+### GET /broadcasts/:id
+Query: `page?` (default 1), `limit?` (default 50, max 200) — pages the recipients (snapshot order).
+`200 { broadcast: BroadcastSummary, recipients: BroadcastRecipient[], pagination: { page, limit, total } }`
+
+### POST /broadcasts
+Body (strict):
+```ts
+{ name: string /* trimmed 1..100 */, templateId: string, segment: Segment,
+  filters?: BroadcastFilters /* strict; city ≤ 80, language ≤ 40 */,
+  variables?: Record<string, string /* ≤ 1000 */>,
+  scheduledAt?: string /* ISO with offset */ | null,
+  action: "draft" | "schedule" | "send_now" }
+```
+Checks, in order:
+1. Payload → `400 VALIDATION_ERROR` (`details`).
+2. `action: "schedule"` needs `scheduledAt` ≥ now + 1 min → otherwise `400 VALIDATION_ERROR`
+   (`details: [{ path: "scheduledAt", … }]`). A draft may carry a `scheduledAt` (same rule); `send_now` ignores it.
+3. Template must be this business's, active, channel `whatsapp|both`, with `metaTemplateName` set and
+   `metaStatus: "approved"` → otherwise `400 TEMPLATE_NOT_APPROVED` ("Broadcasts need a WhatsApp template approved by
+   Meta"; also for an unknown template id).
+4. Every template variable except `customerName` needs a non-blank value in `variables` →
+   `400 TEMPLATE_VARIABLES_MISSING`, `details: [{ path: "<variable>", message: "required" }]`.
+   `{customerName}` is always filled per recipient (customer name, else phone).
+5. Audience count: `0` → `400 EMPTY_AUDIENCE`; `> max` → `409 AUDIENCE_TOO_LARGE`, `details: { count, max }`.
+
+Result: `draft` → status `draft`; `schedule` → `scheduled`; `send_now` → `sending` (`startedAt = now`) and the send job
+is queued. Audit `broadcast_created` `{ broadcastId, name, segment, status }`, plus `broadcast_scheduled` or
+`broadcast_started`. Emits `broadcast:updated`. `201 { broadcast: BroadcastSummary }`
+
+### PATCH /broadcasts/:id
+Only `draft` or `scheduled` → otherwise `409 BROADCAST_LOCKED`.
+Body (strict, all optional): `name`, `templateId`, `segment`, `filters`, `variables`, `scheduledAt`,
+`action?: "schedule" | "send_now"` (move forward; without `action` the status is kept). Template, variables and
+audience are re-validated on the merged values (same errors as POST); a scheduled broadcast's `scheduledAt` must stay
+≥ now + 1 min. If the dispatcher started it meanwhile → `409 BROADCAST_LOCKED`.
+Audit `broadcast_updated` (+ `broadcast_scheduled` / `broadcast_started`). `200 { broadcast: BroadcastSummary }`
+
+### POST /broadcasts/:id/cancel
+`scheduled` or `sending` → `cancelled` (`completedAt = now`), atomically (guarded on the status read). A sending job
+stops before its next batch of 50, so up to one batch may still go out; unsent recipients stay `pending`.
+Any other status → `409 BROADCAST_LOCKED`. Audit `broadcast_cancelled` `{ broadcastId, name, from }`.
+`200 { broadcast: BroadcastSummary }`
+
+### DELETE /broadcasts/:id
+Drafts only (`409 BROADCAST_LOCKED` otherwise). Audit `broadcast_deleted`. `204`.
+
+### Sending (queue)
+- `dispatch-broadcasts` (cron, every minute): `UPDATE … SET status='sending', startedAt=now WHERE status='scheduled'
+  AND scheduledAt <= now RETURNING id` → one `send-broadcast` job each (also re-queues `sending` broadcasts started
+  > 5 min ago, in case a job was lost). Without pg-boss the same check runs in-process every minute.
+- `send-broadcast` (`singletonKey = broadcastId`): snapshots the audience into recipients once (re-checked: empty or
+  over the limit → `failed`), then sends pending recipients in batches of 50 at `BROADCAST_RATE_PER_SEC`. Each send
+  re-checks opt-out (`failed`, `error: "opted_out"`). If the customer has a conversation, the rendered text is also
+  stored there as an outbound message (`senderType: "system"`, `metadata: { kind: "broadcast", broadcastId,
+  templateId }`, `message:new` emitted; `conversation.lastMessageAt` is not bumped); no conversation is ever created.
+  Ends `sent` (≥ 1 recipient reached) or `failed`; audit `broadcast_sent` `{ broadcastId, name, status, ...stats }`.
+  Retries only touch `pending` recipients.
+- Delivery receipts: WhatsApp webhook `statuses[]` (`sent|delivered|read|failed`) update recipients and
+  `messages.deliveryStatus` by Meta message id, forward-only (`pending < sent < delivered < read`; `failed` only from
+  `pending`/`sent`). Note: `sendMessage` returns `metaMessageId: null` in DEMO_MODE (live sending is not implemented
+  yet), so receipts only apply once live sending stores Meta ids.
+
 ## Escalations
 
 ### GET /escalations
@@ -307,7 +487,9 @@ returns 410 and the backend deletes the row.
 
 ### POST /simulate/message
 Admin only. Body `{ customerName, channel?: "whatsapp"|"instagram" (default whatsapp), text, imageUrl? }` →
-`202 { ok: true, messageId: string|null, conversationId, state, queued: "queued"|"batched"|"inline", decision: null }`
+`202 { ok: true, messageId: string|null, conversationId, state, queued: "queued"|"batched"|"inline"|"skipped",
+optAction: "opt_out"|"opt_in"|null, decision: null }`
+`queued: "skipped"` + `optAction` set: the text was a STOP/START keyword (see "Opt-out by message"); the AI was not queued.
 The AI runs after the 10 s batching window; the outcome arrives over the WebSocket (`message:new`,
 `conversation:updated`, `escalation:new`) and via `GET /conversations/:id`.
 
@@ -341,13 +523,15 @@ queries every 5 s (polling fallback), and it refetches once after a reconnect.
 
 | Event | Who receives it | Payload | Emitted when |
 |---|---|---|---|
-| `message:new` | admins | `{ conversationId, message: Message }` | every stored message: inbound customer (simulate, webhook), AI auto-reply (incl. a failed send, `deliveryStatus: "failed"`), owner/staff reply (incl. failed), owner echo from the phone app (a `system` message would go through the same helper; none are created today) |
+| `message:new` | admins | `{ conversationId, message: Message }` | every stored message: inbound customer (simulate, webhook), AI auto-reply (incl. a failed send, `deliveryStatus: "failed"`), owner/staff reply (incl. failed), owner echo from the phone app, `system` messages (STOP/START acknowledgements, broadcast sends into an existing conversation) |
 | `message:new:<conversationId>` | subscribers of that topic (staff re-authorized at delivery) | same as `message:new` | same as `message:new` |
 | `conversation:updated` | admins | `{ conversationId, state, tag }` | escalation (AI rule, window closed, processing failure), auto-reply (tag), owner/staff reply (`owner_handling`), resolve (`ai_active`), echo (`owner_handling`), pause (`paused`) / resume (`ai_active`) |
 | `escalation:new` | admins + all staff | `{ escalationId, conversationId, reason, customerName }` | every escalation creation path (AI decision, `window_closed`, `parse_error` after failures / dead letter) |
 | `escalation:assigned` | admins | `{ escalationId, conversationId, assignedToUserId: string\|null }` | `POST /escalations/:id/assign` (assign, reassign, unassign) |
 | `escalation:assigned:<userId>` | that staff member only | same as `escalation:assigned` | when they become the assignee, and when they stop being it (reassign/unassign) |
 | `settings:updated` | admins | `{ paused: boolean }` | `POST /settings/pause` |
+| `customer:updated` | admins | `{ customerId }` | `PATCH /customers/:id` (when something changed), STOP/START keyword opt-out/in |
+| `broadcast:updated` | admins | `{ broadcastId, status: BroadcastStatus, stats: BroadcastStats }` | every status change (create, schedule, send, dispatch, cancel, finish, fail) and sending/receipt progress (progress throttled to ≤ 1 per 2 s per broadcast, with a trailing emit) |
 | `subscription:revoked` | the affected staff member | `{ event: "message:new:<id>", conversationId }` | their access ended (resolved, reassigned to someone else); the subscription is dropped |
 
 `reason` is one of the `escalation_reason` enum values: `intent_complaint`, `intent_refund`, `intent_unknown`,
@@ -357,7 +541,8 @@ queries every 5 s (polling fallback), and it refetches once after a reconnect.
 ### Scoping rules (enforced in `backend/src/realtime/websocket.ts`)
 
 - Every event is delivered only to sockets whose JWT `businessId` matches the event's business.
-- Staff never receive `message:new`, `conversation:updated`, `escalation:assigned` or `settings:updated`.
+- Staff never receive `message:new`, `conversation:updated`, `escalation:assigned`, `settings:updated`,
+  `customer:updated` or `broadcast:updated`.
 - Staff `message:new:<id>` delivery is re-checked against the escalation table at delivery time; on resolve or reassign
   the server also re-checks immediately and sends `subscription:revoked`, so a stale subscription never leaks messages.
 - Events can originate in any API process (e.g. the pg-boss worker). `backend/src/realtime/bus.ts` delivers each event
@@ -375,4 +560,6 @@ queries every 5 s (polling fallback), and it refetches once after a reconnect.
 | `message:new` | append to the cached thread, invalidate conversation lists + escalations | not received |
 | `message:new:<id>` | append (open chat) | append (open chat) |
 | `settings:updated` | update + invalidate `settings` | not received |
+| `customer:updated` | invalidate `customers` + broadcast audience counts | not received |
+| `broadcast:updated` | invalidate `broadcasts` (history, detail, audience) | not received |
 | `subscription:revoked` | not received | invalidate escalations + that conversation (chat then shows "not assigned to you") |

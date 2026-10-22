@@ -105,7 +105,7 @@ export function ReplyBox({
           placeholder={windowClosed ? "Window closed: send an approved template" : `Reply to ${customerName}…`}
           aria-describedby={windowClosed ? warningId : undefined}
           disabled={textDisabled}
-          className="max-h-40 min-h-11 w-full resize-none border-none bg-transparent text-[15px] text-text placeholder:text-text-muted focus:outline-none disabled:cursor-not-allowed sm:text-13"
+          className="max-h-40 min-h-11 w-full resize-none border-none bg-transparent text-14 text-text placeholder:text-text-muted focus:outline-none disabled:cursor-not-allowed"
         />
 
         <div className="flex items-center justify-between gap-2 border-t border-border/40 pt-2 text-12">

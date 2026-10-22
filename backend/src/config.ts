@@ -150,6 +150,10 @@ export const envSchema = z
     VAPID_PUBLIC_KEY: optional(),
     VAPID_PRIVATE_KEY: optional(),
     VAPID_EMAIL: optional(),
+
+    // Broadcasts
+    BROADCAST_MAX_RECIPIENTS: z.coerce.number().int().min(1).default(250),
+    BROADCAST_RATE_PER_SEC: z.coerce.number().positive().max(80).default(10),
   })
   .superRefine((env, ctx) => {
     if (env.DEMO_MODE) return;

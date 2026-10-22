@@ -60,6 +60,19 @@ export const orderStatusEnum = pgEnum("order_status", [
   "dispatched", "delivered", "cancelled"
 ]);
 
+export const broadcastStatusEnum = pgEnum("broadcast_status", [
+  "draft", "scheduled", "sending", "sent", "cancelled", "failed"
+]);
+
+export const broadcastSegmentEnum = pgEnum("broadcast_segment", [
+  "all", "favourites", "priority", "previous_buyers",
+  "repeat_buyers", "new", "never_ordered", "inactive"
+]);
+
+export const recipientStatusEnum = pgEnum("recipient_status", [
+  "pending", "sent", "delivered", "read", "failed"
+]);
+
 // ─── Tables ───────────────────────────────────────────────────────────────────
 
 // One row per business (SaaS-ready)
@@ -113,11 +126,18 @@ export const customers = pgTable("customers", {
   handleOrPhone: text("handle_or_phone").notNull(),
   language: text("language").default("english"),
   notes: text("notes"),
+  city: text("city"),
+  isFavourite: boolean("is_favourite").notNull().default(false),
+  isPriority: boolean("is_priority").notNull().default(false),
+  optedOut: boolean("opted_out").notNull().default(false),  // no broadcasts/offers
+  optedOutAt: timestamp("opted_out_at"),
+  optOutSource: text("opt_out_source"),                // "keyword" | "admin"
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 }, (t) => [
   index("customers_business_idx").on(t.businessId),
   index("customers_channel_idx").on(t.channelId),
+  index("customers_business_segment_idx").on(t.businessId, t.isFavourite, t.isPriority),
 ]);
 
 // One conversation per customer (ongoing thread)
@@ -343,3 +363,53 @@ export const orderItems = pgTable("order_items", {
   index("idx_order_items_order").on(t.orderId).where(sql`${t.isDeleted} = false`),
 ]);
 
+
+export type BroadcastFilters = {
+  city?: string;
+  language?: string;
+  excludeComplaints?: boolean;
+};
+
+// One-to-many WhatsApp template sends to a customer segment
+export const broadcasts = pgTable("broadcasts", {
+  id: id(),
+  businessId: businessId(),
+  name: text("name").notNull(),
+  templateId: text("template_id").notNull(),
+  segment: broadcastSegmentEnum("segment").notNull(),
+  filters: jsonb("filters").$type<BroadcastFilters>().notNull().default({}),
+  variables: jsonb("variables").$type<Record<string, string>>().notNull().default({}),
+  status: broadcastStatusEnum("status").notNull().default("draft"),
+  scheduledAt: timestamp("scheduled_at"),
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+  recipientCount: integer("recipient_count").notNull().default(0),
+  error: text("error"),
+  createdByUserId: text("created_by_user_id"),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, (t) => [
+  index("broadcasts_business_status_idx").on(t.businessId, t.status, t.scheduledAt),
+]);
+
+// Audience snapshot of a broadcast: one row per customer, with delivery status
+export const broadcastRecipients = pgTable("broadcast_recipients", {
+  id: id(),
+  businessId: businessId(),
+  broadcastId: text("broadcast_id").notNull(),
+  customerId: text("customer_id").notNull(),
+  conversationId: text("conversation_id"),             // null = customer has no conversation
+  messageId: text("message_id"),                       // outbound message row, when a conversation exists
+  phone: text("phone").notNull(),
+  status: recipientStatusEnum("status").notNull().default("pending"),
+  metaMessageId: text("meta_message_id"),
+  error: text("error"),
+  sentAt: timestamp("sent_at"),
+  deliveredAt: timestamp("delivered_at"),
+  readAt: timestamp("read_at"),
+  createdAt: createdAt(),
+}, (t) => [
+  uniqueIndex("broadcast_recipients_unique_idx").on(t.broadcastId, t.customerId),
+  index("broadcast_recipients_status_idx").on(t.broadcastId, t.status),
+  index("broadcast_recipients_meta_id_idx").on(t.metaMessageId),
+]);

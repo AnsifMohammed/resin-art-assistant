@@ -131,7 +131,7 @@ export function MessageBubble({ message, senderLabel, pending = false }: Message
     <div
       className={cn(
         bubbleStyles[senderType],
-        "max-w-[85%] px-3.5 py-2 text-[15px] leading-relaxed shadow-xs sm:max-w-[70%] sm:text-13",
+        "max-w-[85%] px-3.5 py-2 text-14 leading-relaxed shadow-xs sm:max-w-[70%]",
         message.aiDecision && "max-w-full sm:max-w-full",
         pending && "opacity-70",
       )}

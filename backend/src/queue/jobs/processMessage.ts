@@ -62,13 +62,18 @@ export async function isAutomationPaused(businessId: string): Promise<boolean> {
  * last outbound message (AI, owner or staff) or the last inbound message
  * already linked to an ai_decisions row.
  */
+function isBroadcast(m: MessageRow): boolean {
+  return (m.metadata as { kind?: string } | null)?.kind === "broadcast";
+}
+
 export function selectBatch(
   allMessages: MessageRow[],
   processedMessageIds: Set<string>,
 ): { batch: MessageRow[]; history: MessageRow[] } {
   let boundary = -1;
   allMessages.forEach((m, i) => {
-    if (m.direction === "outbound" || processedMessageIds.has(m.id)) boundary = i;
+    // A broadcast is not a reply, so it must not hide customer messages sent just before it.
+    if ((m.direction === "outbound" && !isBroadcast(m)) || processedMessageIds.has(m.id)) boundary = i;
   });
 
   const after = allMessages.slice(boundary + 1);

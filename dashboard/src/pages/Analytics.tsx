@@ -870,10 +870,10 @@ export default function Analytics() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-stretch">
         {/* Card 1: Revenue by Channel */}
         <div className="p-5 rounded-xl border border-border bg-surface flex flex-col justify-between">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between mb-3.5">
             <div>
               <SectionHeading title="Revenue by channel" sample />
-              <p className="text-11 text-text-muted mt-0.5">Sales contribution by messaging channel</p>
+              <p className="text-12 text-text-muted mt-0.5">Sales contribution by messaging channel</p>
             </div>
             <span className="text-12 text-text-muted font-medium bg-surface-muted px-2.5 py-1 rounded-full border border-border/50 shrink-0">
               Proportion split
@@ -882,8 +882,8 @@ export default function Analytics() {
 
           <div className="space-y-3.5 flex-1 flex flex-col justify-between">
             {/* Top: Stat Cards Pair */}
-            <div className="grid grid-cols-2 gap-3.5">
-              <div className="p-3.5 rounded-xl border border-border/60 bg-surface-muted">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="p-3 rounded-xl border border-border/60 bg-surface-muted">
                 <div className="flex items-center justify-between gap-1 mb-1.5">
                   <div className="flex items-center gap-1.5">
                     <ChannelIcon channel="whatsapp" size={14} />
@@ -896,12 +896,12 @@ export default function Analytics() {
                 <p className="text-22 font-bold font-outfit text-text tabular-nums">
                   ₹{sample.channelSplit.whatsapp.revenue.toLocaleString("en-IN")}
                 </p>
-                <p className="text-11 text-text-muted mt-1">
+                <p className="text-12 text-text-muted mt-1">
                   {sample.channelSplit.whatsapp.orders} orders · ₹2,111 avg
                 </p>
               </div>
 
-              <div className="p-3.5 rounded-xl border border-border/60 bg-surface-muted">
+              <div className="p-3 rounded-xl border border-border/60 bg-surface-muted">
                 <div className="flex items-center justify-between gap-1 mb-1.5">
                   <div className="flex items-center gap-1.5">
                     <ChannelIcon channel="instagram" size={14} />
@@ -914,14 +914,14 @@ export default function Analytics() {
                 <p className="text-22 font-bold font-outfit text-text tabular-nums">
                   ₹{sample.channelSplit.instagram.revenue.toLocaleString("en-IN")}
                 </p>
-                <p className="text-11 text-text-muted mt-1">
+                <p className="text-12 text-text-muted mt-1">
                   {sample.channelSplit.instagram.orders} orders · ₹2,100 avg
                 </p>
               </div>
             </div>
 
             {/* Middle: Proportion Bar Graph */}
-            <div className="space-y-2 p-3 rounded-xl border border-border/40 bg-surface-muted/30">
+            <div className="space-y-2 p-2.5 rounded-xl border border-border/40 bg-surface-muted/30">
               <div className="flex justify-between text-12 font-medium">
                 <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-semibold">
                   <span className="w-2 h-2 rounded-full bg-emerald-500" /> WhatsApp ({sample.channelSplit.whatsapp.percentage}%)
@@ -930,31 +930,23 @@ export default function Analytics() {
                   <span className="w-2 h-2 rounded-full bg-amber-500" /> Instagram ({sample.channelSplit.instagram.percentage}%)
                 </span>
               </div>
-              <div className="h-4 w-full bg-border/40 rounded-full overflow-hidden flex p-0.5 shadow-inner">
+              <div className="h-3 w-full bg-border/40 rounded-full overflow-hidden flex shadow-inner">
                 <div
                   style={{ width: `${sample.channelSplit.whatsapp.percentage}%` }}
-                  className="bg-emerald-500 h-full rounded-full transition-all duration-500 flex items-center justify-center text-[10px] text-white font-bold"
+                  className="bg-emerald-500 h-full rounded-l-full transition-all duration-500"
                   title={`WhatsApp: ${sample.channelSplit.whatsapp.percentage}%`}
-                >
-                  {sample.channelSplit.whatsapp.percentage >= 15 && `${sample.channelSplit.whatsapp.percentage}%`}
-                </div>
+                />
                 <div
                   style={{ width: `${sample.channelSplit.instagram.percentage}%` }}
-                  className="bg-amber-500 h-full rounded-full transition-all duration-500 flex items-center justify-center text-[10px] text-white font-bold"
+                  className="bg-amber-500 h-full rounded-r-full transition-all duration-500"
                   title={`Instagram: ${sample.channelSplit.instagram.percentage}%`}
-                >
-                  {sample.channelSplit.instagram.percentage >= 15 && `${sample.channelSplit.instagram.percentage}%`}
-                </div>
-              </div>
-              <div className="flex justify-between text-11 text-text-muted pt-0.5">
-                <span>₹{sample.channelSplit.whatsapp.revenue.toLocaleString("en-IN")} total volume</span>
-                <span>₹{sample.channelSplit.instagram.revenue.toLocaleString("en-IN")} total volume</span>
+                />
               </div>
             </div>
 
             {/* Bottom: Channel Orders Breakdown */}
             <div className="space-y-1.5">
-              <div className="flex items-center justify-between text-11">
+              <div className="flex items-center justify-between text-12">
                 <p className="font-semibold text-text">
                   Channel conversion details:
                 </p>
@@ -987,14 +979,14 @@ export default function Analytics() {
               <span className="inline-flex items-center gap-1.5 text-text font-medium">
                 <TrendingUp className="w-3.5 h-3.5 text-primary" /> Key Channel Trend:
               </span>
-              <span>WhatsApp leads repeat conversions (92%)</span>
+              <span className="truncate">WhatsApp leads repeat conversions (92%)</span>
             </div>
           </div>
         </div>
 
         {/* Card 2: AI Performance */}
         <div className="p-5 rounded-xl border border-border bg-surface flex flex-col justify-between">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between mb-3.5">
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-16 font-semibold font-outfit text-text">
@@ -1002,7 +994,7 @@ export default function Analytics() {
                 </h2>
                 <SampleDataBadge />
               </div>
-              <p className="text-11 text-text-muted mt-0.5">
+              <p className="text-12 text-text-muted mt-0.5">
                 Auto-replied vs escalated inbound inquiries
               </p>
             </div>
@@ -1013,8 +1005,8 @@ export default function Analytics() {
 
           <div className="space-y-3.5 flex-1 flex flex-col justify-between">
             {/* Top: Stat Cards Pair matching Card 1 */}
-            <div className="grid grid-cols-2 gap-3.5">
-              <div className="p-3.5 rounded-xl border border-border/60 bg-surface-muted">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="p-3 rounded-xl border border-border/60 bg-surface-muted">
                 <div className="flex items-center justify-between gap-1 mb-1.5">
                   <div className="flex items-center gap-1.5">
                     <Bot className="w-3.5 h-3.5 text-emerald-500" />
@@ -1027,12 +1019,12 @@ export default function Analytics() {
                 <p className="text-22 font-bold font-outfit text-text tabular-nums">
                   {effectiveAutoReplies.toLocaleString("en-IN")}
                 </p>
-                <p className="text-11 text-text-muted mt-1">
+                <p className="text-12 text-text-muted mt-1">
                   Resolved autonomously
                 </p>
               </div>
 
-              <div className="p-3.5 rounded-xl border border-border/60 bg-surface-muted">
+              <div className="p-3 rounded-xl border border-border/60 bg-surface-muted">
                 <div className="flex items-center justify-between gap-1 mb-1.5">
                   <div className="flex items-center gap-1.5">
                     <AlertTriangle className="w-3.5 h-3.5 text-rose-500" />
@@ -1045,14 +1037,14 @@ export default function Analytics() {
                 <p className="text-22 font-bold font-outfit text-text tabular-nums">
                   {effectiveEscalations.toLocaleString("en-IN")}
                 </p>
-                <p className="text-11 text-text-muted mt-1">
+                <p className="text-12 text-text-muted mt-1">
                   Handed over to staff
                 </p>
               </div>
             </div>
 
-            {/* Middle: Proportion Bar Graph (IN THE MIDDLE!) */}
-            <div className="space-y-2 p-3 rounded-xl border border-border/40 bg-surface-muted/30">
+            {/* Middle: Proportion Bar Graph */}
+            <div className="space-y-2 p-2.5 rounded-xl border border-border/40 bg-surface-muted/30">
               <div className="flex justify-between text-12 font-medium">
                 <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-semibold">
                   <span className="w-2 h-2 rounded-full bg-emerald-500" /> Auto-replied ({effectiveAutoPct}%)
@@ -1061,31 +1053,23 @@ export default function Analytics() {
                   <span className="w-2 h-2 rounded-full bg-rose-500" /> Escalated ({effectiveEscPct}%)
                 </span>
               </div>
-              <div className="h-4 w-full bg-border/40 rounded-full overflow-hidden flex p-0.5 shadow-inner">
+              <div className="h-3 w-full bg-border/40 rounded-full overflow-hidden flex shadow-inner">
                 <div
                   style={{ width: `${Math.min(100, effectiveAutoPct)}%` }}
-                  className="bg-emerald-500 h-full rounded-full transition-all duration-500 flex items-center justify-center text-[10px] text-white font-bold"
-                  title="Auto-replied"
-                >
-                  {effectiveAutoPct >= 15 && `${effectiveAutoPct}%`}
-                </div>
+                  className="bg-emerald-500 h-full rounded-l-full transition-all duration-500"
+                  title={`Auto-replied: ${effectiveAutoPct}%`}
+                />
                 <div
                   style={{ width: `${Math.max(0, Math.min(100 - Math.min(100, effectiveAutoPct), effectiveEscPct))}%` }}
-                  className="bg-red-500 h-full rounded-full transition-all duration-500 flex items-center justify-center text-[10px] text-white font-bold"
-                  title="Escalated to human"
-                >
-                  {effectiveEscPct >= 15 && `${effectiveEscPct}%`}
-                </div>
-              </div>
-              <div className="flex justify-between text-11 text-text-muted pt-0.5">
-                <span>{effectiveAutoReplies.toLocaleString("en-IN")} total automated replies</span>
-                <span>{effectiveEscalations.toLocaleString("en-IN")} total escalations</span>
+                  className="bg-red-500 h-full rounded-r-full transition-all duration-500"
+                  title={`Escalated to human: ${effectiveEscPct}%`}
+                />
               </div>
             </div>
 
             {/* Bottom: Escalation Reasons Breakdown */}
             <div className="space-y-1.5">
-              <div className="flex items-center justify-between text-11">
+              <div className="flex items-center justify-between text-12">
                 <p className="font-semibold text-text">
                   Escalation reasons breakdown:
                 </p>
@@ -1112,23 +1096,15 @@ export default function Analytics() {
                 ))}
               </div>
             </div>
-
-            {/* Footer: Automation Summary note */}
-            <div className="p-2.5 rounded-lg border border-border/40 bg-surface-muted/50 text-12 text-text-muted flex items-center justify-between">
-              <span className="inline-flex items-center gap-1.5 text-text font-medium">
-                <Bot className="w-3.5 h-3.5 text-violet-500" /> Resolution Health:
-              </span>
-              <span>Routine orders resolved without human intervention</span>
-            </div>
           </div>
         </div>
 
         {/* Card 3: Top Products with inside scroll */}
-        <div className="p-5 rounded-xl border border-border bg-surface flex flex-col h-[390px]">
-          <div className="h-[44px] shrink-0 mb-3 flex items-center justify-between">
+        <div className="p-5 rounded-xl border border-border bg-surface flex flex-col h-[360px]">
+          <div className="shrink-0 mb-3 flex items-center justify-between">
             <div>
               <SectionHeading title="Top products" sample />
-              <p className="text-11 text-text-muted">Ranked by revenue generation</p>
+              <p className="text-12 text-text-muted">Ranked by revenue generation</p>
             </div>
             <button
               onClick={() => navigate("/catalogue")}
@@ -1138,26 +1114,26 @@ export default function Analytics() {
             </button>
           </div>
 
-          <div className="flex-1 min-h-0 overflow-y-auto pr-1.5 space-y-2.5 custom-scrollbar">
+          <div className="flex-1 min-h-0 overflow-y-auto pr-1 space-y-2 custom-scrollbar">
             {sample.topProducts.map((p: TopProductMetric, idx: number) => (
               <div
                 key={p.name}
-                className="p-3 rounded-lg border border-border/50 bg-surface-muted/50 hover:bg-surface-muted transition-colors flex items-center justify-between gap-3"
+                className="p-2.5 rounded-lg border border-border/50 bg-surface-muted/50 hover:bg-surface-muted transition-colors flex items-center justify-between gap-3"
               >
                 <div className="flex items-center gap-3 min-w-0">
-                  <span className="text-12 font-bold font-outfit text-text-muted w-4">
+                  <span className="text-12 font-bold font-outfit text-text-muted w-4 shrink-0">
                     #{idx + 1}
                   </span>
                   <img
                     src={p.image}
                     alt={p.name}
-                    className="w-10 h-10 rounded-lg object-cover border border-border shrink-0"
+                    className="w-9 h-9 rounded-lg object-cover border border-border/60 shrink-0"
                   />
                   <div className="min-w-0">
                     <p className="text-13 font-semibold text-text truncate">
                       {p.name}
                     </p>
-                    <p className="text-11 text-text-muted">
+                    <p className="text-12 text-text-muted">
                       {p.units} units · {p.leadTime} lead
                     </p>
                   </div>
@@ -1180,13 +1156,13 @@ export default function Analytics() {
         </div>
 
         {/* Card 4: Recent Activity with inside scroll */}
-        <div className="p-5 rounded-xl border border-border bg-surface flex flex-col h-[390px]">
-          <div className="h-[44px] shrink-0 mb-3 flex items-center justify-between">
+        <div className="p-5 rounded-xl border border-border bg-surface flex flex-col h-[360px]">
+          <div className="shrink-0 mb-3 flex items-center justify-between">
             <div>
               <h2 className="text-16 font-semibold font-outfit text-text">
                 Recent activity
               </h2>
-              <p className="text-11 text-text-muted">Latest actions by the AI and your team</p>
+              <p className="text-12 text-text-muted">Latest actions by the AI and your team</p>
             </div>
             <button
               onClick={() => navigate("/audit-log")}
@@ -1196,14 +1172,14 @@ export default function Analytics() {
             </button>
           </div>
 
-          <div className="flex-1 min-h-0 overflow-y-auto pr-1.5 space-y-2.5 custom-scrollbar">
+          <div className="flex-1 min-h-0 overflow-y-auto pr-1 space-y-1.5 custom-scrollbar">
             {activity.isPending ? (
               Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} className="flex items-start gap-3 p-2.5">
-                  <Skeleton className="h-7 w-7 rounded-md shrink-0" />
-                  <div className="flex-1 space-y-1.5">
-                    <Skeleton className="h-4 w-2/3" />
-                    <Skeleton className="h-3 w-1/2" />
+                <div key={i} className="flex items-center gap-3 p-2">
+                  <Skeleton className="h-8 w-8 rounded-lg shrink-0" />
+                  <div className="flex-1 space-y-1.5 min-w-0">
+                    <Skeleton className="h-3.5 w-2/3" />
+                    <Skeleton className="h-2.5 w-1/2" />
                   </div>
                 </div>
               ))
@@ -1218,20 +1194,20 @@ export default function Analytics() {
                   onClick={item.onClick}
                   role={item.onClick ? "button" : undefined}
                   tabIndex={item.onClick ? 0 : undefined}
-                  className={`flex items-start gap-3 p-2.5 rounded-lg border border-transparent hover:border-border/60 hover:bg-surface-muted transition-colors ${
+                  className={`flex items-center gap-3 p-2 rounded-lg border border-transparent hover:border-border/60 hover:bg-surface-muted transition-colors ${
                     item.onClick ? "cursor-pointer" : ""
                   }`}
                 >
-                  <div className="p-1.5 rounded-md bg-surface-muted border border-border shrink-0 mt-0.5">
+                  <div className="w-8 h-8 rounded-lg bg-surface-muted border border-border/60 flex items-center justify-center shrink-0">
                     {item.icon}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-13 font-medium text-text leading-snug">{item.title}</p>
+                    <p className="text-13 font-medium text-text leading-snug truncate">{item.title}</p>
                     {item.description && (
-                      <p className="text-11 text-text-muted truncate mt-0.5">{item.description}</p>
+                      <p className="text-12 text-text-muted truncate mt-0.5">{item.description}</p>
                     )}
                   </div>
-                  <span className="text-11 text-text-muted shrink-0 tabular-nums">
+                  <span className="text-11 text-text-muted shrink-0 tabular-nums self-center">
                     {item.time}
                   </span>
                 </div>

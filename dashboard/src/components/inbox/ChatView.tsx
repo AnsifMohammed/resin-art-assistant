@@ -202,16 +202,16 @@ export function ChatView({ conversation, onBack, backOnlyOnMobile = false, onRes
                 <ArrowLeft className="h-5 w-5" />
               </button>
             )}
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-primary/20 bg-primary/10 font-outfit text-13 font-bold text-primary-text sm:h-9 sm:w-9 sm:text-14">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-primary/20 bg-primary/10 font-outfit text-14 font-bold text-primary-text sm:h-9 sm:w-9">
               {name.charAt(0).toUpperCase() || "?"}
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-1.5 sm:gap-2">
-                <h2 className="truncate text-14 font-semibold text-text sm:text-15">{name}</h2>
+                <h2 className="truncate font-outfit text-15 font-bold text-text">{name}</h2>
                 <ChannelIcon channel={conversation.channelType} size={12} className="shrink-0" />
                 <ConvStateChip state={conversation.state} className="hidden sm:inline-flex" />
               </div>
-              <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-11 text-text-muted">
+              <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-12 text-text-muted">
                 {conversation.customer.name && <span className="truncate">{conversation.customer.handleOrPhone}</span>}
                 <WindowCountdown windowClosesAt={conversation.windowClosesAt} className="py-0" />
               </div>
@@ -226,7 +226,7 @@ export function ChatView({ conversation, onBack, backOnlyOnMobile = false, onRes
                 onClick={() => setConfirmResolve(true)}
                 disabled={resolve.isPending || reply.isPending}
                 aria-busy={resolve.isPending || undefined}
-                className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1.5 text-xs font-medium text-white shadow-xs transition-colors hover:bg-emerald-700 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 sm:gap-1.5 sm:px-3"
+                className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1.5 text-12 font-medium text-white shadow-xs transition-colors hover:bg-emerald-700 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 sm:gap-1.5 sm:px-3"
                 title="Mark resolved and hand back to the AI"
               >
                 <CheckCircle2 className="h-3.5 w-3.5 shrink-0" aria-hidden />

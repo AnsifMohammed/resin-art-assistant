@@ -1,14 +1,24 @@
 import type { Job } from "pg-boss";
 import { logger } from "../lib/logger.ts";
 import { clearInlineTimers } from "./enqueue.ts";
+import {
+  dispatchBroadcasts,
+  startInlineBroadcastDispatcher,
+  stopInlineBroadcastDispatcher,
+} from "./enqueueBroadcast.ts";
 import { boss, initQueue, PROCESS_MESSAGE_RETRY_LIMIT, QUEUES, stopQueue } from "./index.ts";
 import { escalateAfterFailure, processMessageJob, type ProcessMessageParams } from "./jobs/processMessage.ts";
 import { checkAndRefreshInstagramTokens } from "./jobs/refreshTokens.ts";
+import { sendBroadcastJob, type SendBroadcastParams } from "./jobs/sendBroadcast.ts";
 import { checkAndSendReminders } from "./jobs/sendReminder.ts";
 
 export async function startWorkers(): Promise<void> {
   const queue = await initQueue();
-  if (!queue) return;
+  if (!queue) {
+    // No pg-boss: scheduled broadcasts are still dispatched, in-process.
+    startInlineBroadcastDispatcher();
+    return;
+  }
 
   try {
     // 1. Process message worker. Queues are created in initQueue() (required by pg-boss v12).
@@ -47,6 +57,21 @@ export async function startWorkers(): Promise<void> {
       await checkAndRefreshInstagramTokens();
     });
 
+    // 4. Broadcasts: every minute, claim due scheduled broadcasts and enqueue their send job.
+    await boss.schedule(QUEUES.dispatchBroadcasts, "* * * * *");
+    await boss.work(QUEUES.dispatchBroadcasts, async () => {
+      await dispatchBroadcasts();
+    });
+    await boss.work<SendBroadcastParams>(
+      QUEUES.sendBroadcast,
+      { localConcurrency: 2 },
+      async (jobs: Job<SendBroadcastParams>[]) => {
+        for (const job of jobs) {
+          await sendBroadcastJob(job.data);
+        }
+      },
+    );
+
     logger.info("All pg-boss background workers registered");
   } catch (err) {
     logger.error({ err }, "Error registering background workers");
@@ -55,5 +80,6 @@ export async function startWorkers(): Promise<void> {
 
 export async function stopWorkers(): Promise<void> {
   clearInlineTimers();
+  stopInlineBroadcastDispatcher();
   await stopQueue();
 }

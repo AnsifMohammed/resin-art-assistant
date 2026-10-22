@@ -2,7 +2,9 @@ import type { FastifyInstance } from "fastify";
 import { analyticsRoutes } from "./analytics.ts";
 import { auditLogRoutes } from "./audit-log.ts";
 import { authRoutes } from "./auth.ts";
+import { broadcastRoutes } from "./broadcasts.ts";
 import { conversationRoutes } from "./conversations.ts";
+import { customerRoutes } from "./customers.ts";
 import { escalationRoutes } from "./escalations.ts";
 import { healthRoutes } from "./health.ts";
 import { knowledgeBaseRoutes } from "./knowledge-base.ts";
@@ -29,6 +31,8 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
   await app.register(escalationRoutes);
   await app.register(userRoutes);
   await app.register(orderRoutes);
+  await app.register(customerRoutes);
+  await app.register(broadcastRoutes);
   await app.register(settingsRoutes);
   await app.register(knowledgeBaseRoutes);
   await app.register(analyticsRoutes);

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   AlertCircle,
   Filter,
@@ -9,8 +9,11 @@ import {
   PanelRightOpen,
   Search,
   SearchX,
+  Star,
   X,
+  Zap,
 } from "lucide-react";
+import { toast } from "sonner";
 import { isApiError } from "../api/client.ts";
 import { ChatView } from "../components/inbox/ChatView.tsx";
 import { ConvStateChip } from "../components/inbox/ConvStateChip.tsx";
@@ -18,6 +21,8 @@ import { WindowCountdown } from "../components/inbox/WindowCountdown.tsx";
 import { EscalationBadge } from "../components/escalations/EscalationBadge.tsx";
 import { usePageTitle } from "../components/layout/PageTitle.tsx";
 import { ChannelIcon } from "../components/shared/ChannelIcon.tsx";
+import { OptedOutBadge } from "../components/shared/CustomerChips.tsx";
+import { CustomerNotesField } from "../components/shared/CustomerNotesField.tsx";
 import { Skeleton, SkeletonTableRow } from "../components/shared/Skeleton.tsx";
 import { TagBadge } from "../components/ui/Badge.tsx";
 import {
@@ -26,9 +31,17 @@ import {
   useMarkRead,
   type ConversationFilters,
 } from "../hooks/useConversations.ts";
+import { useCustomer, useCustomerOrders, useUpdateCustomer } from "../hooks/useCustomers.ts";
 import { cn } from "../lib/cn.ts";
+import { formatRupees } from "../lib/customers.ts";
 import { customerLabel, formatDateTime, formatRelative, formatShortDate, humanize } from "../lib/format.ts";
-import { CHANNEL_TYPES, type ChannelType, type ConversationDetail, type ConversationListItem } from "../types/index.ts";
+import {
+  CHANNEL_TYPES,
+  type ChannelType,
+  type ConversationDetail,
+  type ConversationListItem,
+  type UpdateCustomerRequest,
+} from "../types/index.ts";
 
 type FilterState = "all" | "unread" | "ai_active" | "escalated" | "owner_handling" | "paused";
 
@@ -95,23 +108,23 @@ function ConversationRow({
       <div className="mb-1 flex items-start justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2">
           <div className="relative">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border bg-surface-muted font-outfit text-12 font-bold text-text">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border bg-surface-muted font-outfit text-13 font-bold text-text">
               {name.charAt(0).toUpperCase() || "?"}
             </div>
             <span className="absolute -bottom-0.5 -right-0.5">
-              <ChannelIcon channel={item.channelType} size={10} />
+              <ChannelIcon channel={item.channelType} size={11} />
             </span>
           </div>
           <div className="min-w-0">
-            <span className={cn("block truncate text-13 text-text", item.unread ? "font-bold" : "font-semibold")}>
+            <span className={cn("block truncate text-14 text-text font-outfit", item.unread ? "font-bold" : "font-semibold")}>
               {name}
             </span>
-            {item.customer.name && <p className="truncate text-11 text-text-muted">{item.customer.handleOrPhone}</p>}
+            {item.customer.name && <p className="truncate text-12 text-text-muted">{item.customer.handleOrPhone}</p>}
           </div>
         </div>
 
         <div className="shrink-0 text-right">
-          <time dateTime={when} title={formatDateTime(when)} className="text-11 text-text-muted">
+          <time dateTime={when} title={formatDateTime(when)} className="text-12 text-text-muted">
             {formatRelative(when)}
           </time>
           {item.unread && (
@@ -120,7 +133,7 @@ function ConversationRow({
         </div>
       </div>
 
-      <p className={cn("mt-1 line-clamp-1 pl-10 text-12", item.unread ? "text-text" : "text-text-muted")}>
+      <p className={cn("mt-1 line-clamp-1 pl-10 text-13", item.unread ? "text-text font-medium" : "text-text-muted")}>
         {item.lastMessage ? (
           content ? (
             `${previewPrefix(item)}${content}`
@@ -132,9 +145,9 @@ function ConversationRow({
         )}
       </p>
 
-      <div className="mt-2 flex flex-wrap items-center gap-1.5 pl-10 text-[11px]">
+      <div className="mt-2 flex flex-wrap items-center gap-1.5 pl-10 text-11">
         <ConvStateChip state={item.state} />
-        {item.openEscalation && <EscalationBadge reason={item.openEscalation.reason} className="text-[11px]" />}
+        {item.openEscalation && <EscalationBadge reason={item.openEscalation.reason} className="text-11" />}
       </div>
     </button>
   );
@@ -255,6 +268,149 @@ function DetailRow({ label, children }: { label: string; children: ReactNode }) 
   );
 }
 
+/** Admin-only customer data for the panel: flags, city, spend, recent orders, editable notes. */
+function CustomerInsights({ customerId, fallbackNotes }: { customerId: string; fallbackNotes: string | null }) {
+  const navigate = useNavigate();
+  const customerQuery = useCustomer(customerId);
+  const ordersQuery = useCustomerOrders(customerId);
+  const update = useUpdateCustomer();
+  const c = customerQuery.data;
+
+  const save = (body: UpdateCustomerRequest, success?: string) => {
+    if (!c) return;
+    update.mutate(
+      { id: c.id, body },
+      {
+        onSuccess: () => {
+          if (success) toast.success(success, { description: customerLabel(c) });
+        },
+        onError: (err) => toast.error("Couldn't update customer", { description: err.message }),
+      },
+    );
+  };
+
+  if (customerQuery.isPending) {
+    return (
+      <div className="space-y-2 border-t border-border/60 pt-3" aria-busy="true">
+        <Skeleton className="h-8 w-full" />
+        <Skeleton className="h-14 w-full" />
+        <Skeleton className="h-16 w-full" />
+      </div>
+    );
+  }
+
+  if (customerQuery.isError || !c) {
+    return (
+      <div className="space-y-3 border-t border-border/60 pt-3">
+        <div className="flex items-center justify-between text-11 text-text-muted">
+          <span>Couldn't load orders and flags.</span>
+          <button
+            type="button"
+            onClick={() => void customerQuery.refetch()}
+            className="font-semibold text-text hover:underline cursor-pointer"
+          >
+            Retry
+          </button>
+        </div>
+        {fallbackNotes && (
+          <p className="whitespace-pre-wrap rounded-lg border border-border bg-surface-muted p-2 text-12 text-text">
+            {fallbackNotes}
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  const orders = ordersQuery.data ?? [];
+  return (
+    <div className="space-y-3 border-t border-border/60 pt-3">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => save({ isFavourite: !c.isFavourite }, c.isFavourite ? "Removed from favourites" : "Marked as favourite")}
+            aria-pressed={c.isFavourite}
+            className={cn(
+              "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-11 font-medium transition-colors cursor-pointer",
+              c.isFavourite
+                ? "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300"
+                : "border-border text-text-muted hover:text-text",
+            )}
+          >
+            <Star className={cn("h-3 w-3", c.isFavourite && "fill-amber-500 text-amber-500")} />
+            Favourite
+          </button>
+          <button
+            type="button"
+            onClick={() => save({ isPriority: !c.isPriority }, c.isPriority ? "Priority removed" : "Marked as priority")}
+            aria-pressed={c.isPriority}
+            className={cn(
+              "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-11 font-medium transition-colors cursor-pointer",
+              c.isPriority
+                ? "border-rose-500/40 bg-rose-500/10 text-rose-700 dark:text-rose-300"
+                : "border-border text-text-muted hover:text-text",
+            )}
+          >
+            <Zap className={cn("h-3 w-3", c.isPriority && "fill-rose-500 text-rose-500")} />
+            Priority
+          </button>
+        </div>
+        {c.optedOut && <OptedOutBadge />}
+      </div>
+
+      <dl className="divide-y divide-border/60">
+        <DetailRow label="City">{c.city ?? "Unknown"}</DetailRow>
+        <DetailRow label="Orders">{c.ordersCount}</DetailRow>
+        <DetailRow label="Total spend">{formatRupees(c.totalSpend)}</DetailRow>
+      </dl>
+
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between">
+          <p className="text-11 font-semibold uppercase tracking-wider text-text-muted">Recent orders</p>
+          {orders.length > 0 && (
+            <button
+              type="button"
+              onClick={() => navigate("/orders")}
+              className="text-11 font-semibold text-primary-text hover:underline cursor-pointer"
+            >
+              All orders
+            </button>
+          )}
+        </div>
+        {ordersQuery.isPending ? (
+          <Skeleton className="h-10 w-full" />
+        ) : ordersQuery.isError ? (
+          <p className="text-11 text-text-muted">Couldn't load orders.</p>
+        ) : orders.length === 0 ? (
+          <p className="text-11 text-text-muted">No orders yet.</p>
+        ) : (
+          <ul className="divide-y divide-border/50 rounded-lg border border-border">
+            {orders.slice(0, 3).map((o) => (
+              <li key={o.id} className="flex items-center justify-between gap-2 px-2.5 py-1.5 text-12">
+                <div className="min-w-0">
+                  <p className="truncate font-semibold text-text">{o.orderNo}</p>
+                  <p className="text-11 text-text-muted">
+                    {humanize(o.status)} · {formatShortDate(o.createdAt)}
+                  </p>
+                </div>
+                <span className="shrink-0 font-semibold tabular-nums text-text">{formatRupees(o.totalAmount)}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      <CustomerNotesField
+        label="Notes"
+        rows={3}
+        value={c.notes}
+        saving={update.isPending}
+        onSave={(notes) => save({ notes }, "Notes saved")}
+      />
+    </div>
+  );
+}
+
 function CustomerPanel({ conversation, onClose }: { conversation: ConversationDetail; onClose: () => void }) {
   const { customer } = conversation;
   const name = customerLabel(customer);
@@ -272,7 +428,7 @@ function CustomerPanel({ conversation, onClose }: { conversation: ConversationDe
         aria-label="Customer profile"
       >
         <div className="flex items-center justify-between border-b border-border/60 pb-3">
-          <h3 className="font-outfit text-14 font-semibold text-text">Customer Profile</h3>
+          <h3 className="font-outfit text-15 font-bold text-text">Customer Profile</h3>
           <button
             type="button"
             onClick={onClose}
@@ -283,12 +439,12 @@ function CustomerPanel({ conversation, onClose }: { conversation: ConversationDe
           </button>
         </div>
 
-        <div className="rounded-xl border border-border/60 bg-surface-muted p-3 text-center">
-          <div className="mx-auto mb-2 flex h-14 w-14 items-center justify-center rounded-full border-2 border-primary bg-primary/20 font-outfit text-20 font-bold text-primary-text">
+        <div className="rounded-xl border border-border/60 bg-surface-muted p-3.5 text-center">
+          <div className="mx-auto mb-2 flex h-14 w-14 items-center justify-center rounded-full border-2 border-primary bg-primary/20 font-outfit text-22 font-bold text-primary-text">
             {name.charAt(0).toUpperCase() || "?"}
           </div>
-          <h4 className="font-outfit text-15 font-bold text-text">{name}</h4>
-          <div className="mt-0.5 flex items-center justify-center gap-1 text-12 text-text-muted">
+          <h4 className="font-outfit text-16 font-bold text-text">{name}</h4>
+          <div className="mt-0.5 flex items-center justify-center gap-1.5 text-12 text-text-muted">
             <ChannelIcon channel={conversation.channelType} size={12} />
             <span className="truncate">{customer.handleOrPhone}</span>
           </div>
@@ -307,16 +463,7 @@ function CustomerPanel({ conversation, onClose }: { conversation: ConversationDe
           <DetailRow label="Customer since">{formatShortDate(customer.createdAt)}</DetailRow>
         </dl>
 
-        {customer.notes && (
-          <div className="space-y-1.5">
-            <p className="text-11 font-semibold uppercase tracking-wider text-text-muted">Notes</p>
-            <p className="whitespace-pre-wrap rounded-lg border border-border bg-surface-muted p-2 text-12 text-text">
-              {customer.notes}
-            </p>
-          </div>
-        )}
-
-        <p className="border-t border-border/60 pt-3 text-11 text-text-muted">Orders and notes coming soon.</p>
+        <CustomerInsights key={conversation.customerId} customerId={conversation.customerId} fallbackNotes={customer.notes} />
       </aside>
     </>
   );
@@ -592,8 +739,8 @@ export default function Inbox() {
             <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary-soft text-primary-text shadow-xs">
               <MessagesSquare className="h-6 w-6" aria-hidden />
             </div>
-            <h3 className="font-display text-lg font-semibold text-text">Select a conversation</h3>
-            <p className="mt-1.5 text-sm text-text-muted">Pick a customer on the left to read the thread and reply.</p>
+            <h3 className="font-outfit text-16 font-bold text-text">Select a conversation</h3>
+            <p className="mt-1.5 text-13 text-text-muted">Pick a customer on the left to read the thread and reply.</p>
           </div>
         )}
       </div>

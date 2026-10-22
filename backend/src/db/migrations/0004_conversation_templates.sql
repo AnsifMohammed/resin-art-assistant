@@ -1,3 +1,7 @@
+-- Restore escalation reasons the app uses (a branch migration recreated the enum without them).
+ALTER TYPE "public"."escalation_reason" ADD VALUE IF NOT EXISTS 'intent_off_topic';--> statement-breakpoint
+ALTER TYPE "public"."escalation_reason" ADD VALUE IF NOT EXISTS 'intent_payment';--> statement-breakpoint
+ALTER TYPE "public"."escalation_reason" ADD VALUE IF NOT EXISTS 'window_closed';--> statement-breakpoint
 CREATE TYPE "public"."meta_template_status" AS ENUM('not_submitted', 'pending', 'approved', 'rejected');--> statement-breakpoint
 CREATE TYPE "public"."template_category" AS ENUM('delivery', 'festive', 'custom_order', 'payment', 'general');--> statement-breakpoint
 CREATE TYPE "public"."template_channel" AS ENUM('whatsapp', 'instagram', 'both');--> statement-breakpoint

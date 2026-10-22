@@ -7,12 +7,18 @@ export interface SendMessageOptions {
   recipient: string;
   text: string;
   businessId: string;
-  conversationId: string;
+  /** null for sends outside a conversation (e.g. a broadcast to a customer without one). */
+  conversationId: string | null;
+}
+
+export interface SendMessageResult {
+  /** Meta's message id (wamid / mid), used to match delivery receipts. null in DEMO_MODE. */
+  metaMessageId: string | null;
 }
 
 const isDev = () => config.NODE_ENV === "development";
 
-export async function sendMessage(opts: SendMessageOptions): Promise<void> {
+export async function sendMessage(opts: SendMessageOptions): Promise<SendMessageResult> {
   if (config.DEMO_MODE) {
     // Message text (and recipient identifiers) only appear in development logs.
     if (isDev()) {
@@ -36,7 +42,7 @@ export async function sendMessage(opts: SendMessageOptions): Promise<void> {
         "[DEMO_MODE] Reply logged (not sent)",
       );
     }
-    return;
+    return { metaMessageId: null };
   }
 
   // Live Meta delivery (WhatsApp Cloud API / Instagram) is not wired up yet.

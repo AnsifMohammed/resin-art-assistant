@@ -42,6 +42,24 @@ export interface SettingsUpdatedPayload {
   paused: boolean;
 }
 
+export interface CustomerUpdatedPayload {
+  customerId: string;
+}
+
+export interface BroadcastStats {
+  pending: number;
+  sent: number;
+  delivered: number;
+  read: number;
+  failed: number;
+}
+
+export interface BroadcastUpdatedPayload {
+  broadcastId: string;
+  status: string;
+  stats: BroadcastStats;
+}
+
 /** Internal, transport-neutral description of something that happened. */
 export type RealtimeEnvelope =
   | { kind: "message:new"; businessId: string; conversationId: string; message: MessageRow }
@@ -55,6 +73,8 @@ export type RealtimeEnvelope =
       previousAssigneeId: string | null;
     }
   | { kind: "settings:updated"; businessId: string; payload: SettingsUpdatedPayload }
+  | { kind: "customer:updated"; businessId: string; payload: CustomerUpdatedPayload }
+  | { kind: "broadcast:updated"; businessId: string; payload: BroadcastUpdatedPayload }
   /** Escalation resolved/reassigned: re-check staff message subscriptions for this conversation. */
   | { kind: "access:changed"; businessId: string; conversationId: string }
   | { kind: "user:disconnect"; businessId: string; userId: string };
@@ -171,7 +191,10 @@ export async function deliverLocal(env: RealtimeEnvelope): Promise<void> {
     }
 
     case "settings:updated":
-      for (const c of clientsOf(env.businessId, isAdmin)) send(c, "settings:updated", env.payload);
+    case "customer:updated":
+    case "broadcast:updated":
+      // Admin only: customers and broadcasts are admin pages.
+      for (const c of clientsOf(env.businessId, isAdmin)) send(c, env.kind, env.payload);
       return;
 
     case "access:changed":

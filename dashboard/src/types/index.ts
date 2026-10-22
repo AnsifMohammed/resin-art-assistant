@@ -178,6 +178,12 @@ export interface Customer {
   handleOrPhone: string;
   language: string | null;
   notes: string | null;
+  city?: string | null;
+  isFavourite?: boolean;
+  isPriority?: boolean;
+  optedOut?: boolean;
+  optedOutAt?: ISODateString | null;
+  optOutSource?: "keyword" | "admin" | null;
   createdAt: ISODateString;
   updatedAt: ISODateString;
 }
@@ -602,8 +608,12 @@ export interface SimulateResponse {
   messageId: string | null;
   conversationId: string;
   state: ConvState;
-  /** "queued" = new job, "batched" = merged into a pending job, "inline" = in-process fallback */
-  queued: "queued" | "batched" | "inline";
+  /**
+   * "queued" = new job, "batched" = merged into a pending job, "inline" = in-process fallback,
+   * "skipped" = STOP/START keyword (see optAction); the AI was not queued.
+   */
+  queued: "queued" | "batched" | "inline" | "skipped";
+  optAction?: "opt_out" | "opt_in" | null;
   /** Always null now; the decision arrives later via realtime events / GET /conversations/:id. */
   decision: null;
 }
@@ -639,6 +649,18 @@ export interface SettingsUpdatedEvent {
   paused: boolean;
 }
 
+/** Admin only: a customer's profile/flags/opt-out changed (PATCH /customers/:id, STOP/START keyword). */
+export interface CustomerUpdatedEvent {
+  customerId: string;
+}
+
+/** Admin only: a broadcast changed status or made sending/receipt progress. */
+export interface BroadcastUpdatedEvent {
+  broadcastId: string;
+  status: BroadcastStatus;
+  stats: BroadcastStats;
+}
+
 /** Server acknowledgement of a `message:new:<id>` subscribe frame. */
 export interface SubscribedEvent {
   event: string;
@@ -666,6 +688,8 @@ export interface SocketEventMap {
   "escalation:assigned": EscalationAssignedEvent;
   "message:new": MessageNewEvent;
   "settings:updated": SettingsUpdatedEvent;
+  "customer:updated": CustomerUpdatedEvent;
+  "broadcast:updated": BroadcastUpdatedEvent;
   subscribed: SubscribedEvent;
   "subscription:denied": SubscriptionDeniedEvent;
   "subscription:revoked": SubscriptionRevokedEvent;
@@ -800,4 +824,211 @@ export interface UpdateOrderStatusRequest {
   trackingId?: string | null | undefined;
   courier?: string | null | undefined;
   sendNotification?: boolean | undefined;
+}
+
+// ─── Customers (admin only) ──────────────────────────────────────────────────
+
+/** Mirrors backend/src/lib/segments.ts. "all" is not a membership segment. */
+export const CUSTOMER_SEGMENTS = [
+  "favourites",
+  "priority",
+  "previous_buyers",
+  "repeat_buyers",
+  "new",
+  "never_ordered",
+  "inactive",
+] as const;
+export type CustomerSegment = (typeof CUSTOMER_SEGMENTS)[number];
+
+export const SEGMENTS = ["all", ...CUSTOMER_SEGMENTS] as const;
+export type Segment = (typeof SEGMENTS)[number];
+
+export const SEGMENT_LABELS: Record<Segment, string> = {
+  all: "All",
+  favourites: "Favourites",
+  priority: "Priority",
+  previous_buyers: "Previous buyers",
+  repeat_buyers: "Repeat buyers",
+  new: "New",
+  never_ordered: "Never ordered",
+  inactive: "Inactive",
+};
+
+export const CUSTOMER_SORTS = ["recent", "spend", "orders", "name"] as const;
+export type CustomerSort = (typeof CUSTOMER_SORTS)[number];
+
+export interface CustomerListItem {
+  id: string;
+  name: string | null;
+  handleOrPhone: string;
+  channel: ChannelType;
+  city: string | null;
+  language: string | null;
+  notes: string | null;
+  isFavourite: boolean;
+  isPriority: boolean;
+  optedOut: boolean;
+  optedOutAt: ISODateString | null;
+  createdAt: ISODateString;
+  /** Latest conversation (by lastMessageAt, then createdAt). */
+  conversationId: string | null;
+  conversationState: ConvState | null;
+  lastMessageAt: ISODateString | null;
+  ordersCount: number;
+  /** Rupees. */
+  totalSpend: number;
+  lastOrderAt: ISODateString | null;
+  segments: CustomerSegment[];
+}
+
+export interface CustomerListParams extends PageParams {
+  segment?: Segment;
+  search?: string;
+  city?: string;
+  language?: string;
+  channel?: ChannelType;
+  sort?: CustomerSort;
+}
+
+export interface CustomerListResponse {
+  customers: CustomerListItem[];
+  pagination: Pagination;
+  /** Per segment for the whole business (search/city/language/channel not applied). */
+  counts: Record<Segment, number>;
+}
+
+export interface CustomerResponse {
+  customer: CustomerListItem;
+}
+
+export interface UpdateCustomerRequest {
+  name?: string | null;
+  city?: string | null;
+  notes?: string | null;
+  isFavourite?: boolean;
+  isPriority?: boolean;
+  optedOut?: boolean;
+}
+
+export interface CustomerOrderSummary {
+  id: string;
+  orderNo: string;
+  status: OrderStatus;
+  totalAmount: number;
+  createdAt: ISODateString;
+  itemsCount: number;
+}
+
+export interface CustomerOrdersResponse {
+  orders: CustomerOrderSummary[];
+}
+
+// ─── Broadcasts (admin only) ─────────────────────────────────────────────────
+
+export const BROADCAST_STATUSES = ["draft", "scheduled", "sending", "sent", "cancelled", "failed"] as const;
+export type BroadcastStatus = (typeof BROADCAST_STATUSES)[number];
+
+export const BROADCAST_RECIPIENT_STATUSES = ["pending", "sent", "delivered", "read", "failed"] as const;
+export type BroadcastRecipientStatus = (typeof BROADCAST_RECIPIENT_STATUSES)[number];
+
+export type BroadcastAction = "draft" | "schedule" | "send_now";
+
+export interface BroadcastFilters {
+  city?: string;
+  language?: string;
+  excludeComplaints?: boolean;
+}
+
+/** Recipient counts by status. */
+export interface BroadcastStats {
+  pending: number;
+  sent: number;
+  delivered: number;
+  read: number;
+  failed: number;
+}
+
+export interface BroadcastSummary {
+  id: string;
+  name: string;
+  templateId: string;
+  templateName: string | null;
+  segment: Segment;
+  filters: BroadcastFilters;
+  variables: Record<string, string>;
+  status: BroadcastStatus;
+  scheduledAt: ISODateString | null;
+  startedAt: ISODateString | null;
+  completedAt: ISODateString | null;
+  /** Audience snapshot size (0 until sending starts). */
+  recipientCount: number;
+  error: string | null;
+  stats: BroadcastStats;
+  createdAt: ISODateString;
+  createdByUserId: string | null;
+}
+
+export interface BroadcastRecipient {
+  id: string;
+  customerId: string;
+  customerName: string | null;
+  phone: string;
+  status: BroadcastRecipientStatus;
+  error: string | null;
+  sentAt: ISODateString | null;
+  deliveredAt: ISODateString | null;
+  readAt: ISODateString | null;
+}
+
+export interface BroadcastListParams extends PageParams {
+  status?: BroadcastStatus;
+}
+
+export interface BroadcastListResponse {
+  broadcasts: BroadcastSummary[];
+  pagination: Pagination;
+}
+
+export interface BroadcastDetailResponse {
+  broadcast: BroadcastSummary;
+  recipients: BroadcastRecipient[];
+  pagination: Pagination;
+}
+
+export interface BroadcastResponse {
+  broadcast: BroadcastSummary;
+}
+
+export interface AudienceParams {
+  segment?: Segment;
+  city?: string;
+  language?: string;
+  excludeComplaints?: boolean;
+}
+
+export interface AudienceResponse {
+  count: number;
+  /** BROADCAST_MAX_RECIPIENTS */
+  max: number;
+}
+
+export interface CreateBroadcastRequest {
+  name: string;
+  templateId: string;
+  segment: Segment;
+  filters?: BroadcastFilters;
+  variables?: Record<string, string>;
+  /** ISO with offset. Required (≥ now + 1 min) for action "schedule". */
+  scheduledAt?: string | null;
+  action: BroadcastAction;
+}
+
+export interface UpdateBroadcastRequest {
+  name?: string;
+  templateId?: string;
+  segment?: Segment;
+  filters?: BroadcastFilters;
+  variables?: Record<string, string>;
+  scheduledAt?: string | null;
+  action?: "schedule" | "send_now";
 }
