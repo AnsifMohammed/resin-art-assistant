@@ -1,16 +1,25 @@
-import { Fragment, useEffect, useLayoutEffect, useMemo, useRef } from "react";
+import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, MessageSquare, UserRound } from "lucide-react";
+import { ArrowLeft, CheckCircle2, MessageSquare, PauseCircle, PlayCircle } from "lucide-react";
 import { EscalationBadge } from "../escalations/EscalationBadge.tsx";
-import { StateBadge, TagBadge } from "../ui/Badge.tsx";
+import { ChannelIcon } from "../shared/ChannelIcon.tsx";
+import { ConfirmDialog } from "../shared/ConfirmDialog.tsx";
+import { TagBadge } from "../ui/Badge.tsx";
 import { EmptyState } from "../ui/EmptyState.tsx";
 import { useToast } from "../ui/Toast.tsx";
 import { useAuth } from "../../hooks/useAuth.ts";
-import { appendMessageToCache, useReply, useResolve } from "../../hooks/useConversations.ts";
+import {
+  appendMessageToCache,
+  usePauseConversation,
+  useReply,
+  useResolve,
+  useResumeConversation,
+} from "../../hooks/useConversations.ts";
+import { useNow } from "../../hooks/useNow.ts";
 import { useSocketEvent } from "../../hooks/useSocket.ts";
 import { customerLabel, formatDayLabel, windowTimeLeft } from "../../lib/format.ts";
 import type { ConversationDetail, Message } from "../../types/index.ts";
-import { ChannelIcon, channelLabels } from "../ui/ChannelIcon.tsx";
+import { ConvStateChip } from "./ConvStateChip.tsx";
 import { MessageBubble } from "./MessageBubble.tsx";
 import { ReplyBox } from "./ReplyBox.tsx";
 import { WindowCountdown } from "./WindowCountdown.tsx";
@@ -23,27 +32,91 @@ export interface ChatViewProps {
   backOnlyOnMobile?: boolean;
   /** Called after a successful resolve. */
   onResolved?: (() => void) | undefined;
+  /** Extra buttons at the right of the header (e.g. the inbox's customer-panel toggle). */
+  headerActions?: ReactNode;
 }
 
 function sameDay(a: string, b: string): boolean {
   return new Date(a).toDateString() === new Date(b).toDateString();
 }
 
-/** Full thread + reply box for one conversation. Used by AdminInbox and StaffChat. */
-export function ChatView({ conversation, onBack, backOnlyOnMobile = false, onResolved }: ChatViewProps) {
+const headerButton =
+  "inline-flex items-center gap-1 rounded-lg border border-border bg-surface px-2 py-1.5 text-xs font-medium text-text transition-colors " +
+  "hover:bg-surface-muted cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 sm:gap-1.5 sm:px-2.5 " +
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary";
+
+/** Admin only: stop / restart the AI for this one conversation. */
+function PauseResumeButton({ conversation }: { conversation: ConversationDetail }) {
+  const { toast } = useToast();
+  const pause = usePauseConversation(conversation.id);
+  const resume = useResumeConversation(conversation.id);
+  const { state } = conversation;
+  const busy = pause.isPending || resume.isPending;
+
+  if (state === "paused") {
+    return (
+      <button
+        type="button"
+        className={headerButton}
+        disabled={busy}
+        aria-busy={busy || undefined}
+        title="Let the AI answer this customer again"
+        aria-label="Resume AI"
+        onClick={() =>
+          resume.mutate(undefined, {
+            onSuccess: () => toast({ variant: "success", title: "AI resumed for this chat" }),
+            onError: (err) => toast({ variant: "error", title: "Couldn't resume the AI", description: err.message }),
+          })
+        }
+      >
+        <PlayCircle className="h-3.5 w-3.5 shrink-0 text-emerald-500" aria-hidden />
+        <span className="hidden sm:inline">Resume AI</span>
+        
+      </button>
+    );
+  }
+
+  const escalated = state === "escalated";
+  return (
+    <span title={escalated ? "Resolve first" : "Stop the AI from replying to this customer"}>
+      <button
+        type="button"
+        className={headerButton}
+        disabled={busy || escalated}
+        aria-busy={busy || undefined}
+        aria-label={escalated ? "Pause AI (resolve the escalation first)" : "Pause AI"}
+        onClick={() =>
+          pause.mutate(undefined, {
+            onSuccess: () => toast({ variant: "info", title: "AI paused for this chat" }),
+            onError: (err) => toast({ variant: "error", title: "Couldn't pause the AI", description: err.message }),
+          })
+        }
+      >
+        <PauseCircle className="h-3.5 w-3.5 shrink-0 text-amber-500" aria-hidden />
+        <span className="hidden sm:inline">Pause AI</span>
+      </button>
+    </span>
+  );
+}
+
+/** Full thread + reply box for one conversation. Used by the admin Inbox and StaffChat. */
+export function ChatView({ conversation, onBack, backOnlyOnMobile = false, onResolved, headerActions }: ChatViewProps) {
   const { user } = useAuth();
   const { toast } = useToast();
   const qc = useQueryClient();
   const reply = useReply(conversation.id);
   const resolve = useResolve(conversation.id);
+  const [confirmResolve, setConfirmResolve] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const stickToBottom = useRef(true);
+  const now = useNow(30_000);
+  const isAdmin = user?.role === "admin";
 
   // Live messages for this conversation (staff rely on this; admin also gets the global message:new).
   useSocketEvent(`message:new:${conversation.id}`, (e) => appendMessageToCache(qc, conversation.id, e.message));
 
   const messages = conversation.messages;
-  const pendingText = reply.isPending ? reply.variables : undefined;
+  const pendingText = reply.isPending && reply.variables && "text" in reply.variables ? reply.variables.text : undefined;
 
   /** Label for outbound messages. Messages only carry senderId (see report: contract gap). */
   const labelFor = useMemo(() => {
@@ -80,12 +153,12 @@ export function ChatView({ conversation, onBack, backOnlyOnMobile = false, onRes
     if (stickToBottom.current || pendingText) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
   }, [messages.length, pendingText]);
 
-  const windowClosed = windowTimeLeft(conversation.windowClosesAt).expired && conversation.windowClosesAt !== null;
+  const windowClosed = conversation.windowClosesAt !== null && windowTimeLeft(conversation.windowClosesAt, now).expired;
   const canResolve = conversation.state === "escalated" || conversation.state === "owner_handling";
   const esc = conversation.openEscalation;
 
   const handleSend = (text: string) =>
-    reply.mutateAsync(text).catch((err: unknown) => {
+    reply.mutateAsync({ text }).catch((err: unknown) => {
       toast({
         variant: "error",
         title: "Reply not sent",
@@ -93,6 +166,10 @@ export function ChatView({ conversation, onBack, backOnlyOnMobile = false, onRes
       });
       throw err;
     });
+
+  // The template picker shows its own errors (variables mapped to inputs, others toasted).
+  const handleSendTemplate = (templateId: string, variables: Record<string, string>) =>
+    reply.mutateAsync({ templateId, variables });
 
   const handleResolve = () =>
     resolve.mutate(undefined, {
@@ -106,60 +183,83 @@ export function ChatView({ conversation, onBack, backOnlyOnMobile = false, onRes
   const name = customerLabel(conversation.customer);
 
   return (
-    <section className="flex h-full min-h-0 flex-col bg-surface" aria-label={`Conversation with ${name}`}>
+    <section className="flex h-full min-h-0 flex-col bg-surface-muted/30" aria-label={`Conversation with ${name}`}>
       {/* Header */}
-      <header className="border-b border-border bg-surface px-3 py-2.5 sm:px-4">
-        <div className="flex items-center gap-2">
-          {onBack && (
-            <button
-              type="button"
-              onClick={onBack}
-              className={
-                "-ml-1 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-text hover:bg-surface-muted transition " +
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" +
-                (backOnlyOnMobile ? " md:hidden" : "")
-              }
-              aria-label="Back"
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </button>
-          )}
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-surface-muted text-sm font-semibold text-text">
-            {name.charAt(0).toUpperCase() || <UserRound className="h-5 w-5" aria-hidden />}
+      <header className="shrink-0 border-b border-border bg-surface p-3 sm:p-3.5">
+        <div className="flex items-center justify-between gap-2 sm:gap-3">
+          <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+            {onBack && (
+              <button
+                type="button"
+                onClick={onBack}
+                className={
+                  "-ml-1 shrink-0 rounded-lg p-1.5 text-text-muted transition hover:bg-surface-muted hover:text-text cursor-pointer " +
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" +
+                  (backOnlyOnMobile ? " md:hidden" : "")
+                }
+                aria-label="Back"
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </button>
+            )}
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-primary/20 bg-primary/10 font-outfit text-14 font-bold text-primary-text sm:h-9 sm:w-9">
+              {name.charAt(0).toUpperCase() || "?"}
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <h2 className="truncate font-outfit text-15 font-bold text-text">{name}</h2>
+                <ChannelIcon channel={conversation.channelType} size={12} className="shrink-0" />
+                <ConvStateChip state={conversation.state} className="hidden sm:inline-flex" />
+              </div>
+              <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-12 text-text-muted">
+                {conversation.customer.name && <span className="truncate">{conversation.customer.handleOrPhone}</span>}
+                <WindowCountdown windowClosesAt={conversation.windowClosesAt} className="py-0" />
+              </div>
+            </div>
           </div>
-          <div className="min-w-0 flex-1">
-            <h2 className="truncate text-sm font-semibold text-text sm:text-base">{name}</h2>
-            <p className="flex min-w-0 items-center gap-1 text-xs text-text-muted">
-              <ChannelIcon channel={conversation.channelType} className="h-3.5 w-3.5" />
-              <span className="truncate">
-                {channelLabels[conversation.channelType]}
-                {conversation.customer.name ? ` · ${conversation.customer.handleOrPhone}` : ""}
-              </span>
-            </p>
+
+          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+            {isAdmin && <PauseResumeButton conversation={conversation} />}
+            {canResolve && (
+              <button
+                type="button"
+                onClick={() => setConfirmResolve(true)}
+                disabled={resolve.isPending || reply.isPending}
+                aria-busy={resolve.isPending || undefined}
+                className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1.5 text-12 font-medium text-white shadow-xs transition-colors hover:bg-emerald-700 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 sm:gap-1.5 sm:px-3"
+                title="Mark resolved and hand back to the AI"
+              >
+                <CheckCircle2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                <span className="hidden sm:inline">{resolve.isPending ? "Resolving…" : "Mark resolved"}</span>
+                <span className="sm:hidden">Resolve</span>
+              </button>
+            )}
+            {headerActions}
           </div>
         </div>
-        <div className="mt-2 flex flex-wrap items-center gap-1.5">
-          <StateBadge state={conversation.state} />
-          {conversation.tag && <TagBadge tag={conversation.tag} />}
-          <WindowCountdown windowClosesAt={conversation.windowClosesAt} />
-          {esc && (
-            <>
-              <EscalationBadge reason={esc.reason} />
-              <span className="text-xs text-text-muted">
-                {esc.assignedTo
-                  ? `Assigned to ${esc.assignedTo.id === user?.id ? "you" : esc.assignedTo.name}`
-                  : "Unassigned"}
-              </span>
-            </>
-          )}
-        </div>
+
+        {(conversation.tag || esc) && (
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            {conversation.tag && <TagBadge tag={conversation.tag} />}
+            {esc && (
+              <>
+                <EscalationBadge reason={esc.reason} />
+                <span className="text-xs text-text-muted">
+                  {esc.assignedTo
+                    ? `Assigned to ${esc.assignedTo.id === user?.id ? "you" : esc.assignedTo.name}`
+                    : "Unassigned"}
+                </span>
+              </>
+            )}
+          </div>
+        )}
       </header>
 
       {/* Thread */}
       <div
         ref={scrollRef}
         onScroll={onScroll}
-        className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-surface-muted/30 px-3 py-4 sm:px-4"
+        className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 custom-scrollbar md:p-6"
         role="log"
         aria-live="polite"
         aria-label="Messages"
@@ -167,14 +267,14 @@ export function ChatView({ conversation, onBack, backOnlyOnMobile = false, onRes
         {messages.length === 0 && !pendingText ? (
           <EmptyState icon={MessageSquare} title="No messages yet" />
         ) : (
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-3">
             {messages.map((m, i) => {
               const prev = messages[i - 1];
               const showDay = !prev || !sameDay(prev.createdAt, m.createdAt);
               return (
                 <Fragment key={m.id}>
                   {showDay && (
-                    <div className="my-2 self-center rounded-full bg-surface px-3 py-0.5 text-xs font-medium text-text-muted shadow-sm ring-1 ring-border">
+                    <div className="my-2 self-center rounded-full border border-border bg-surface px-3 py-1 text-11 font-medium text-text-muted shadow-xs">
                       {formatDayLabel(m.createdAt)}
                     </div>
                   )}
@@ -203,11 +303,21 @@ export function ChatView({ conversation, onBack, backOnlyOnMobile = false, onRes
       <ReplyBox
         key={conversation.id}
         onSend={handleSend}
-        onResolve={handleResolve}
-        canResolve={canResolve}
+        onSendTemplate={handleSendTemplate}
         sending={reply.isPending}
-        resolving={resolve.isPending}
+        disabled={resolve.isPending}
         windowClosed={windowClosed}
+        channel={conversation.channelType}
+        customerName={name}
+      />
+
+      <ConfirmDialog
+        isOpen={confirmResolve}
+        onClose={() => setConfirmResolve(false)}
+        onConfirm={handleResolve}
+        title="Resolve conversation?"
+        description="This hands the chat back to the AI assistant. Routine questions will be answered automatically again."
+        confirmLabel="Confirm & hand to AI"
       />
     </section>
   );

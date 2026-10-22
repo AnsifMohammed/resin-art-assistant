@@ -67,6 +67,15 @@ export type LanguageDetected = "english" | "malayalam" | "manglish";
 
 export type ActorType = "admin" | "staff" | "ai" | "system";
 
+export const TEMPLATE_CATEGORIES = ["delivery", "festive", "custom_order", "payment", "general"] as const;
+export type TemplateCategory = (typeof TEMPLATE_CATEGORIES)[number];
+
+export const TEMPLATE_CHANNELS = ["whatsapp", "instagram", "both"] as const;
+export type TemplateChannel = (typeof TEMPLATE_CHANNELS)[number];
+
+export const META_TEMPLATE_STATUSES = ["not_submitted", "pending", "approved", "rejected"] as const;
+export type MetaTemplateStatus = (typeof META_TEMPLATE_STATUSES)[number];
+
 // ─── Errors ──────────────────────────────────────────────────────────────────
 
 /** Every backend error body: { error, code } (+ details on validation errors). */
@@ -169,6 +178,12 @@ export interface Customer {
   handleOrPhone: string;
   language: string | null;
   notes: string | null;
+  city?: string | null;
+  isFavourite?: boolean;
+  isPriority?: boolean;
+  optedOut?: boolean;
+  optedOutAt?: ISODateString | null;
+  optOutSource?: "keyword" | "admin" | null;
   createdAt: ISODateString;
   updatedAt: ISODateString;
 }
@@ -182,8 +197,25 @@ export interface Conversation {
   tag: ConvTag | null;
   lastCustomerMessageAt: ISODateString | null;
   windowClosesAt: ISODateString | null;
+  /** Set on every stored message (customer, AI, human reply, echo). */
+  lastMessageAt: ISODateString | null;
+  /** Last time an admin opened the thread (POST /conversations/:id/read). */
+  adminLastReadAt: ISODateString | null;
   createdAt: ISODateString;
   updatedAt: ISODateString;
+}
+
+/** Summary of the AI decision linked to the last customer message of a batch (admin only). */
+export interface AiDecisionSummary {
+  intent: AiIntent | string;
+  escalate: boolean;
+  escalateReason: EscalationReason | string | null;
+  factsUsed: string[];
+  missingFacts: string[];
+  languageDetected: LanguageDetected | string | null;
+  suggestedTag: ConvTag | string | null;
+  sent: boolean;
+  createdAt: ISODateString;
 }
 
 export interface Message {
@@ -199,6 +231,8 @@ export interface Message {
   deliveryStatus: DeliveryStatus | null;
   metadata: Record<string, unknown>;
   createdAt: ISODateString;
+  /** Admin only: present on inbound customer messages the AI decided on. */
+  aiDecision?: AiDecisionSummary;
 }
 
 export interface AiDecisionRecord {
@@ -216,6 +250,24 @@ export interface AiDecisionRecord {
   languageDetected: LanguageDetected | null;
   sent: boolean;
   createdAt: ISODateString;
+}
+
+export interface MessageTemplate {
+  id: string;
+  name: string;
+  category: TemplateCategory;
+  channel: TemplateChannel;
+  body: string;
+  /** Computed server-side from body: unique {variable} names, first-seen order. */
+  variables: string[];
+  isActive: boolean;
+  /** Approved WhatsApp template name (lowercase_underscore). Needed to message after 24h. */
+  metaTemplateName: string | null;
+  metaStatus: MetaTemplateStatus;
+  createdByUserId: string | null;
+  updatedByUserId: string | null;
+  createdAt: ISODateString;
+  updatedAt: ISODateString;
 }
 
 export interface Escalation {
@@ -272,6 +324,10 @@ export interface ConversationListParams extends PageParams {
   state?: ConvState;
   tag?: ConvTag;
   channel?: ChannelType;
+  /** Case-insensitive substring of customer name, handle/phone or last message (max 100). */
+  search?: string;
+  /** "true" = unread only. */
+  unread?: "true" | "false";
 }
 
 export interface ConversationListItem extends Conversation {
@@ -280,6 +336,8 @@ export interface ConversationListItem extends Conversation {
   lastMessage: MessagePreview | null;
   /** Open (unresolved) escalation, if any. */
   openEscalation: Pick<Escalation, "id" | "reason" | "assignedToUserId" | "createdAt"> | null;
+  /** Customer wrote after the admin last opened the thread. */
+  unread: boolean;
 }
 
 export interface ConversationListResponse {
@@ -299,19 +357,54 @@ export interface ConversationDetailResponse {
   conversation: ConversationDetail;
 }
 
-export interface ReplyRequest {
-  text: string;
-}
+/** Body is exactly one of { text } or { templateId, variables? }. */
+export type ReplyRequest =
+  | { text: string }
+  | { templateId: string; variables?: Record<string, string> };
 
 export interface ReplyResponse {
   message: Message;
   conversation: Pick<Conversation, "id" | "state">;
 }
 
+export interface ConversationStateResponse {
+  conversation: Pick<Conversation, "id" | "state" | "tag">;
+}
+
 export interface ResolveResponse {
   conversation: Pick<Conversation, "id" | "state">;
   escalation: Escalation | null;
 }
+
+// ─── Message templates ─────────────────────────────────────────────
+
+export interface TemplateListParams {
+  category?: TemplateCategory;
+  /** whatsapp | instagram → that channel's templates plus "both". */
+  channel?: ChannelType;
+  /** Default "all". Staff always get active only. */
+  active?: "true" | "false" | "all";
+}
+
+export interface TemplateListResponse {
+  templates: MessageTemplate[];
+}
+
+export interface TemplateResponse {
+  template: MessageTemplate;
+}
+
+export interface CreateTemplateRequest {
+  name: string;
+  category: TemplateCategory;
+  channel?: TemplateChannel;
+  body: string;
+  isActive?: boolean;
+  metaTemplateName?: string | null;
+  metaStatus?: MetaTemplateStatus;
+}
+
+export type UpdateTemplateRequest = Partial<CreateTemplateRequest>;
 
 // ─── Escalations ──────────────────────────────────────────────────
 
@@ -515,8 +608,12 @@ export interface SimulateResponse {
   messageId: string | null;
   conversationId: string;
   state: ConvState;
-  /** "queued" = new job, "batched" = merged into a pending job, "inline" = in-process fallback */
-  queued: "queued" | "batched" | "inline";
+  /**
+   * "queued" = new job, "batched" = merged into a pending job, "inline" = in-process fallback,
+   * "skipped" = STOP/START keyword (see optAction); the AI was not queued.
+   */
+  queued: "queued" | "batched" | "inline" | "skipped";
+  optAction?: "opt_out" | "opt_in" | null;
   /** Always null now; the decision arrives later via realtime events / GET /conversations/:id. */
   decision: null;
 }
@@ -552,6 +649,18 @@ export interface SettingsUpdatedEvent {
   paused: boolean;
 }
 
+/** Admin only: a customer's profile/flags/opt-out changed (PATCH /customers/:id, STOP/START keyword). */
+export interface CustomerUpdatedEvent {
+  customerId: string;
+}
+
+/** Admin only: a broadcast changed status or made sending/receipt progress. */
+export interface BroadcastUpdatedEvent {
+  broadcastId: string;
+  status: BroadcastStatus;
+  stats: BroadcastStats;
+}
+
 /** Server acknowledgement of a `message:new:<id>` subscribe frame. */
 export interface SubscribedEvent {
   event: string;
@@ -579,6 +688,8 @@ export interface SocketEventMap {
   "escalation:assigned": EscalationAssignedEvent;
   "message:new": MessageNewEvent;
   "settings:updated": SettingsUpdatedEvent;
+  "customer:updated": CustomerUpdatedEvent;
+  "broadcast:updated": BroadcastUpdatedEvent;
   subscribed: SubscribedEvent;
   "subscription:denied": SubscriptionDeniedEvent;
   "subscription:revoked": SubscriptionRevokedEvent;
@@ -710,3 +821,336 @@ export interface VoidPaymentRequest {
   reason: string;
 }
 
+// ─── Orders ──────────────────────────────────────────────────────────────────
+
+export const ORDER_STATUSES = [
+  "pending",
+  "confirmed",
+  "in_production",
+  "ready",
+  "dispatched",
+  "delivered",
+  "cancelled",
+] as const;
+export type OrderStatus = (typeof ORDER_STATUSES)[number];
+
+export interface DbOrderItem {
+  id: string;
+  orderId: string;
+  productId?: string | null;
+  productName: string;
+  productDescription?: string | null;
+  quantity: number;
+  unitPrice: string | number;
+  lineTotal?: string | number;
+  customizations?: Record<string, unknown>;
+  createdAt: ISODateString;
+}
+
+export interface DbOrder {
+  id: string;
+  businessId: string;
+  customerId?: string | null;
+  orderNo: string;
+  customerName: string;
+  customerPhone?: string | null;
+  customerEmail?: string | null;
+  channel: "whatsapp" | "instagram";
+  status: OrderStatus;
+  subtotal: string | number;
+  deliveryCharge: string | number;
+  discountAmount: string | number;
+  totalAmount: string | number;
+  currency: string;
+  shippingAddress?: string | null;
+  courier?: string | null;
+  trackingId?: string | null;
+  customerNotes?: string | null;
+  internalNotes?: string | null;
+  expectedDeliveryDate?: string | null;
+  dispatchedAt?: ISODateString | null;
+  deliveredAt?: ISODateString | null;
+  isDeleted: boolean;
+  createdAt: ISODateString;
+  updatedAt: ISODateString;
+  items: DbOrderItem[];
+}
+
+export interface OrderListResponse {
+  orders: DbOrder[];
+  statusCounts: {
+    all: number;
+    pending: number;
+    confirmed: number;
+    in_production: number;
+    ready: number;
+    dispatched: number;
+    delivered: number;
+    cancelled: number;
+  };
+  total: number;
+}
+
+export interface OrderResponse {
+  ok: boolean;
+  order: DbOrder;
+}
+
+export interface CreateOrderItemInput {
+  productId?: string | null | undefined;
+  productName: string;
+  productDescription?: string | null | undefined;
+  quantity: number;
+  unitPrice: number;
+  customizations?: Record<string, unknown> | undefined;
+}
+
+export interface CreateOrderRequest {
+  orderNo?: string | undefined;
+  customerName: string;
+  customerPhone?: string | null | undefined;
+  customerEmail?: string | null | undefined;
+  customerId?: string | null | undefined;
+  channel?: "whatsapp" | "instagram" | undefined;
+  status?: OrderStatus | undefined;
+  shippingAddress?: string | null | undefined;
+  courier?: string | null | undefined;
+  trackingId?: string | null | undefined;
+  expectedDeliveryDate?: string | null | undefined;
+  customerNotes?: string | null | undefined;
+  internalNotes?: string | null | undefined;
+  deliveryCharge?: number | undefined;
+  discountAmount?: number | undefined;
+  items: CreateOrderItemInput[];
+}
+
+export interface UpdateOrderRequest {
+  customerName?: string | undefined;
+  customerPhone?: string | null | undefined;
+  customerEmail?: string | null | undefined;
+  channel?: "whatsapp" | "instagram" | undefined;
+  status?: OrderStatus | undefined;
+  shippingAddress?: string | null | undefined;
+  courier?: string | null | undefined;
+  trackingId?: string | null | undefined;
+  expectedDeliveryDate?: string | null | undefined;
+  customerNotes?: string | null | undefined;
+  internalNotes?: string | null | undefined;
+  deliveryCharge?: number | undefined;
+  discountAmount?: number | undefined;
+  items?: CreateOrderItemInput[] | undefined;
+}
+
+export interface UpdateOrderStatusRequest {
+  status: OrderStatus;
+  trackingId?: string | null | undefined;
+  courier?: string | null | undefined;
+  sendNotification?: boolean | undefined;
+}
+
+// ─── Customers (admin only) ──────────────────────────────────────────────────
+
+/** Mirrors backend/src/lib/segments.ts. "all" is not a membership segment. */
+export const CUSTOMER_SEGMENTS = [
+  "favourites",
+  "priority",
+  "previous_buyers",
+  "repeat_buyers",
+  "new",
+  "never_ordered",
+  "inactive",
+] as const;
+export type CustomerSegment = (typeof CUSTOMER_SEGMENTS)[number];
+
+export const SEGMENTS = ["all", ...CUSTOMER_SEGMENTS] as const;
+export type Segment = (typeof SEGMENTS)[number];
+
+export const SEGMENT_LABELS: Record<Segment, string> = {
+  all: "All",
+  favourites: "Favourites",
+  priority: "Priority",
+  previous_buyers: "Previous buyers",
+  repeat_buyers: "Repeat buyers",
+  new: "New",
+  never_ordered: "Never ordered",
+  inactive: "Inactive",
+};
+
+export const CUSTOMER_SORTS = ["recent", "spend", "orders", "name"] as const;
+export type CustomerSort = (typeof CUSTOMER_SORTS)[number];
+
+export interface CustomerListItem {
+  id: string;
+  name: string | null;
+  handleOrPhone: string;
+  channel: ChannelType;
+  city: string | null;
+  language: string | null;
+  notes: string | null;
+  isFavourite: boolean;
+  isPriority: boolean;
+  optedOut: boolean;
+  optedOutAt: ISODateString | null;
+  createdAt: ISODateString;
+  /** Latest conversation (by lastMessageAt, then createdAt). */
+  conversationId: string | null;
+  conversationState: ConvState | null;
+  lastMessageAt: ISODateString | null;
+  ordersCount: number;
+  /** Rupees. */
+  totalSpend: number;
+  lastOrderAt: ISODateString | null;
+  segments: CustomerSegment[];
+}
+
+export interface CustomerListParams extends PageParams {
+  segment?: Segment;
+  search?: string;
+  city?: string;
+  language?: string;
+  channel?: ChannelType;
+  sort?: CustomerSort;
+}
+
+export interface CustomerListResponse {
+  customers: CustomerListItem[];
+  pagination: Pagination;
+  /** Per segment for the whole business (search/city/language/channel not applied). */
+  counts: Record<Segment, number>;
+}
+
+export interface CustomerResponse {
+  customer: CustomerListItem;
+}
+
+export interface UpdateCustomerRequest {
+  name?: string | null;
+  city?: string | null;
+  notes?: string | null;
+  isFavourite?: boolean;
+  isPriority?: boolean;
+  optedOut?: boolean;
+}
+
+export interface CustomerOrderSummary {
+  id: string;
+  orderNo: string;
+  status: OrderStatus;
+  totalAmount: number;
+  createdAt: ISODateString;
+  itemsCount: number;
+}
+
+export interface CustomerOrdersResponse {
+  orders: CustomerOrderSummary[];
+}
+
+// ─── Broadcasts (admin only) ─────────────────────────────────────────────────
+
+export const BROADCAST_STATUSES = ["draft", "scheduled", "sending", "sent", "cancelled", "failed"] as const;
+export type BroadcastStatus = (typeof BROADCAST_STATUSES)[number];
+
+export const BROADCAST_RECIPIENT_STATUSES = ["pending", "sent", "delivered", "read", "failed"] as const;
+export type BroadcastRecipientStatus = (typeof BROADCAST_RECIPIENT_STATUSES)[number];
+
+export type BroadcastAction = "draft" | "schedule" | "send_now";
+
+export interface BroadcastFilters {
+  city?: string;
+  language?: string;
+  excludeComplaints?: boolean;
+}
+
+/** Recipient counts by status. */
+export interface BroadcastStats {
+  pending: number;
+  sent: number;
+  delivered: number;
+  read: number;
+  failed: number;
+}
+
+export interface BroadcastSummary {
+  id: string;
+  name: string;
+  templateId: string;
+  templateName: string | null;
+  segment: Segment;
+  filters: BroadcastFilters;
+  variables: Record<string, string>;
+  status: BroadcastStatus;
+  scheduledAt: ISODateString | null;
+  startedAt: ISODateString | null;
+  completedAt: ISODateString | null;
+  /** Audience snapshot size (0 until sending starts). */
+  recipientCount: number;
+  error: string | null;
+  stats: BroadcastStats;
+  createdAt: ISODateString;
+  createdByUserId: string | null;
+}
+
+export interface BroadcastRecipient {
+  id: string;
+  customerId: string;
+  customerName: string | null;
+  phone: string;
+  status: BroadcastRecipientStatus;
+  error: string | null;
+  sentAt: ISODateString | null;
+  deliveredAt: ISODateString | null;
+  readAt: ISODateString | null;
+}
+
+export interface BroadcastListParams extends PageParams {
+  status?: BroadcastStatus;
+}
+
+export interface BroadcastListResponse {
+  broadcasts: BroadcastSummary[];
+  pagination: Pagination;
+}
+
+export interface BroadcastDetailResponse {
+  broadcast: BroadcastSummary;
+  recipients: BroadcastRecipient[];
+  pagination: Pagination;
+}
+
+export interface BroadcastResponse {
+  broadcast: BroadcastSummary;
+}
+
+export interface AudienceParams {
+  segment?: Segment;
+  city?: string;
+  language?: string;
+  excludeComplaints?: boolean;
+}
+
+export interface AudienceResponse {
+  count: number;
+  /** BROADCAST_MAX_RECIPIENTS */
+  max: number;
+}
+
+export interface CreateBroadcastRequest {
+  name: string;
+  templateId: string;
+  segment: Segment;
+  filters?: BroadcastFilters;
+  variables?: Record<string, string>;
+  /** ISO with offset. Required (≥ now + 1 min) for action "schedule". */
+  scheduledAt?: string | null;
+  action: BroadcastAction;
+}
+
+export interface UpdateBroadcastRequest {
+  name?: string;
+  templateId?: string;
+  segment?: Segment;
+  filters?: BroadcastFilters;
+  variables?: Record<string, string>;
+  scheduledAt?: string | null;
+  action?: "schedule" | "send_now";
+}

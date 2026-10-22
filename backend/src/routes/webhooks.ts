@@ -6,6 +6,8 @@ import { auditLog, channels, conversations, customers, messages } from "../db/sc
 import { AppError } from "../lib/errors.ts";
 import { logger } from "../lib/logger.ts";
 import { enqueueProcessMessage } from "../queue/enqueue.ts";
+import { applyWhatsAppStatus } from "../services/deliveryReceipts.ts";
+import { handleOptKeyword } from "../services/optOut.ts";
 import { emitConversationUpdated, emitMessageNew } from "../realtime/events.ts";
 import {
   digitsOnly,
@@ -118,6 +120,7 @@ async function handleCustomerMessage(m: InboundCustomerMessage): Promise<void> {
         channelId: chan.id,
         state: "ai_active",
         lastCustomerMessageAt: now,
+        lastMessageAt: now,
         windowClosesAt,
       })
       .returning();
@@ -147,7 +150,7 @@ async function handleCustomerMessage(m: InboundCustomerMessage): Promise<void> {
   if (!isNewConv) {
     await db
       .update(conversations)
-      .set({ lastCustomerMessageAt: now, windowClosesAt })
+      .set({ lastCustomerMessageAt: now, lastMessageAt: now, windowClosesAt })
       .where(eq(conversations.id, conv.id));
   }
 
@@ -156,6 +159,21 @@ async function handleCustomerMessage(m: InboundCustomerMessage): Promise<void> {
     "Stored inbound customer message",
   );
   emitMessageNew(inserted);
+
+  // STOP / START: update the opt-out flag and acknowledge; never sent to the AI.
+  const optAction = await handleOptKeyword({
+    businessId: config.BUSINESS_ID,
+    customer,
+    conversationId: conv.id,
+    channelType: m.channelType,
+    recipient: m.handleOrPhone,
+    text: m.text,
+    messageId: inserted.id,
+  });
+  if (optAction) {
+    logger.info({ messageId: inserted.id, conversationId: conv.id, optAction }, "Opt keyword handled; AI skipped");
+    return;
+  }
 
   // The job re-checks state and the pause switch before doing anything.
   if (conv.state === "ai_active") {
@@ -212,12 +230,14 @@ async function handleEcho(m: EchoMessage): Promise<void> {
 
   emitMessageNew(inserted);
 
-  if (conv.state !== "owner_handling") {
-    await db
-      .update(conversations)
-      .set({ state: "owner_handling" })
-      .where(eq(conversations.id, conv.id));
+  // One update bumps the inbox sort key and, if needed, hands the conversation to the owner.
+  const stateChanged = conv.state !== "owner_handling";
+  await db
+    .update(conversations)
+    .set({ lastMessageAt: new Date(), ...(stateChanged ? { state: "owner_handling" as const } : {}) })
+    .where(eq(conversations.id, conv.id));
 
+  if (stateChanged) {
     await db.insert(auditLog).values({
       businessId: config.BUSINESS_ID,
       actorId: null,
@@ -247,6 +267,16 @@ async function processWhatsApp(body: any): Promise<void> {
       const incoming: any[] = Array.isArray(value.messages) ? value.messages : [];
       // Coexistence / SMB app echoes arrive in a separate array and are always business-sent.
       const echoes: any[] = Array.isArray(value.message_echoes) ? value.message_echoes : [];
+
+      // Delivery/read receipts for messages we sent (broadcasts, replies). Forward-only.
+      const statuses: any[] = Array.isArray(value.statuses) ? value.statuses : [];
+      for (const status of statuses) {
+        try {
+          await applyWhatsAppStatus(status);
+        } catch (err) {
+          logger.error({ err, metaMessageId: status?.id }, "Failed to apply WhatsApp status");
+        }
+      }
 
       const items = [
         ...incoming.map((msg) => ({ msg, forcedEcho: false })),

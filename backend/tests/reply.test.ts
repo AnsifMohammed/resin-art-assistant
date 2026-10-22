@@ -24,11 +24,12 @@ interface State {
   conv: Record<string, any>;
   channel: Record<string, any> | null;
   openEscalations: any[];
+  template: Record<string, any> | null;
   inserted: Record<string, any[]>;
   updates: Array<{ table: string; vals: any }>;
 }
 
-const state: State = { conv: {}, channel: null, openEscalations: [], inserted: {}, updates: [] };
+const state: State = { conv: {}, channel: null, openEscalations: [], template: null, inserted: {}, updates: [] };
 const tableName = (t: any): string => t?.[Symbol.for("drizzle:Name")] ?? "";
 
 function thenable<T>(value: () => T, extra: Record<string, any> = {}): any {
@@ -56,6 +57,7 @@ vi.mock("../src/db/index.ts", () => {
             ];
           }
           if (name === "escalations") return state.openEscalations;
+          if (name === "message_templates") return state.template ? [{ ...state.template }] : [];
           return [];
         }),
     }),
@@ -111,6 +113,18 @@ beforeEach(() => {
   };
   state.channel = { id: "chan-1", type: "instagram" };
   state.openEscalations = [{ id: "esc-1", assignedToUserId: "staff-1", resolvedAt: null }];
+  state.template = {
+    id: "tpl-1",
+    businessId: "biz-1",
+    name: "Order dispatched",
+    category: "delivery",
+    channel: "both",
+    body: "Hi {customerName}, your {product} is on its way!",
+    variables: ["customerName", "product"],
+    isActive: true,
+    metaTemplateName: null,
+    metaStatus: "not_submitted",
+  };
   state.inserted = {};
   state.updates = [];
   sendMessage.mockReset();
@@ -135,7 +149,10 @@ describe("POST /conversations/:id/reply", () => {
       expect.objectContaining({ channelType: "instagram", recipient: "meera_ig", conversationId: "conv-1" }),
     );
     expect(state.updates).toContainEqual({ table: "messages", vals: { deliveryStatus: "sent" } });
-    expect(state.updates).toContainEqual({ table: "conversations", vals: { state: "owner_handling" } });
+    expect(state.updates).toContainEqual({
+      table: "conversations",
+      vals: { state: "owner_handling", lastMessageAt: expect.any(Date) },
+    });
     expect(res.json().message.deliveryStatus).toBe("sent");
     expect(state.inserted.audit_log?.[0]).toMatchObject({ action: "reply_sent", actorType: "admin" });
     expect(rt.emitMessageNew).toHaveBeenCalledTimes(1);
@@ -201,5 +218,130 @@ describe("POST /conversations/:id/reply", () => {
     expect(res.statusCode).toBe(201);
     expect(state.inserted.messages?.[0]).toMatchObject({ senderType: "staff", deliveryStatus: "queued" });
     expect(rt.emitMessageNew.mock.calls[0]![0]).toMatchObject({ senderType: "staff", senderId: "staff-1" });
+  });
+});
+
+const postTemplate = (token: string, payload: Record<string, unknown>) =>
+  app.inject({
+    method: "POST",
+    url: "/conversations/conv-1/reply",
+    headers: { authorization: `Bearer ${token}` },
+    payload,
+  });
+
+const closeWindow = () => {
+  state.conv.windowClosesAt = new Date(Date.now() - 60 * 1000);
+};
+
+describe("POST /conversations/:id/reply with a template", () => {
+  it("renders the template, auto-fills customerName, stores template metadata and audits template_reply_sent", async () => {
+    const res = await postTemplate(adminToken, { templateId: "tpl-1", variables: { product: "Resin Clock" } });
+
+    expect(res.statusCode).toBe(201);
+    const text = "Hi Meera, your Resin Clock is on its way!";
+    expect(state.inserted.messages?.[0]).toMatchObject({
+      content: text,
+      senderType: "owner",
+      metadata: { templateId: "tpl-1", templateName: "Order dispatched" },
+    });
+    expect(sendMessage).toHaveBeenCalledWith(expect.objectContaining({ text, channelType: "instagram" }));
+    expect(state.inserted.audit_log?.[0]).toMatchObject({
+      action: "template_reply_sent",
+      actorType: "admin",
+      details: { messageId: "messages-1", templateId: "tpl-1", preview: text },
+    });
+    expect(res.json().conversation.state).toBe("owner_handling");
+  });
+
+  it("explicit variables win over the auto-filled customerName", async () => {
+    await postTemplate(staffToken, { templateId: "tpl-1", variables: { customerName: "Meera chechi", product: "tray" } });
+    expect(state.inserted.messages?.[0]?.content).toBe("Hi Meera chechi, your tray is on its way!");
+    expect(state.inserted.messages?.[0]?.senderType).toBe("staff");
+  });
+
+  it("400 TEMPLATE_VARIABLES_MISSING lists the missing variables and sends nothing", async () => {
+    const res = await postTemplate(adminToken, { templateId: "tpl-1" });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.json()).toMatchObject({
+      code: "TEMPLATE_VARIABLES_MISSING",
+      error: expect.stringContaining("product"),
+      details: [{ path: "product", message: "required" }],
+    });
+    expect(sendMessage).not.toHaveBeenCalled();
+    expect(state.inserted.messages).toBeUndefined();
+  });
+
+  it("404 TEMPLATE_NOT_FOUND for an unknown or inactive template", async () => {
+    state.template = null;
+    const res = await postTemplate(adminToken, { templateId: "nope" });
+    expect(res.statusCode).toBe(404);
+    expect(res.json().code).toBe("TEMPLATE_NOT_FOUND");
+  });
+
+  it("400 TEMPLATE_CHANNEL_MISMATCH when the template is for the other channel", async () => {
+    state.template!.channel = "whatsapp";
+    const res = await postTemplate(adminToken, { templateId: "tpl-1", variables: { product: "tray" } });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().code).toBe("TEMPLATE_CHANNEL_MISMATCH");
+    expect(sendMessage).not.toHaveBeenCalled();
+  });
+
+  it("400 TEMPLATE_TOO_LONG when the rendered text exceeds the channel limit", async () => {
+    const res = await postTemplate(adminToken, { templateId: "tpl-1", variables: { product: "x".repeat(990) } });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().code).toBe("TEMPLATE_TOO_LONG");
+  });
+
+  it.each([
+    ["both text and templateId", { text: "Hi", templateId: "tpl-1" }],
+    ["neither", {}],
+    ["variables with non-string values", { templateId: "tpl-1", variables: { product: 5 } }],
+  ])("400 VALIDATION_ERROR for %s", async (_label, payload) => {
+    const res = await postTemplate(adminToken, payload);
+    expect(res.statusCode).toBe(400);
+    expect(res.json().code).toBe("VALIDATION_ERROR");
+    expect(sendMessage).not.toHaveBeenCalled();
+  });
+
+  describe("after the 24h window closed", () => {
+    beforeEach(() => {
+      closeWindow();
+      state.channel = { id: "chan-1", type: "whatsapp" };
+    });
+
+    it("blocks plain text (409 WINDOW_CLOSED)", async () => {
+      const res = await postReply(adminToken);
+      expect(res.statusCode).toBe(409);
+      expect(res.json().code).toBe("WINDOW_CLOSED");
+    });
+
+    it("blocks a template that is not an approved Meta template", async () => {
+      state.template!.metaTemplateName = "order_dispatched";
+      state.template!.metaStatus = "pending";
+      const res = await postTemplate(adminToken, { templateId: "tpl-1", variables: { product: "tray" } });
+      expect(res.statusCode).toBe(409);
+      expect(res.json()).toMatchObject({
+        code: "WINDOW_CLOSED",
+        error: "Only approved WhatsApp templates can be sent after 24 hours",
+      });
+      expect(sendMessage).not.toHaveBeenCalled();
+    });
+
+    it("blocks an approved status without a Meta template name", async () => {
+      state.template!.metaStatus = "approved";
+      const res = await postTemplate(adminToken, { templateId: "tpl-1", variables: { product: "tray" } });
+      expect(res.statusCode).toBe(409);
+    });
+
+    it("allows an approved Meta template", async () => {
+      state.template!.metaTemplateName = "order_dispatched";
+      state.template!.metaStatus = "approved";
+      const res = await postTemplate(adminToken, { templateId: "tpl-1", variables: { product: "tray" } });
+      expect(res.statusCode).toBe(201);
+      expect(sendMessage).toHaveBeenCalledWith(
+        expect.objectContaining({ channelType: "whatsapp", text: "Hi Meera, your tray is on its way!" }),
+      );
+    });
   });
 });

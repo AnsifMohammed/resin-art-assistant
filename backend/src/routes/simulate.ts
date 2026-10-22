@@ -9,6 +9,7 @@ import { authenticate } from "../middleware/authenticate.ts";
 import { requireAdmin } from "../middleware/requireAdmin.ts";
 import { emitMessageNew } from "../realtime/events.ts";
 import { enqueueProcessMessage } from "../queue/enqueue.ts";
+import { handleOptKeyword } from "../services/optOut.ts";
 
 const simulateSchema = z.object({
   customerName: z.string().min(1),
@@ -111,6 +112,7 @@ export const simulateRoutes: FastifyPluginAsync = async (app: FastifyInstance) =
           channelId,
           state: "ai_active",
           lastCustomerMessageAt: now,
+          lastMessageAt: now,
           windowClosesAt,
         })
         .returning();
@@ -120,6 +122,7 @@ export const simulateRoutes: FastifyPluginAsync = async (app: FastifyInstance) =
         .update(conversations)
         .set({
           lastCustomerMessageAt: now,
+          lastMessageAt: now,
           windowClosesAt,
         })
         .where(eq(conversations.id, conv.id));
@@ -146,7 +149,31 @@ export const simulateRoutes: FastifyPluginAsync = async (app: FastifyInstance) =
 
     emitMessageNew(inbound);
 
-    // 5. Queue AI processing. Messages are batched per conversation: the job
+    // 5. STOP / START keywords: update opt-out, acknowledge, skip the AI.
+    const optAction = inbound
+      ? await handleOptKeyword({
+          businessId,
+          customer,
+          conversationId,
+          channelType,
+          recipient: customer.handleOrPhone,
+          text,
+          messageId: inbound.id,
+        })
+      : null;
+    if (optAction) {
+      return reply.status(202).send({
+        ok: true,
+        messageId: inbound?.id ?? null,
+        conversationId,
+        state: conv.state,
+        queued: "skipped",
+        optAction,
+        decision: null,
+      });
+    }
+
+    // 6. Queue AI processing. Messages are batched per conversation: the job
     //    runs after the batch window and handles every message received by then.
     const queued = await enqueueProcessMessage({ conversationId, businessId });
 
@@ -156,6 +183,7 @@ export const simulateRoutes: FastifyPluginAsync = async (app: FastifyInstance) =
       conversationId,
       state: conv.state,
       queued: queued.mode,
+      optAction: null,
       decision: null,
     });
   });

@@ -1,6 +1,7 @@
 import {
-  pgTable, pgEnum, text, boolean, integer,
-  jsonb, timestamp, uniqueIndex, index
+  pgTable, pgEnum, text, boolean,
+  jsonb, timestamp, uniqueIndex, index,
+  integer, numeric, date, check, unique, foreignKey
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { nanoid } from "nanoid";
@@ -41,11 +42,40 @@ export const escalationReasonEnum = pgEnum("escalation_reason", [
   "intent_complaint", "intent_refund", "intent_unknown",
   "missing_facts", "always_escalate_phrase",
   "payment_claim", "unapproved_intent", "parse_error", "manual",
+  "intent_off_topic", "intent_payment", "window_closed"
 ]);
 
 export const paymentKindEnum = pgEnum("payment_kind", ["advance", "balance", "other"]);
 
 export const paymentStatusEnum = pgEnum("payment_status", ["pending", "paid", "void"]);
+
+export const templateCategoryEnum = pgEnum("template_category", [
+  "delivery", "festive", "custom_order", "payment", "general"
+]);
+
+export const templateChannelEnum = pgEnum("template_channel", ["whatsapp", "instagram", "both"]);
+
+export const metaTemplateStatusEnum = pgEnum("meta_template_status", [
+  "not_submitted", "pending", "approved", "rejected"
+]);
+
+export const orderStatusEnum = pgEnum("order_status", [
+  "pending", "confirmed", "in_production", "ready",
+  "dispatched", "delivered", "cancelled"
+]);
+
+export const broadcastStatusEnum = pgEnum("broadcast_status", [
+  "draft", "scheduled", "sending", "sent", "cancelled", "failed"
+]);
+
+export const broadcastSegmentEnum = pgEnum("broadcast_segment", [
+  "all", "favourites", "priority", "previous_buyers",
+  "repeat_buyers", "new", "never_ordered", "inactive"
+]);
+
+export const recipientStatusEnum = pgEnum("recipient_status", [
+  "pending", "sent", "delivered", "read", "failed"
+]);
 
 // ─── Tables ───────────────────────────────────────────────────────────────────
 
@@ -100,11 +130,18 @@ export const customers = pgTable("customers", {
   handleOrPhone: text("handle_or_phone").notNull(),
   language: text("language").default("english"),
   notes: text("notes"),
+  city: text("city"),
+  isFavourite: boolean("is_favourite").notNull().default(false),
+  isPriority: boolean("is_priority").notNull().default(false),
+  optedOut: boolean("opted_out").notNull().default(false),  // no broadcasts/offers
+  optedOutAt: timestamp("opted_out_at"),
+  optOutSource: text("opt_out_source"),                // "keyword" | "admin"
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 }, (t) => [
   index("customers_business_idx").on(t.businessId),
   index("customers_channel_idx").on(t.channelId),
+  index("customers_business_segment_idx").on(t.businessId, t.isFavourite, t.isPriority),
 ]);
 
 // One conversation per customer (ongoing thread)
@@ -117,11 +154,14 @@ export const conversations = pgTable("conversations", {
   tag: convTagEnum("tag"),
   lastCustomerMessageAt: timestamp("last_customer_message_at"),
   windowClosesAt: timestamp("window_closes_at"),       // 24h after lastCustomerMessageAt
+  lastMessageAt: timestamp("last_message_at"),         // any direction; inbox sort key
+  adminLastReadAt: timestamp("admin_last_read_at"),    // unread = customer message after this
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 }, (t) => [
   index("conversations_business_state_idx").on(t.businessId, t.state),
   index("conversations_customer_idx").on(t.customerId),
+  index("conversations_business_last_msg_idx").on(t.businessId, t.lastMessageAt),
 ]);
 
 // Every message in every conversation
@@ -270,3 +310,151 @@ export const payments = pgTable("payments", {
   index("payments_revenue_idx").on(t.businessId, t.status, t.paidAt),
 ]);
 
+// Ready-made messages admin/staff insert into replies. {variable} placeholders.
+export const messageTemplates = pgTable("message_templates", {
+  id: id(),
+  businessId: businessId(),
+  name: text("name").notNull(),
+  category: templateCategoryEnum("category").notNull(),
+  channel: templateChannelEnum("channel").notNull().default("both"),
+  body: text("body").notNull(),
+  variables: jsonb("variables").$type<string[]>().notNull().default([]),  // derived from body
+  isActive: boolean("is_active").notNull().default(true),
+  metaTemplateName: text("meta_template_name"),        // approved WhatsApp template name
+  metaStatus: metaTemplateStatusEnum("meta_status").notNull().default("not_submitted"),
+  createdByUserId: text("created_by_user_id"),
+  updatedByUserId: text("updated_by_user_id"),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, (t) => [
+  uniqueIndex("templates_business_name_idx").on(t.businessId, t.name),
+  index("templates_business_category_idx").on(t.businessId, t.category),
+]);
+
+// Customer orders
+export const orders = pgTable("orders", {
+  id: text("id").primaryKey().default(sql`(gen_random_uuid())::text`),
+  businessId: businessId(),
+  customerId: text("customer_id"),
+  orderNo: text("order_no").notNull(),
+  customerName: text("customer_name").notNull(),
+  customerPhone: text("customer_phone"),
+  customerEmail: text("customer_email"),
+  channel: text("channel").notNull().default("whatsapp"),
+  status: orderStatusEnum("status").notNull().default("pending"),
+  subtotal: numeric("subtotal", { precision: 12, scale: 2 }).notNull().default("0"),
+  deliveryCharge: numeric("delivery_charge", { precision: 12, scale: 2 }).notNull().default("0"),
+  discountAmount: numeric("discount_amount", { precision: 12, scale: 2 }).notNull().default("0"),
+  totalAmount: numeric("total_amount", { precision: 12, scale: 2 }).notNull().default("0"),
+  currency: text("currency").notNull().default("INR"),
+  shippingAddress: text("shipping_address"),
+  courier: text("courier"),
+  trackingId: text("tracking_id"),
+  customerNotes: text("customer_notes"),
+  internalNotes: text("internal_notes"),
+  expectedDeliveryDate: date("expected_delivery_date"),
+  dispatchedAt: timestamp("dispatched_at"),
+  deliveredAt: timestamp("delivered_at"),
+  isDeleted: boolean("is_deleted").notNull().default(false),
+  deletedAt: timestamp("deleted_at"),
+  deletedBy: text("deleted_by"),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, (t) => [
+  unique("uq_orders_business_order_no").on(t.businessId, t.orderNo),
+  foreignKey({
+    name: "orders_customer_id_fkey",
+    columns: [t.customerId],
+    foreignColumns: [customers.id],
+  }),
+  foreignKey({
+    name: "orders_business_id_fkey",
+    columns: [t.businessId],
+    foreignColumns: [businesses.id],
+  }),
+  check("orders_delivery_charge_check", sql`${t.deliveryCharge} >= (0)::numeric`),
+  check("orders_discount_amount_check", sql`${t.discountAmount} >= (0)::numeric`),
+  check("orders_subtotal_check", sql`${t.subtotal} >= (0)::numeric`),
+  check("orders_total_amount_check", sql`${t.totalAmount} >= (0)::numeric`),
+  index("idx_orders_business_status").on(t.businessId, t.status).where(sql`${t.isDeleted} = false`),
+  index("idx_orders_created_at").on(t.createdAt.desc()).where(sql`${t.isDeleted} = false`),
+  index("idx_orders_customer").on(t.customerId).where(sql`${t.isDeleted} = false`),
+]);
+
+// Items inside an order
+export const orderItems = pgTable("order_items", {
+  id: text("id").primaryKey().default(sql`(gen_random_uuid())::text`),
+  orderId: text("order_id").notNull(),
+  productId: text("product_id"),
+  productName: text("product_name").notNull(),
+  productDescription: text("product_description"),
+  quantity: integer("quantity").notNull().default(1),
+  unitPrice: numeric("unit_price", { precision: 12, scale: 2 }).notNull(),
+  lineTotal: numeric("line_total", { precision: 12, scale: 2 })
+    .generatedAlwaysAs(sql`(((quantity)::numeric * unit_price))`),
+  customizations: jsonb("customizations").notNull().default({}),
+  isDeleted: boolean("is_deleted").notNull().default(false),
+  deletedAt: timestamp("deleted_at"),
+  deletedBy: text("deleted_by"),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, (t) => [
+  foreignKey({
+    name: "order_items_order_id_fkey",
+    columns: [t.orderId],
+    foreignColumns: [orders.id],
+  }),
+  check("order_items_quantity_check", sql`${t.quantity} > 0`),
+  check("order_items_unit_price_check", sql`${t.unitPrice} >= (0)::numeric`),
+  index("idx_order_items_order").on(t.orderId).where(sql`${t.isDeleted} = false`),
+]);
+
+export type BroadcastFilters = {
+  city?: string;
+  language?: string;
+  excludeComplaints?: boolean;
+};
+
+// One-to-many WhatsApp template sends to a customer segment
+export const broadcasts = pgTable("broadcasts", {
+  id: id(),
+  businessId: businessId(),
+  name: text("name").notNull(),
+  templateId: text("template_id").notNull(),
+  segment: broadcastSegmentEnum("segment").notNull(),
+  filters: jsonb("filters").$type<BroadcastFilters>().notNull().default({}),
+  variables: jsonb("variables").$type<Record<string, string>>().notNull().default({}),
+  status: broadcastStatusEnum("status").notNull().default("draft"),
+  scheduledAt: timestamp("scheduled_at"),
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+  recipientCount: integer("recipient_count").notNull().default(0),
+  error: text("error"),
+  createdByUserId: text("created_by_user_id"),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, (t) => [
+  index("broadcasts_business_status_idx").on(t.businessId, t.status, t.scheduledAt),
+]);
+
+// Audience snapshot of a broadcast: one row per customer, with delivery status
+export const broadcastRecipients = pgTable("broadcast_recipients", {
+  id: id(),
+  businessId: businessId(),
+  broadcastId: text("broadcast_id").notNull(),
+  customerId: text("customer_id").notNull(),
+  conversationId: text("conversation_id"),             // null = customer has no conversation
+  messageId: text("message_id"),                       // outbound message row, when a conversation exists
+  phone: text("phone").notNull(),
+  status: recipientStatusEnum("status").notNull().default("pending"),
+  metaMessageId: text("meta_message_id"),
+  error: text("error"),
+  sentAt: timestamp("sent_at"),
+  deliveredAt: timestamp("delivered_at"),
+  readAt: timestamp("read_at"),
+  createdAt: createdAt(),
+}, (t) => [
+  uniqueIndex("broadcast_recipients_unique_idx").on(t.broadcastId, t.customerId),
+  index("broadcast_recipients_status_idx").on(t.broadcastId, t.status),
+  index("broadcast_recipients_meta_id_idx").on(t.metaMessageId),
+]);

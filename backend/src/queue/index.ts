@@ -9,6 +9,8 @@ export const QUEUES = {
   processMessageFailed: "process-message-failed",
   sendReminder: "send-reminder",
   refreshTokens: "refresh-tokens",
+  dispatchBroadcasts: "dispatch-broadcasts",
+  sendBroadcast: "send-broadcast",
 } as const;
 
 /** Seconds to wait after the first message of a burst before running the AI (message batching). */
@@ -78,6 +80,15 @@ export async function initQueue(): Promise<PgBoss | null> {
     });
     await boss.createQueue(QUEUES.sendReminder);
     await boss.createQueue(QUEUES.refreshTokens);
+    await boss.createQueue(QUEUES.dispatchBroadcasts);
+    // `stately` + singletonKey=broadcastId: never two active jobs for one broadcast.
+    await boss.createQueue(QUEUES.sendBroadcast, {
+      policy: "stately",
+      retryLimit: 3,
+      retryDelay: 30,
+      retryBackoff: true,
+      expireInSeconds: 30 * 60,
+    });
 
     running = true;
     logger.info("pg-boss background job queue initialized");

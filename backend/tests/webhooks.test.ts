@@ -1,6 +1,9 @@
 import crypto from "node:crypto";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { PgDialect } from "drizzle-orm/pg-core";
 import { applyTestEnv } from "./env.ts";
+
+const dialect = new PgDialect();
 
 const SECRET = "test_app_secret";
 const IG_ACCOUNT = "17841400000000000";
@@ -19,19 +22,23 @@ const h = vi.hoisted(() => {
   const state = {
     rows: {} as Record<string, any[]>,
     inserts: [] as { table: string; val: any }[],
-    updates: [] as { table: string; vals: any }[],
+    updates: [] as { table: string; vals: any; where?: any }[],
     duplicateIds: new Set<string>(),
     failIds: new Set<string>(),
   };
   const enqueue = vi.fn(async () => ({ mode: "inline", jobId: null }));
   const emitMessageNew = vi.fn();
   const emitConversationUpdated = vi.fn();
-  return { state, enqueue, emitMessageNew, emitConversationUpdated };
+  const emitCustomerUpdated = vi.fn();
+  const emitBroadcastUpdated = vi.fn();
+  return { state, enqueue, emitMessageNew, emitConversationUpdated, emitCustomerUpdated, emitBroadcastUpdated };
 });
 
 vi.mock("../src/realtime/events.ts", () => ({
   emitMessageNew: h.emitMessageNew,
   emitConversationUpdated: h.emitConversationUpdated,
+  emitCustomerUpdated: h.emitCustomerUpdated,
+  emitBroadcastUpdated: h.emitBroadcastUpdated,
 }));
 
 const tableName = (table: any): string => table?.[Symbol.for("drizzle:Name")] || "";
@@ -67,9 +74,16 @@ vi.mock("../src/db/index.ts", () => {
       }),
       update: (table: any) => ({
         set: (vals: any) => ({
-          where: () => {
-            h.state.updates.push({ table: tableName(table), vals });
-            return Promise.resolve();
+          where: (where: any) => {
+            h.state.updates.push({ table: tableName(table), vals, where });
+            const done = Promise.resolve(undefined);
+            return Object.assign(done, {
+              // Receipts: pretend one broadcast recipient matched.
+              returning: () =>
+                Promise.resolve(
+                  tableName(table) === "broadcast_recipients" ? [{ broadcastId: "b-1", businessId: "test-business" }] : [],
+                ),
+            });
           },
         }),
       }),
@@ -115,6 +129,8 @@ beforeEach(() => {
   h.enqueue.mockClear();
   h.emitMessageNew.mockClear();
   h.emitConversationUpdated.mockClear();
+  h.emitCustomerUpdated.mockClear();
+  h.emitBroadcastUpdated.mockClear();
 });
 
 const sign = (raw: string | Buffer, secret = SECRET) =>
@@ -239,6 +255,7 @@ describe("Meta Webhooks", () => {
       // Existing conversation: window bumped.
       const convUpdate = h.state.updates.find((u) => u.table === "conversations");
       expect(convUpdate?.vals.windowClosesAt).toBeInstanceOf(Date);
+      expect(convUpdate?.vals.lastMessageAt).toBe(convUpdate?.vals.lastCustomerMessageAt);
     });
 
     it("rejects a wrong signature with 403", async () => {
@@ -340,7 +357,8 @@ describe("Meta Webhooks", () => {
 
       const convUpdates = h.state.updates.filter((u) => u.table === "conversations");
       expect(convUpdates).toHaveLength(1);
-      expect(convUpdates[0]!.vals).toEqual({ state: "owner_handling" });
+      // Same update bumps the inbox sort key; the customer window is untouched.
+      expect(convUpdates[0]!.vals).toEqual({ state: "owner_handling", lastMessageAt: expect.any(Date) });
 
       const audits = insertsInto("audit_log");
       expect(audits).toHaveLength(1);
@@ -434,10 +452,117 @@ describe("Meta Webhooks", () => {
         senderType: "owner",
         direction: "inbound",
       });
-      expect(h.state.updates.filter((u) => u.table === "conversations")[0]?.vals).toEqual({ state: "owner_handling" });
+      expect(h.state.updates.filter((u) => u.table === "conversations")[0]?.vals).toEqual({
+        state: "owner_handling",
+        lastMessageAt: expect.any(Date),
+      });
       expect(insertsInto("audit_log")[0]).toMatchObject({
         details: { from: "escalated", to: "owner_handling", reason: "echo" },
       });
+      expect(h.enqueue).not.toHaveBeenCalled();
+    });
+  });
+  describe("POST /webhook opt-out keywords", () => {
+    const send = async (id: string, text: string) => {
+      const raw = JSON.stringify(waPayload([waText(id, text)]));
+      return post(raw, sign(raw));
+    };
+
+    it("STOP opts the customer out, acknowledges and never reaches the AI", async () => {
+      const res = await send("wamid.stop", "  STOP! ");
+      expect(res.statusCode).toBe(200);
+
+      const custUpdate = h.state.updates.find((u) => u.table === "customers");
+      expect(custUpdate?.vals).toEqual({ optedOut: true, optedOutAt: expect.any(Date), optOutSource: "keyword" });
+
+      expect(insertsInto("audit_log")).toEqual([
+        expect.objectContaining({
+          action: "customer_opted_out",
+          actorType: "system",
+          conversationId: "conv-1",
+          details: { customerId: "cust-wa", source: "keyword", messageId: "messages-new" },
+        }),
+      ]);
+
+      // Inbound STOP + outbound system acknowledgement.
+      const msgs = insertsInto("messages");
+      expect(msgs).toHaveLength(2);
+      expect(msgs[1]).toMatchObject({
+        conversationId: "conv-1",
+        direction: "outbound",
+        senderType: "system",
+        content: "You won't receive offers from us anymore. Reply START to subscribe again.",
+        metadata: { kind: "opt_out_ack" },
+      });
+      expect(h.state.updates.find((u) => u.table === "messages")?.vals).toEqual({ deliveryStatus: "sent" });
+      expect(h.enqueue).not.toHaveBeenCalled();
+      expect(h.emitCustomerUpdated).toHaveBeenCalledWith("test-business", { customerId: "cust-wa" });
+      expect(h.emitMessageNew).toHaveBeenCalledTimes(2);
+    });
+
+    it("Tamil நிறுத்து also opts out", async () => {
+      await send("wamid.ta", "நிறுத்து");
+      expect(h.state.updates.find((u) => u.table === "customers")?.vals).toMatchObject({ optedOut: true });
+      expect(h.enqueue).not.toHaveBeenCalled();
+    });
+
+    it("START re-subscribes an opted-out customer", async () => {
+      h.state.rows.customers = [{ id: "cust-wa", handleOrPhone: "919876543210", optedOut: true }];
+      await send("wamid.start", "Start");
+      expect(h.state.updates.find((u) => u.table === "customers")?.vals).toEqual({
+        optedOut: false,
+        optedOutAt: null,
+        optOutSource: null,
+      });
+      expect(insertsInto("audit_log")[0]).toMatchObject({ action: "customer_opted_in" });
+      expect(insertsInto("messages")[1]).toMatchObject({ senderType: "system", content: "You're subscribed again 😊" });
+      expect(h.enqueue).not.toHaveBeenCalled();
+    });
+
+    it("START from a subscribed customer is a normal message for the AI", async () => {
+      await send("wamid.start2", "start");
+      expect(h.state.updates.some((u) => u.table === "customers")).toBe(false);
+      expect(insertsInto("messages")).toHaveLength(1);
+      expect(h.enqueue).toHaveBeenCalledTimes(1);
+    });
+
+    it("a sentence containing stop is a normal message", async () => {
+      await send("wamid.s3", "please stop the order, I want to change the colour");
+      expect(h.state.updates.some((u) => u.table === "customers")).toBe(false);
+      expect(h.enqueue).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("POST /webhook WhatsApp statuses", () => {
+    it("applies forward-only receipts to broadcast recipients and messages", async () => {
+      const raw = JSON.stringify(
+        waPayload([], {
+          statuses: [
+            { id: "wamid.out1", status: "delivered", timestamp: "1790589000", recipient_id: "919876543210" },
+            { id: "wamid.out2", status: "failed", timestamp: "1790589001", errors: [{ code: 131026, title: "Message undeliverable" }] },
+            { id: "wamid.out3", status: "deleted" },
+          ],
+        }),
+      );
+      const res = await post(raw, sign(raw));
+      expect(res.statusCode).toBe(200);
+
+      const recipientUpdates = h.state.updates.filter((u) => u.table === "broadcast_recipients");
+      expect(recipientUpdates.map((u) => u.vals)).toEqual([
+        { status: "delivered", deliveredAt: new Date(1790589000 * 1000) },
+        { status: "failed", error: "131026: Message undeliverable" },
+      ]);
+      const delivered = dialect.sqlToQuery(recipientUpdates[0]!.where);
+      expect(delivered.sql).toContain('"broadcast_recipients"."meta_message_id" = $1');
+      expect(delivered.sql).toContain('"broadcast_recipients"."status" in ($2, $3)');
+      expect(delivered.params).toEqual(["wamid.out1", "pending", "sent"]);
+
+      const messageUpdates = h.state.updates.filter((u) => u.table === "messages");
+      expect(messageUpdates.map((u) => u.vals)).toEqual([{ deliveryStatus: "delivered" }, { deliveryStatus: "failed" }]);
+      expect(dialect.sqlToQuery(messageUpdates[1]!.where).params).toEqual(["wamid.out2", "queued", "sent"]);
+
+      // Statuses never create messages or run the AI.
+      expect(insertsInto("messages")).toHaveLength(0);
       expect(h.enqueue).not.toHaveBeenCalled();
     });
   });

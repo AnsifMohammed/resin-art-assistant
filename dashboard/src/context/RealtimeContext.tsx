@@ -136,6 +136,19 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
           void qc.invalidateQueries({ queryKey: queryKeys.settings.all });
         }),
       );
+      // Profile/flag/opt-out change (dashboard or STOP/START keyword). Opt-out also moves broadcast audiences.
+      offs.push(
+        transport.on("customer:updated", () => {
+          void qc.invalidateQueries({ queryKey: queryKeys.customers.all });
+          void qc.invalidateQueries({ queryKey: queryKeys.broadcasts.audienceAll() });
+        }),
+      );
+      // Status changes and sending/receipt progress (throttled server-side).
+      offs.push(
+        transport.on("broadcast:updated", () => {
+          void qc.invalidateQueries({ queryKey: queryKeys.broadcasts.all });
+        }),
+      );
     } else {
       // Staff: only their own assignments (gained or lost). Per-conversation messages are subscribed by
       // the chat view via useSocketEvent(`message:new:${conversationId}`).
@@ -163,7 +176,11 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
     if (wasConnected.current) {
       void qc.invalidateQueries({ queryKey: queryKeys.escalations.all });
       void qc.invalidateQueries({ queryKey: queryKeys.conversations.all });
-      if (role === "admin") void qc.invalidateQueries({ queryKey: queryKeys.settings.all });
+      if (role === "admin") {
+        void qc.invalidateQueries({ queryKey: queryKeys.settings.all });
+        void qc.invalidateQueries({ queryKey: queryKeys.customers.all });
+        void qc.invalidateQueries({ queryKey: queryKeys.broadcasts.all });
+      }
     }
     wasConnected.current = true;
   }, [status, role, qc]);
@@ -176,10 +193,12 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
       if (document.visibilityState !== "visible") return;
       void qc.invalidateQueries({ queryKey: queryKeys.escalations.all });
       void qc.invalidateQueries({ queryKey: queryKeys.conversations.all });
+      // Broadcast progress only arrives over the socket; mounted lists only (staff never mount them).
+      if (role === "admin") void qc.invalidateQueries({ queryKey: queryKeys.broadcasts.lists() });
     };
     const id = setInterval(tick, POLL_INTERVAL_MS);
     return () => clearInterval(id);
-  }, [userId, connected, qc]);
+  }, [userId, role, connected, qc]);
 
   const value = useMemo<RealtimeContextValue>(
     () => ({ status, connected, polling: Boolean(userId) && !connected, subscribe }),

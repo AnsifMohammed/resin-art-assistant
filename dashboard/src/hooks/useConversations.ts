@@ -9,8 +9,11 @@ import {
 import {
   getConversation,
   listConversations,
+  markConversationRead,
+  pauseConversation,
   replyToConversation,
   resolveConversation,
+  resumeConversation,
 } from "../api/conversations.ts";
 import { queryKeys } from "../lib/queryKeys.ts";
 import type {
@@ -19,7 +22,9 @@ import type {
   ConvTag,
   ConversationDetailResponse,
   ConversationListParams,
+  ConversationListResponse,
   Message,
+  ReplyRequest,
 } from "../types/index.ts";
 
 /** Admin only: GET /conversations. Keeps the previous page visible while paging/filtering. */
@@ -38,6 +43,10 @@ export interface ConversationFilters {
   state?: ConvState | undefined;
   tag?: ConvTag | undefined;
   channel?: ChannelType | undefined;
+  /** Free-text search (trimmed; empty is ignored). */
+  search?: string | undefined;
+  /** Only conversations with unread customer messages. */
+  unread?: boolean | undefined;
 }
 
 /**
@@ -49,6 +58,9 @@ export function useInfiniteConversations(filters: ConversationFilters) {
   if (filters.state) params.state = filters.state;
   if (filters.tag) params.tag = filters.tag;
   if (filters.channel) params.channel = filters.channel;
+  const search = filters.search?.trim().slice(0, 100);
+  if (search) params.search = search;
+  if (filters.unread) params.unread = "true";
   return useInfiniteQuery({
     queryKey: [...queryKeys.conversations.lists(), "infinite", params],
     queryFn: ({ pageParam, signal }) => listConversations({ ...params, page: pageParam, limit: CONVERSATIONS_PAGE_SIZE }, signal),
@@ -71,11 +83,11 @@ export function useConversation(id: string | undefined) {
   });
 }
 
-/** POST /conversations/:id/reply. Appends the sent message to the cached thread, then refetches. */
+/** POST /conversations/:id/reply ({ text } or { templateId, variables }). Appends the sent message, then refetches. */
 export function useReply(conversationId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (text: string) => replyToConversation(conversationId, text),
+    mutationFn: (body: ReplyRequest) => replyToConversation(conversationId, body),
     onSuccess: (res) => {
       qc.setQueryData<ConversationDetailResponse>(queryKeys.conversations.detail(conversationId), (prev) =>
         prev
@@ -109,6 +121,61 @@ export function useResolve(conversationId: string) {
       void qc.invalidateQueries({ queryKey: queryKeys.escalations.all });
     },
   });
+}
+
+type InfiniteConversations = { pages: ConversationListResponse[]; pageParams: unknown[] };
+
+/** Admin only: POST /conversations/:id/read. Clears the unread dot in every cached list. */
+export function useMarkRead() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (conversationId: string) => markConversationRead(conversationId),
+    onSuccess: (_res, conversationId) => {
+      const clear = (list: ConversationListResponse): ConversationListResponse => ({
+        ...list,
+        conversations: list.conversations.map((c) =>
+          c.id === conversationId ? { ...c, unread: false, adminLastReadAt: new Date().toISOString() } : c,
+        ),
+      });
+      qc.setQueriesData<ConversationListResponse | InfiniteConversations>(
+        { queryKey: queryKeys.conversations.lists() },
+        (prev) => {
+          if (!prev) return prev;
+          if ("pages" in prev) return { ...prev, pages: prev.pages.map(clear) };
+          if ("conversations" in prev) return clear(prev);
+          return prev;
+        },
+      );
+      // An "Unread only" list should drop the row on its next fetch.
+      void qc.invalidateQueries({ queryKey: queryKeys.conversations.lists(), refetchType: "none" });
+    },
+  });
+}
+
+function useStateChange(conversationId: string, fn: (id: string) => Promise<{ conversation: { state: ConvState } }>) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => fn(conversationId),
+    onSuccess: (res) => {
+      qc.setQueryData<ConversationDetailResponse>(queryKeys.conversations.detail(conversationId), (prev) =>
+        prev ? { conversation: { ...prev.conversation, state: res.conversation.state } } : prev,
+      );
+    },
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.conversations.lists() });
+      void qc.invalidateQueries({ queryKey: queryKeys.conversations.detail(conversationId) });
+    },
+  });
+}
+
+/** Admin only: POST /conversations/:id/pause (stop the AI for this conversation). */
+export function usePauseConversation(conversationId: string) {
+  return useStateChange(conversationId, pauseConversation);
+}
+
+/** Admin only: POST /conversations/:id/resume (hand back to the AI). */
+export function useResumeConversation(conversationId: string) {
+  return useStateChange(conversationId, resumeConversation);
 }
 
 /** Append a live (realtime) message to a cached thread. No-op if the thread isn't cached or already has it. */

@@ -2,16 +2,63 @@ import type { FastifyInstance, FastifyPluginAsync } from "fastify";
 import { and, eq, isNull, or } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../db/index.ts";
-import { auditLog, channels, conversations, customers, escalations, messages } from "../db/schema.ts";
+import {
+  auditLog,
+  channels,
+  conversations,
+  customers,
+  escalations,
+  messages,
+  messageTemplates,
+} from "../db/schema.ts";
 import { AppError } from "../lib/errors.ts";
+import { renderTemplate, TEMPLATE_MAX_LENGTH } from "../lib/templates.ts";
 import { authenticate } from "../middleware/authenticate.ts";
 import { requireStaffOrAdmin } from "../middleware/requireStaffOrAdmin.ts";
 import { emitConversationUpdated, emitMessageNew } from "../realtime/events.ts";
 import { sendMessage } from "../services/send.ts";
 
-const replySchema = z.object({
-  text: z.string().min(1).max(4096),
-});
+// Either free text or a template (+ variable values). Strict objects so a body
+// with both (or neither) matches no branch.
+const replySchema = z.union([
+  z.strictObject({
+    text: z.string().min(1).max(4096),
+  }),
+  z.strictObject({
+    templateId: z.string().min(1),
+    variables: z.record(z.string(), z.string().max(1000)).optional(),
+  }),
+]);
+
+/**
+ * Render a template for a conversation. customerName is pre-filled by the
+ * caller; explicit values from the request win. Throws 400 when a variable has
+ * no value or the result is too long for the channel.
+ */
+function renderTemplateReply(
+  template: typeof messageTemplates.$inferSelect,
+  channelType: "whatsapp" | "instagram",
+  vars: Record<string, string>,
+): string {
+  const { text, missing } = renderTemplate(template.body, vars);
+  if (missing.length > 0) {
+    throw new AppError(
+      400,
+      `Missing template variables: ${missing.join(", ")}`,
+      "TEMPLATE_VARIABLES_MISSING",
+      missing.map((m) => ({ path: m, message: "required" })),
+    );
+  }
+  const maxLength = TEMPLATE_MAX_LENGTH[channelType];
+  if (text.length > maxLength) {
+    throw new AppError(
+      400,
+      `Message is too long for ${channelType} (${text.length}/${maxLength} characters)`,
+      "TEMPLATE_TOO_LONG",
+    );
+  }
+  return text;
+}
 
 export const replyRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
   app.post<{ Params: { id: string } }>(
@@ -26,7 +73,7 @@ export const replyRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
         throw new AppError(400, "Invalid reply payload", "VALIDATION_ERROR");
       }
 
-      const { text } = parsed.data;
+      const body = parsed.data;
 
       // 1. Fetch conversation with its customer and channel
       const [row] = await db
@@ -72,21 +119,67 @@ export const replyRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
         }
       }
 
-      // 3. Check 24-hour messaging window
-      if (conv.windowClosesAt && new Date(conv.windowClosesAt) < new Date()) {
-        throw new AppError(409, "Customer 24h messaging window is closed", "WINDOW_CLOSED");
-      }
-
       const channel = row.channel;
       const customer = row.customer;
+
+      // 2a. Template replies: load the (active) template and check it fits this channel
+      let template: typeof messageTemplates.$inferSelect | undefined;
+      if ("templateId" in body) {
+        [template] = await db
+          .select()
+          .from(messageTemplates)
+          .where(
+            and(
+              eq(messageTemplates.id, body.templateId),
+              eq(messageTemplates.businessId, businessId),
+              eq(messageTemplates.isActive, true),
+            ),
+          );
+
+        if (!template) {
+          throw new AppError(404, "Template not found", "TEMPLATE_NOT_FOUND");
+        }
+        if (channel && template.channel !== "both" && template.channel !== channel.type) {
+          throw new AppError(
+            400,
+            `This template is for ${template.channel} only`,
+            "TEMPLATE_CHANNEL_MISMATCH",
+          );
+        }
+      }
+
+      // 3. Check 24-hour messaging window. After it closes only an approved
+      //    WhatsApp (Meta) template may be sent.
+      if (conv.windowClosesAt && new Date(conv.windowClosesAt) < new Date()) {
+        if (!template) {
+          throw new AppError(409, "Customer 24h messaging window is closed", "WINDOW_CLOSED");
+        }
+        if (!template.metaTemplateName || template.metaStatus !== "approved") {
+          throw new AppError(
+            409,
+            "Only approved WhatsApp templates can be sent after 24 hours",
+            "WINDOW_CLOSED",
+          );
+        }
+      }
+
       if (!channel || !customer?.handleOrPhone) {
         throw new AppError(409, "Conversation channel or customer not found", "CHANNEL_NOT_FOUND");
       }
 
+      // 3a. Resolve the text to send (template is always loaded on the template branch).
+      const text =
+        "text" in body
+          ? body.text
+          : renderTemplateReply(template!, channel.type, {
+              customerName: customer.name ?? customer.handleOrPhone,
+              ...body.variables,
+            });
+
       // 4. Update conversation state to owner_handling (pauses AI for human handling)
       await db
         .update(conversations)
-        .set({ state: "owner_handling" })
+        .set({ state: "owner_handling", lastMessageAt: new Date() })
         .where(eq(conversations.id, id));
 
       // 5. Insert message as queued; delivery status is updated after sending
@@ -100,10 +193,13 @@ export const replyRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
           senderId: request.user.sub,
           content: text,
           deliveryStatus: "queued",
+          ...(template ? { metadata: { templateId: template.id, templateName: template.name } } : {}),
         })
         .returning();
 
-      // 6. Send outbound reply on the conversation's own channel
+      // 6. Send outbound reply on the conversation's own channel.
+      //    Templates go out as their rendered text for now; live mode will send
+      //    the approved Meta template by metaTemplateName instead.
       try {
         await sendMessage({
           channelType: channel.type,
@@ -151,10 +247,11 @@ export const replyRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
         businessId,
         actorId: request.user.sub,
         actorType: request.user.role,
-        action: "reply_sent",
+        action: template ? "template_reply_sent" : "reply_sent",
         conversationId: id,
         details: {
           messageId: newMsg?.id,
+          ...(template ? { templateId: template.id } : {}),
           preview: text.slice(0, 100),
         },
       });

@@ -259,6 +259,8 @@ describe("processMessageJob: outcomes", () => {
     expect(state.updates).toContainEqual({ table: "messages", vals: { deliveryStatus: "sent" } });
     expect(state.inserted.audit_log?.[0]).toMatchObject({ action: "auto_reply_sent", actorType: "ai" });
     expect(state.conv.tag).toBe("new_lead");
+    // The claim update also bumps the inbox sort key.
+    expect(state.conv.lastMessageAt).toBeInstanceOf(Date);
     // Realtime: the AI reply (as sent) and the tag change.
     expect(rt.emitMessageNew).toHaveBeenCalledTimes(1);
     expect(rt.emitMessageNew.mock.calls[0]![0]).toMatchObject({ senderType: "ai", deliveryStatus: "sent", content: autoReply.reply });
@@ -421,6 +423,16 @@ describe("selectBatch / normalizeReason", () => {
 
     expect(selectBatch(all, new Set()).batch.map((m) => m.id)).toEqual(["d", "e"]);
     expect(selectBatch(all, new Set(["d"])).batch.map((m) => m.id)).toEqual(["e"]);
+  });
+
+  it("does not treat a broadcast as a reply boundary", () => {
+    const all = [
+      msg({ id: "a", content: "is the clock available?" }),
+      msg({ id: "b", direction: "outbound", senderType: "system", content: "Diwali offer", metadata: { kind: "broadcast" } }),
+      msg({ id: "c", content: "in blue?" }),
+    ] as any[];
+
+    expect(selectBatch(all, new Set()).batch.map((m) => m.id)).toEqual(["a", "c"]);
   });
 
   it("stores enum reasons as-is (incl. window_closed, intent_payment, intent_off_topic)", () => {

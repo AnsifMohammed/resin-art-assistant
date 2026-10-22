@@ -1,7 +1,7 @@
 import type { Role } from "../types/index.ts";
 
 /** Landing page per role. */
-export const roleHome = (role: Role | null | undefined): string => (role === "admin" ? "/analytics" : "/escalations");
+export const roleHome = (role: Role | null | undefined): string => (role === "admin" ? "/inbox" : "/escalations");
 
 const STAFF_ALLOWED = [/^\/escalations(\/|$)/, /^\/conversations\/[^/]+$/];
 

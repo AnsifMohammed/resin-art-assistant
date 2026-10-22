@@ -2,10 +2,13 @@ import type { FastifyInstance } from "fastify";
 import { analyticsRoutes } from "./analytics.ts";
 import { auditLogRoutes } from "./audit-log.ts";
 import { authRoutes } from "./auth.ts";
+import { broadcastRoutes } from "./broadcasts.ts";
 import { conversationRoutes } from "./conversations.ts";
+import { customerRoutes } from "./customers.ts";
 import { escalationRoutes } from "./escalations.ts";
 import { healthRoutes } from "./health.ts";
 import { knowledgeBaseRoutes } from "./knowledge-base.ts";
+import { orderRoutes } from "./orders.ts";
 import { paymentRoutes } from "./payments.ts";
 import { productRoutes } from "./products.ts";
 import { pushRoutes } from "./push.ts";
@@ -13,6 +16,7 @@ import { replyRoutes } from "./reply.ts";
 import { resolveRoutes } from "./resolve.ts";
 import { settingsRoutes } from "./settings.ts";
 import { simulateRoutes } from "./simulate.ts";
+import { templateRoutes } from "./templates.ts";
 import { userRoutes } from "./users.ts";
 import { webhookRoutes } from "./webhooks.ts";
 import { websocketRoutes } from "../realtime/websocket.ts";
@@ -24,9 +28,13 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
   await app.register(simulateRoutes);
   await app.register(conversationRoutes);
   await app.register(replyRoutes);
+  await app.register(templateRoutes);
   await app.register(resolveRoutes);
   await app.register(escalationRoutes);
   await app.register(userRoutes);
+  await app.register(orderRoutes);
+  await app.register(customerRoutes);
+  await app.register(broadcastRoutes);
   await app.register(settingsRoutes);
   await app.register(knowledgeBaseRoutes);
   await app.register(productRoutes);
@@ -36,4 +44,3 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
   await app.register(webhookRoutes);
   await app.register(websocketRoutes);
 }
-

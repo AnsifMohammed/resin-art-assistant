@@ -203,6 +203,18 @@ describe("realtime scoping: admin vs staff vs other business", () => {
     expect(otherAdmin.frames).toEqual([]);
   });
 
+  it("customer:updated and broadcast:updated are admin only and business scoped", async () => {
+    const [admin, staff, otherAdmin] = [await connect("admin-1", "admin"), await connect("staff-1", "staff"), await connect("admin-x", "admin", "biz-2")];
+    events.emitCustomerUpdated("biz-1", { customerId: "cust-1" });
+    expect((await admin.next("customer:updated")).data).toEqual({ customerId: "cust-1" });
+    const stats = { pending: 1, sent: 2, delivered: 0, read: 0, failed: 0 };
+    events.emitBroadcastUpdated("biz-1", { broadcastId: "b-1", status: "sending", stats });
+    expect((await admin.next("broadcast:updated")).data).toEqual({ broadcastId: "b-1", status: "sending", stats });
+    await tick();
+    expect(staff.frames).toEqual([]);
+    expect(otherAdmin.frames).toEqual([]);
+  });
+
   it("a staff token cannot connect with another business's id (account check)", async () => {
     const token = app.jwt.sign({ sub: "staff-1", businessId: "biz-2", role: "staff", name: "x" });
     const ws = await app.injectWS(`/ws?token=${token}`);

@@ -24,7 +24,7 @@ import StaffChat from "./pages/StaffChat.tsx";
 
 const SentryRoutes = Sentry.withSentryReactRouterV7Routing(Routes);
 
-/** "/" → role landing page (admin → /analytics, staff → /escalations), from the backend user. */
+/** "/" → role landing page (admin → /inbox, staff → /escalations), from the backend user. */
 function RoleHome() {
   const { user } = useAuth();
   return <Navigate to={roleHome(user?.role)} replace />;
