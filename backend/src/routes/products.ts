@@ -151,6 +151,10 @@ export const productRoutes: FastifyPluginAsync = async (app: FastifyInstance) =>
         })
         .returning();
 
+      if (!newProduct) {
+        throw new AppError(500, "Failed to create product", "INTERNAL_ERROR");
+      }
+
       await invalidateKBCache(businessId);
 
       await db.insert(auditLog).values({

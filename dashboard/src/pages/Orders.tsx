@@ -21,7 +21,6 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { ChannelIcon } from "../components/shared/ChannelIcon.tsx";
-import { SampleDataBadge } from "../components/shared/SampleDataBadge.tsx";
 import { PaymentsPanel } from "../components/orders/PaymentsPanel.tsx";
 import { useOrderPayments } from "../hooks/usePayments.ts";
 import {
@@ -1575,7 +1574,7 @@ export default function Orders() {
 
             {/* Payments & Invoicing Panel */}
             <div className="pt-2 border-t border-border/40">
-              <PaymentsPanel orderId={activeOrder.id} orderTotal={Number(activeOrder.totalAmount)} />
+              <PaymentsPanel orderId={liveActiveOrder.id} orderTotal={Number(liveActiveOrder.totalAmount)} />
             </div>
           </div>
         </div>

@@ -149,6 +149,10 @@ export const paymentRoutes: FastifyPluginAsync = async (app: FastifyInstance) =>
         })
         .returning();
 
+      if (!newPayment) {
+        throw new AppError(500, "Failed to record payment", "INTERNAL_ERROR");
+      }
+
       await db.insert(auditLog).values({
         businessId,
         actorId: request.user.sub,
@@ -221,6 +225,10 @@ export const paymentRoutes: FastifyPluginAsync = async (app: FastifyInstance) =>
           .where(and(eq(payments.businessId, businessId), eq(payments.id, paymentId)))
           .returning();
 
+        if (!row) {
+          throw new AppError(404, "Payment not found", "NOT_FOUND");
+        }
+
         await tx.insert(auditLog).values({
           businessId,
           actorId: request.user.sub,
@@ -236,6 +244,10 @@ export const paymentRoutes: FastifyPluginAsync = async (app: FastifyInstance) =>
 
         return row;
       });
+
+      if (!updated) {
+        throw new AppError(404, "Payment not found", "NOT_FOUND");
+      }
 
       emitOrderUpdated(businessId, {
         orderId: updated.orderId,
@@ -292,6 +304,10 @@ export const paymentRoutes: FastifyPluginAsync = async (app: FastifyInstance) =>
         })
         .where(and(eq(payments.businessId, businessId), eq(payments.id, paymentId)))
         .returning();
+
+      if (!updated) {
+        throw new AppError(404, "Payment not found", "NOT_FOUND");
+      }
 
       await db.insert(auditLog).values({
         businessId,
@@ -361,6 +377,10 @@ export const paymentRoutes: FastifyPluginAsync = async (app: FastifyInstance) =>
         })
         .where(and(eq(payments.businessId, businessId), eq(payments.id, paymentId)))
         .returning();
+
+      if (!updated) {
+        throw new AppError(404, "Payment not found", "NOT_FOUND");
+      }
 
       await db.insert(auditLog).values({
         businessId,

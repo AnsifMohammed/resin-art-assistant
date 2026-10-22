@@ -4,10 +4,7 @@ import {
   Ban,
   Check,
   CheckCircle2,
-  ChevronDown,
-  ChevronUp,
   Clock,
-  CreditCard,
   Plus,
   Receipt,
   X,
@@ -58,7 +55,6 @@ export function PaymentsPanel({ orderId, orderTotal: initialOrderTotal }: Paymen
 
   const effectiveOrderTotal = summary?.orderTotal ?? initialOrderTotal;
   const totalPaid = summary?.totalPaid ?? 0;
-  const totalPending = summary?.totalPending ?? 0;
   const balanceDue = summary ? summary.balanceDue : Math.max(0, effectiveOrderTotal - totalPaid);
   const paymentState =
     summary?.paymentState ??
@@ -83,7 +79,7 @@ export function PaymentsPanel({ orderId, orderTotal: initialOrderTotal }: Paymen
         paymentId: markingPaidPayment.id,
         data: {
           method: markPaidMethod,
-          reference: markPaidReference.trim() || undefined,
+          reference: markPaidReference.trim() || null,
         },
       });
       toast.success(
@@ -131,8 +127,8 @@ export function PaymentsPanel({ orderId, orderTotal: initialOrderTotal }: Paymen
         kind: newKind,
         amount: parsedAmount,
         method: newMethod,
-        reference: newReference.trim() || undefined,
-        note: newNote.trim() || undefined,
+        reference: newReference.trim() || null,
+        note: newNote.trim() || null,
         markPaidImmediately,
       });
       toast.success(
