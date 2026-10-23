@@ -100,7 +100,7 @@ function mockDemoDecision(text: string): AiDecision {
     return {
       intent: "price",
       reply: "Hi! 😊 The Ocean Coaster Set of 4 is ₹1,200. We can customise colours and add a name too! Lead time is about 5 days. Interested?",
-      facts_used: ["products.ocean-coaster-set-4.price: 1200"],
+      facts_used: ["products.ocean-coaster-set-4.sizes.10cm round.price: 1200"],
       missing_facts: [],
       escalate: false,
       escalate_reason: null,
@@ -113,7 +113,7 @@ function mockDemoDecision(text: string): AiDecision {
     return {
       intent: "custom_order",
       reply: "Of course! 💕 The 12 inch clock with her name is ₹2,800. Which colours does she like? I'll send some options!",
-      facts_used: ["products.resin-clock-12in.price: 2800"],
+      facts_used: ["products.resin-clock-12in.sizes.12 inch.price: 2800"],
       missing_facts: [],
       escalate: false,
       escalate_reason: null,
@@ -152,7 +152,7 @@ function mockDemoDecision(text: string): AiDecision {
     return {
       intent: "price",
       reply: "Resin Keychain Set of 3 ₹450 ആണ് 😊 Colour, name, shape customise ചെയ്യാം. Interest ഉണ്ടോ?",
-      facts_used: ["products.keychain-set-3.price: 450"],
+      facts_used: ["products.keychain-set-3.sizes.Standard.price: 450"],
       missing_facts: [],
       escalate: false,
       escalate_reason: null,

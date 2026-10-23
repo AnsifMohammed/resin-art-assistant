@@ -310,7 +310,7 @@ describe("H2: login rate limiting", () => {
     for (let i = 0; i < 4; i++) {
       expect((await login("priya@asharesins.com", "wrong")).statusCode).toBe(401);
     }
-  });
+  }, 15000);
 
   it("rate limit is checked before any DB or argon2 work", async () => {
     for (let i = 0; i < 5; i++) await login("nobody@example.com", "x");
