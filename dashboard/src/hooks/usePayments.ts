@@ -3,13 +3,11 @@ import {
   getOrderPayments,
   markPaymentPaid,
   recordPayment,
-  updatePayment,
   voidPayment,
 } from "../api/payments.ts";
 import { queryKeys } from "../lib/queryKeys.ts";
 import type {
   MarkPaidRequest,
-  Payment,
   RecordPaymentRequest,
   VoidPaymentRequest,
 } from "../types/index.ts";
@@ -64,19 +62,6 @@ export function useVoidPayment(orderId: string) {
       const reason = "reason" in args ? args.reason : args.data.reason;
       return voidPayment(args.paymentId, { reason });
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: queryKeys.payments.byOrder(orderId) });
-      qc.invalidateQueries({ queryKey: ["orders"] });
-    },
-  });
-}
-
-/** PATCH /payments/:id (admin only) */
-export function useUpdatePayment(orderId: string) {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: ({ paymentId, data }: { paymentId: string; data: Partial<Payment> }) =>
-      updatePayment(paymentId, data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.payments.byOrder(orderId) });
       qc.invalidateQueries({ queryKey: ["orders"] });

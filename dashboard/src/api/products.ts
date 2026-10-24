@@ -60,8 +60,8 @@ export async function uploadToCloudinary(file: File): Promise<string> {
         return json.secure_url;
       }
     }
-  } catch (err) {
-    console.warn("Signed Cloudinary upload failed or not configured, checking client env...", err);
+  } catch {
+    // Signed upload failed or isn't configured: fall back to the client-side preset below.
   }
 
   const clientCloudName = (import.meta as unknown as { env: Record<string, string> }).env?.VITE_CLOUDINARY_CLOUD_NAME;

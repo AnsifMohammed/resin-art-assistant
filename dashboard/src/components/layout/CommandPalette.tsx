@@ -73,9 +73,9 @@ export function CommandPalette({ open, setOpen, automation }: CommandPaletteProp
   const { toggleTheme, resolvedTheme } = useTheme();
   const [search, setSearch] = useState("");
 
-  // Admin only (the endpoint is 403 for staff), and only while the palette is open.
+  // Admin only (the endpoints are 403 for staff), and only while the palette is open.
   const conversations = useConversations({ limit: CONVERSATION_SEARCH_LIMIT }, { enabled: isAdmin && open });
-  const ordersQuery = useOrders();
+  const ordersQuery = useOrders(undefined, { enabled: isAdmin && open });
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -204,15 +204,7 @@ export function CommandPalette({ open, setOpen, automation }: CommandPaletteProp
 
             {/* Real Orders */}
             {isAdmin && (
-              <Command.Group
-                heading="Recent Orders"
-                /*
-                  <span className="inline-flex items-center gap-2">
-                    Recent Orders <SampleDataBadge />
-                  </span>
-                */
-                className="text-xs font-semibold text-text-muted px-2 py-1 mt-2"
-              >
+              <Command.Group heading="Recent Orders" className="text-xs font-semibold text-text-muted px-2 py-1 mt-2">
                 {(ordersQuery.data?.orders || []).slice(0, 4).map((o) => (
                   <Command.Item
                     key={o.id}

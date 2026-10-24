@@ -1,5 +1,5 @@
 import type { FastifyInstance, FastifyPluginAsync } from "fastify";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, like, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../db/index.ts";
 import { auditLog, users } from "../db/schema.ts";
@@ -12,7 +12,13 @@ const auditLogQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(50),
   actorId: z.string().optional(),
   action: z.string().optional(),
+  actorType: z.enum(["admin", "staff", "ai", "system"]).optional(),
+  /** e.g. "order_" or "payment_" → action LIKE 'order\_%'. */
+  actionPrefix: z.string().min(1).max(100).optional(),
 });
+
+/** Escape LIKE wildcards (Postgres default escape character is backslash). */
+export const escapeLike = (s: string) => s.replace(/[\\%_]/g, (c) => `\\${c}`);
 
 export const auditLogRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
   app.get(
@@ -24,13 +30,15 @@ export const auditLogRoutes: FastifyPluginAsync = async (app: FastifyInstance) =
         throw new AppError(400, "Invalid query parameters", "VALIDATION_ERROR");
       }
 
-      const { page, limit, actorId, action } = parsed.data;
+      const { page, limit, actorId, action, actorType, actionPrefix } = parsed.data;
       const businessId = request.user.businessId;
       const offset = (page - 1) * limit;
 
       const conditions = [eq(auditLog.businessId, businessId)];
       if (actorId) conditions.push(eq(auditLog.actorId, actorId));
       if (action) conditions.push(eq(auditLog.action, action));
+      if (actorType) conditions.push(eq(auditLog.actorType, actorType));
+      if (actionPrefix) conditions.push(like(auditLog.action, `${escapeLike(actionPrefix)}%`));
 
       const whereClause = and(...conditions);
 

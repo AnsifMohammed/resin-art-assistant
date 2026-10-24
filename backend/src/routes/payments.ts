@@ -2,7 +2,7 @@ import type { FastifyInstance, FastifyPluginAsync } from "fastify";
 import { and, asc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../db/index.ts";
-import { auditLog, payments } from "../db/schema.ts";
+import { auditLog, orders, payments } from "../db/schema.ts";
 import { AppError } from "../lib/errors.ts";
 import { authenticate } from "../middleware/authenticate.ts";
 import { requireAdmin } from "../middleware/requireAdmin.ts";
@@ -10,6 +10,15 @@ import { requireStaffOrAdmin } from "../middleware/requireStaffOrAdmin.ts";
 import { emitOrderUpdated } from "../realtime/events.ts";
 
 export type PaymentRow = typeof payments.$inferSelect;
+
+/** The order's total in whole rupees, read from the database (never trusted from the client). */
+async function orderTotalFor(businessId: string, orderId: string): Promise<number | undefined> {
+  const [order] = await db
+    .select({ total: orders.totalAmount })
+    .from(orders)
+    .where(and(eq(orders.businessId, businessId), eq(orders.id, orderId)));
+  return order ? Math.round(Number(order.total)) : undefined;
+}
 
 export interface PaymentSummaryResult {
   orderTotal: number;
@@ -97,8 +106,6 @@ export const paymentRoutes: FastifyPluginAsync = async (app: FastifyInstance) =>
     async (request) => {
       const businessId = request.user.businessId;
       const { id: orderId } = request.params as { id: string };
-      const query = request.query as { orderTotal?: string };
-      const queryTotal = query.orderTotal ? parseInt(query.orderTotal, 10) : undefined;
 
       const rows = await db
         .select()
@@ -106,7 +113,7 @@ export const paymentRoutes: FastifyPluginAsync = async (app: FastifyInstance) =>
         .where(and(eq(payments.businessId, businessId), eq(payments.orderId, orderId)))
         .orderBy(asc(payments.createdAt));
 
-      const summary = derivePaymentSummary(rows, queryTotal);
+      const summary = derivePaymentSummary(rows, await orderTotalFor(businessId, orderId));
 
       return {
         payments: rows,
@@ -128,8 +135,6 @@ export const paymentRoutes: FastifyPluginAsync = async (app: FastifyInstance) =>
     async (request, reply) => {
       const businessId = request.user.businessId;
       const { id: orderId } = request.params as { id: string };
-      const query = request.query as { orderTotal?: string };
-      const queryTotal = query.orderTotal ? parseInt(query.orderTotal, 10) : undefined;
       const body = createPaymentSchema.parse(request.body);
 
       const isPaidImmediately = Boolean(body.markPaidImmediately);
@@ -172,7 +177,7 @@ export const paymentRoutes: FastifyPluginAsync = async (app: FastifyInstance) =>
         .where(and(eq(payments.businessId, businessId), eq(payments.orderId, orderId)))
         .orderBy(asc(payments.createdAt));
 
-      const summary = derivePaymentSummary(allPayments, queryTotal);
+      const summary = derivePaymentSummary(allPayments, await orderTotalFor(businessId, orderId));
 
       reply.status(201);
       return {
@@ -195,8 +200,6 @@ export const paymentRoutes: FastifyPluginAsync = async (app: FastifyInstance) =>
     async (request) => {
       const businessId = request.user.businessId;
       const { id: paymentId } = request.params as { id: string };
-      const query = request.query as { orderTotal?: string };
-      const queryTotal = query.orderTotal ? parseInt(query.orderTotal, 10) : undefined;
       const body = markPaidSchema.parse(request.body ?? {});
 
       const [existing] = await db
@@ -261,7 +264,7 @@ export const paymentRoutes: FastifyPluginAsync = async (app: FastifyInstance) =>
         .where(and(eq(payments.businessId, businessId), eq(payments.orderId, updated.orderId)))
         .orderBy(asc(payments.createdAt));
 
-      const summary = derivePaymentSummary(allPayments, queryTotal);
+      const summary = derivePaymentSummary(allPayments, await orderTotalFor(businessId, updated.orderId));
 
       return {
         payment: updated,
@@ -283,8 +286,6 @@ export const paymentRoutes: FastifyPluginAsync = async (app: FastifyInstance) =>
     async (request) => {
       const businessId = request.user.businessId;
       const { id: paymentId } = request.params as { id: string };
-      const query = request.query as { orderTotal?: string };
-      const queryTotal = query.orderTotal ? parseInt(query.orderTotal, 10) : undefined;
       const body = voidPaymentSchema.parse(request.body);
 
       const [existing] = await db
@@ -334,7 +335,7 @@ export const paymentRoutes: FastifyPluginAsync = async (app: FastifyInstance) =>
         .where(and(eq(payments.businessId, businessId), eq(payments.orderId, updated.orderId)))
         .orderBy(asc(payments.createdAt));
 
-      const summary = derivePaymentSummary(allPayments, queryTotal);
+      const summary = derivePaymentSummary(allPayments, await orderTotalFor(businessId, updated.orderId));
 
 
       return {

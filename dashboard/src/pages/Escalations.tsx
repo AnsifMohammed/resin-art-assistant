@@ -10,6 +10,7 @@ import {
   Table as TableIcon,
   CheckCircle2,
   Loader2,
+  ChevronDown,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "../context/AuthContext.tsx";
@@ -197,6 +198,9 @@ export default function Escalations() {
       active ? "bg-primary text-primary-foreground font-semibold" : "bg-surface-muted text-text-muted hover:text-text"
     }`;
 
+  // The table scrolls inside its own box (sticky header); everything else scrolls in the content area.
+  const showsTable = viewMode === "table" && !isPending && !isError && filteredEscalations.length > 0;
+
   let content: ReactNode;
   if (isPending) {
     content = (
@@ -325,9 +329,9 @@ export default function Escalations() {
     );
   } else {
     content = (
-      <div className="rounded-xl border border-border bg-surface overflow-x-auto">
+      <div className="rounded-xl border border-border bg-surface overflow-auto md:max-h-full custom-scrollbar">
         <table className="w-full text-left text-13">
-          <thead className="bg-surface-muted border-b border-border text-11 uppercase font-semibold text-text-muted">
+          <thead className="sticky top-0 z-[1] bg-surface-muted border-b border-border text-11 uppercase font-semibold text-text-muted">
             <tr>
               <th className="p-3.5">Customer</th>
               <th className="p-3.5">Channel</th>
@@ -400,9 +404,9 @@ export default function Escalations() {
   }
 
   return (
-    <div className="space-y-6 pb-12 w-full">
+    <div className="h-full w-full flex flex-col gap-6 p-4 sm:p-6 lg:p-8 overflow-y-auto md:overflow-hidden">
       {/* ─── Header & Top Stats ──────────────────────────────────────────────── */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="shrink-0 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-24 md:text-28 font-bold font-outfit text-text tracking-tight flex items-center gap-2">
             <span>Escalation Queue</span>
@@ -449,7 +453,7 @@ export default function Escalations() {
       </div>
 
       {/* ─── Metric Summary Cards ────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="shrink-0 grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="p-4 rounded-xl border border-border bg-surface flex items-center justify-between">
           <div>
             <p className="text-12 font-medium text-text-muted">Open Escalations</p>
@@ -486,8 +490,8 @@ export default function Escalations() {
         </div>
       </div>
 
-      {/* ─── Filters Bar ─────────────────────────────────────────────────────── */}
-      <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-xl border border-border bg-surface">
+      {/* ─── Filters Bar (pinned while the page scrolls on phones) ────────────── */}
+      <div className="shrink-0 sticky top-0 z-10 md:static flex flex-wrap items-center justify-between gap-3 p-3 rounded-xl border border-border bg-surface">
         <div className="flex flex-wrap items-center gap-1.5 text-12 font-medium" role="group" aria-label="Assignment filter">
           <button
             type="button"
@@ -515,25 +519,35 @@ export default function Escalations() {
           </button>
         </div>
 
-        <label className="flex items-center gap-2">
+        <div className="flex items-center gap-2">
           <span className="text-12 text-text-muted font-medium">Reason:</span>
-          <select
-            value={reasonFilter}
-            onChange={(ev) => setReasonFilter(ev.target.value)}
-            className="px-2.5 py-1.5 rounded-lg border border-border bg-surface-muted text-12 text-text font-medium focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
-          >
-            <option value="all">All reasons</option>
-            {reasonOptions.map((r) => (
-              <option key={r} value={r}>
-                {escalationReasonLabel(r)}
-              </option>
-            ))}
-          </select>
-        </label>
+          <div className="relative inline-flex items-center">
+            <select
+              value={reasonFilter}
+              aria-label="Filter by escalation reason"
+              onChange={(ev) => setReasonFilter(ev.target.value)}
+              className="h-8 pl-2.5 pr-7.5 appearance-none rounded-lg border border-border bg-surface-muted text-12 text-text font-medium focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
+            >
+              <option value="all">All reasons</option>
+              {reasonOptions.map((r) => (
+                <option key={r} value={r}>
+                  {escalationReasonLabel(r)}
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted" aria-hidden />
+          </div>
+        </div>
       </div>
 
-      {/* ─── Content: Cards vs Table ─────────────────────────────────────────── */}
-      {content}
+      {/* ─── Content: Cards vs Table — the only part that scrolls on md+ ─────────── */}
+      <div
+        className={`md:flex-1 md:min-h-0 ${
+          showsTable ? "md:flex md:flex-col" : "md:overflow-y-auto custom-scrollbar md:pr-1 md:pb-1"
+        }`}
+      >
+        {content}
+      </div>
 
       {isAdmin && <AssignModal escalation={assigning} onClose={() => setAssigning(null)} />}
     </div>

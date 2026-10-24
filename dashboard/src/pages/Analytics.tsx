@@ -1,62 +1,40 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import dayjs from "dayjs";
 import {
   Download,
   Calendar,
-  ArrowRight,
-  Bot,
-  UserCheck,
-  AlertTriangle,
-  Clock,
   Sparkles,
-  CheckCircle2,
-  Layers,
-  ChevronRight,
-  X,
-  PauseCircle,
-  PlayCircle,
-  BookOpen,
-  RefreshCw,
   TrendingUp,
+  Package,
+  Bot,
+  Clock,
+  AlertTriangle,
+  X,
+  RefreshCw,
 } from "lucide-react";
-import {
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  AreaChart,
-  Area,
-  PieChart,
-  Pie,
-  Cell,
-} from "recharts";
 import { toast } from "sonner";
 import { useAuth } from "../context/AuthContext.tsx";
-import { useTheme } from "../context/ThemeContext.tsx";
-import { brandChannels } from "../theme/index.ts";
-import { StatCard } from "../components/shared/StatCard.tsx";
+import { StatCard, type StatCardProps } from "../components/shared/StatCard.tsx";
 import { SegmentedControl } from "../components/shared/SegmentedControl.tsx";
-import { ChannelIcon } from "../components/shared/ChannelIcon.tsx";
-import { Skeleton } from "../components/shared/Skeleton.tsx";
-import { SampleDataBadge } from "../components/shared/SampleDataBadge.tsx";
 import { useAnalytics } from "../hooks/useAnalytics.ts";
-import { useAuditLog } from "../hooks/useAuditLog.ts";
-import { useEscalations } from "../hooks/useEscalations.ts";
-import { useSocket } from "../hooks/useSocket.ts";
+import { formatDuration } from "../lib/format.ts";
 import { escalationReasonLabel } from "../lib/escalationReasons.ts";
-import { formatDuration, formatRelative, humanize } from "../lib/format.ts";
-import type { AnalyticsResponse, AuditLogEntry } from "../types/index.ts";
-import {
-  mockAnalyticsData,
-  type DailyRevenuePoint,
-  type MessageVolumePoint,
-  type TopProductMetric,
-} from "../data/mockData.ts";
+import type { AnalyticsTrend } from "../types/index.ts";
 
-// ─── Date ranges (GET /analytics?from&to) ────────────────────────────────────
+import { AttentionStrip, type AttentionData } from "../components/analytics/AttentionStrip.tsx";
+import {
+  MainChartCard,
+  type DailyRevenueItem,
+  type DailyMessageItem,
+} from "../components/analytics/MainChartCard.tsx";
+import { ChannelsCard } from "../components/analytics/ChannelsCard.tsx";
+import { TopProductsCard } from "../components/analytics/TopProductsCard.tsx";
+import { AiHealthCard, type EscalationReasonStat } from "../components/analytics/AiHealthCard.tsx";
+import { RecentActivityCard } from "../components/analytics/RecentActivityCard.tsx";
+import { AnalyticsSkeleton } from "../components/analytics/AnalyticsSkeleton.tsx";
+
+// ─── Date Ranges ─────────────────────────────────────────────────────────────
 
 type RangePreset = "7d" | "30d" | "custom";
 
@@ -84,18 +62,7 @@ function customRange(start: string, end: string): DateRange {
   };
 }
 
-// ─── Small view helpers ──────────────────────────────────────────────────────
-
-const REASON_COLORS = [
-  "#EF4444",
-  "#F59E0B",
-  "#8B5CF6",
-  "#14B8A6",
-  "#3B82F6",
-  "#EC4899",
-  "#64748B",
-  "#84CC16",
-];
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function greeting(): string {
   const hour = new Date().getHours();
@@ -121,122 +88,38 @@ function downloadCsv(filename: string, rows: Array<Array<string | number>>): voi
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-function analyticsCsvRows(data: AnalyticsResponse): Array<Array<string | number>> {
-  const rows: Array<Array<string | number>> = [
-    ["Metric", "Value"],
-    ["From", data.from],
-    ["To", data.to],
-    ["Messages (total)", data.messages.total],
-    ["Messages inbound", data.messages.inbound],
-    ["Messages outbound", data.messages.outbound],
-    ["AI auto-replies", data.autoReplies],
-    ["Escalations created", data.escalations],
-    ["Auto-reply rate", `${Math.round(data.autoReplyRate * 100)}%`],
-    ["Escalation rate", `${Math.round(data.escalationRate * 100)}%`],
-    ["Avg escalation resolution (seconds)", data.avgResponseTimeSeconds ?? ""],
-  ];
-  if (data.byChannel) {
-    for (const ch of ["whatsapp", "instagram"] as const) {
-      rows.push([`${ch === "whatsapp" ? "WhatsApp" : "Instagram"} inbound`, data.byChannel[ch]?.inbound ?? 0]);
-      rows.push([`${ch === "whatsapp" ? "WhatsApp" : "Instagram"} outbound`, data.byChannel[ch]?.outbound ?? 0]);
-    }
-  }
-  for (const [reason, count] of Object.entries(data.byReason ?? {})) {
-    rows.push([`Escalations: ${escalationReasonLabel(reason)}`, count ?? 0]);
-  }
-  return rows;
+
+
+// ─── Real-data helpers ───────────────────────────────────────────────────────
+
+const DASH = "—";
+
+type StatTrend = StatCardProps["trend"];
+
+/** Trend chip from trends.*.changePct. Hidden (undefined) when there is no previous value or no change. */
+function trendChip(t: AnalyticsTrend | undefined, label: string, lowerIsBetter = false): StatTrend {
+  if (!t || t.changePct === null || !Number.isFinite(t.changePct)) return undefined;
+  const abs = Math.abs(t.changePct);
+  const shown = abs >= 10 ? Math.round(abs) : Math.round(abs * 10) / 10;
+  if (shown === 0) return undefined;
+  const up = t.changePct > 0;
+  return {
+    value: `${shown}%`,
+    direction: up ? "up" : "down",
+    isPositive: lowerIsBetter ? !up : up,
+    label,
+  };
 }
 
-function actorLabel(entry: AuditLogEntry): string {
-  if (entry.actorName) return entry.actorName;
-  if (entry.actorType === "ai") return "AI";
-  if (entry.actorType === "system") return "System";
-  return humanize(entry.actorType);
-}
+/** "2026-10-24" → "24 Oct" for the chart axis. */
+const axisDate = (date: string) => dayjs(date).format("D MMM");
 
-function detailString(entry: AuditLogEntry, key: string): string | undefined {
-  const v = entry.details?.[key];
-  return typeof v === "string" && v.trim() ? v : undefined;
-}
-
-/** Audit log row → activity feed item. */
-function activityView(entry: AuditLogEntry): { icon: ReactNode; title: string; description: string } {
-  const actor = actorLabel(entry);
-  const reason = detailString(entry, "reason");
-  const fallback = entry.conversationId ? `Conversation ${entry.conversationId.slice(0, 8)}` : "";
-  switch (entry.action) {
-    case "auto_reply_sent":
-      return {
-        icon: <Bot className="w-4 h-4 text-violet-500" />,
-        title: "AI auto-replied",
-        description: detailString(entry, "replyPreview") ?? detailString(entry, "intent") ?? fallback,
-      };
-    case "auto_reply_failed":
-    case "reply_failed":
-      return {
-        icon: <AlertTriangle className="w-4 h-4 text-red-500" />,
-        title: entry.action === "auto_reply_failed" ? "AI auto-reply failed" : `Reply by ${actor} failed`,
-        description: fallback,
-      };
-    case "escalation_created":
-      return {
-        icon: <AlertTriangle className="w-4 h-4 text-red-500" />,
-        title: "Escalated to a human",
-        description: reason ? escalationReasonLabel(reason) : fallback,
-      };
-    case "escalation_reminded":
-      return { icon: <Clock className="w-4 h-4 text-amber-500" />, title: "Escalation reminder sent", description: fallback };
-    case "escalation_assigned":
-    case "escalation_unassigned":
-      return {
-        icon: <UserCheck className="w-4 h-4 text-amber-500" />,
-        title: entry.action === "escalation_assigned" ? `${actor} assigned an escalation` : `${actor} unassigned an escalation`,
-        description: fallback,
-      };
-    case "reply_sent":
-      return {
-        icon: <UserCheck className="w-4 h-4 text-amber-500" />,
-        title: `${actor} replied`,
-        description: detailString(entry, "preview") ?? fallback,
-      };
-    case "conversation_resolved":
-      return { icon: <CheckCircle2 className="w-4 h-4 text-emerald-500" />, title: `${actor} resolved a conversation`, description: fallback };
-    case "state_changed": {
-      const to = detailString(entry, "to") ?? detailString(entry, "toState");
-      return {
-        icon: <Clock className="w-4 h-4 text-blue-500" />,
-        title: to ? `Conversation moved to ${humanize(to)}` : "Conversation state changed",
-        description: fallback,
-      };
-    }
-    case "automation_paused":
-      return { icon: <PauseCircle className="w-4 h-4 text-rose-500" />, title: `${actor} paused AI automation`, description: "" };
-    case "automation_resumed":
-      return { icon: <PlayCircle className="w-4 h-4 text-emerald-500" />, title: `${actor} resumed AI automation`, description: "" };
-    case "knowledge_base_updated":
-      return { icon: <BookOpen className="w-4 h-4 text-blue-500" />, title: `${actor} updated the knowledge base`, description: "" };
-    default:
-      return { icon: <Layers className="w-4 h-4 text-text-muted" />, title: `${humanize(entry.action)} · ${actor}`, description: fallback };
-  }
-}
-
-function SectionHeading({ title, sample }: { title: string; sample?: boolean }) {
-  return (
-    <div className="flex items-center gap-2">
-      <h2 className="text-16 font-semibold font-outfit text-text">{title}</h2>
-      {sample && <SampleDataBadge />}
-    </div>
-  );
-}
-
-// ─── Page ────────────────────────────────────────────────────────────────────
+// ─── Analytics Main Cockpit Page ─────────────────────────────────────────────
 
 export default function Analytics() {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
-  const { chartPalette } = useTheme();
-  const socket = useSocket();
 
   const [range, setRange] = useState<DateRange>(() => presetRange("7d"));
   const [pickerPreset, setPickerPreset] = useState<RangePreset>("7d");
@@ -244,26 +127,159 @@ export default function Analytics() {
   const [customStartDate, setCustomStartDate] = useState(() => dayjs().subtract(6, "day").format("YYYY-MM-DD"));
   const [customEndDate, setCustomEndDate] = useState(() => dayjs().format("YYYY-MM-DD"));
 
-  // Real backend queries
-  const analytics = useAnalytics({ from: range.from, to: range.to });
-  const openEscalations = useEscalations();
-  const activity = useAuditLog({ limit: 8 });
-
-  const data = analytics.data;
-  const kpiLoading = analytics.isPending || analytics.isPlaceholderData;
-
-  // Selected channel from the TopBar ("all" | "whatsapp" | "instagram")
+  // Active channel ("all" | "whatsapp" | "instagram")
   const rawChannel = searchParams.get("channel");
   const activeChannel: "all" | "whatsapp" | "instagram" =
     rawChannel === "whatsapp" || rawChannel === "instagram" ? rawChannel : "all";
 
-  // Sample data scoped by channel and date preset
-  const sample = mockAnalyticsData[activeChannel][range.preset];
+  // Backend queries (channel is part of the analytics query key)
+  const analytics = useAnalytics({
+    from: range.from,
+    to: range.to,
+    channel: activeChannel === "all" ? undefined : activeChannel,
+  });
 
+  const data = analytics.data;
+  const isLoading = analytics.isLoading;
+  const isError = analytics.isError;
+
+  // Trends compare against the previous period of the same length.
+  const trendLabel =
+    range.preset === "30d" ? "previous 30 days" : range.preset === "7d" ? "previous 7 days" : "previous period";
+  const trendShort = range.preset === "30d" ? "prev 30d" : range.preset === "7d" ? "prev 7d" : "prev period";
+
+  const formattedDate = new Intl.DateTimeFormat("en-IN", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }).format(new Date());
+
+  // ─── Main chart series (zero-filled by the API for every day in range) ─────
+  const revenueDailyData: DailyRevenueItem[] = useMemo(
+    () => (data?.revenue?.daily ?? []).map((d) => ({ ...d, date: axisDate(d.date) })),
+    [data?.revenue?.daily]
+  );
+  const messagesDailyData: DailyMessageItem[] = useMemo(
+    () => (data?.messagesDaily ?? []).map((d) => ({ ...d, date: axisDate(d.date) })),
+    [data?.messagesDaily]
+  );
+
+  // ─── Escalations: from analytics attention (channel-filtered) ─────────────
+  const openEscalationsCount: number | null = data?.attention?.openEscalations ?? null;
+
+  const oldestWaitingText = useMemo(() => {
+    const oldest = data?.attention?.oldestOpenEscalationAt;
+    if (!oldest) return null;
+    const seconds = Math.max(60, dayjs().diff(dayjs(oldest), "second"));
+    // Whole days once past a day, so the small tile never truncates ("26d", not "25d 23h").
+    return seconds >= 86_400 ? `${Math.floor(seconds / 86_400)}d` : formatDuration(seconds);
+  }, [data?.attention?.oldestOpenEscalationAt]);
+
+  // ─── Attention strip (null = not available, never faked) ──────────────────
+  const attentionData: AttentionData = {
+    openEscalations: openEscalationsCount,
+    windowsClosingSoon: data?.attention?.windowsClosingSoon ?? null,
+    pendingOrders: data?.attention?.pendingOrders ?? data?.orders?.pending ?? null,
+    unpaidBalance: data?.attention?.unpaidBalance ?? null,
+  };
+
+  // ─── KPI values: zero stays 0; missing → "—" with no trend chip ────────────
+  const revenueValue = data?.revenue ? data.revenue.total : null;
+  const ordersValue = data?.orders ? (data.orders.total ?? data.orders.confirmed) : null;
+  const messagesValue = data?.messages ? data.messages.total : null;
+
+  const autoRepliesCount = data ? data.autoReplies : null;
+  const escalationsCount = data ? data.escalations : null;
+  // A rate needs at least one processed message; with none it is "—", not 0%.
+  const processed = (autoRepliesCount ?? 0) + (escalationsCount ?? 0);
+  const autoReplyRateValue = data && processed > 0 ? Math.round(data.autoReplyRate * 100) : null;
+
+  // avgResponseTimeSeconds = mean time from escalation to resolution.
+  const avgResolveText =
+    data?.avgResponseTimeSeconds !== null && data?.avgResponseTimeSeconds !== undefined
+      ? formatDuration(data.avgResponseTimeSeconds)
+      : null;
+
+  const trends = data?.trends;
+  const revenueTrend = revenueValue === null ? undefined : trendChip(trends?.revenue, trendLabel);
+  const ordersTrend = ordersValue === null ? undefined : trendChip(trends?.orders, trendLabel);
+  const messagesTrend = messagesValue === null ? undefined : trendChip(trends?.messages, trendLabel);
+  const autoReplyTrend = autoReplyRateValue === null ? undefined : trendChip(trends?.autoReplyRate, trendLabel);
+  const avgResolveTrend =
+    avgResolveText === null ? undefined : trendChip(trends?.avgResponseTimeSeconds, trendLabel, true);
+
+  const aiTrendPct = autoReplyRateValue === null ? null : (trends?.autoReplyRate?.changePct ?? null);
+  const aiTrendText =
+    aiTrendPct === null || Math.round(Math.abs(aiTrendPct)) === 0
+      ? null
+      : `${aiTrendPct > 0 ? "↑" : "↓"}${Math.round(Math.abs(aiTrendPct))}% vs ${trendShort}`;
+
+  // ─── Channels card ─────────────────────────────────────────────────────────
+  const channelsWhatsapp = data?.channels?.whatsapp ?? null;
+  const channelsInstagram = data?.channels?.instagram ?? null;
+
+  // ─── AI health: escalation reasons (real, sorted, no padding) ──────────────
+  const escalationReasonsList: EscalationReasonStat[] = useMemo(() => {
+    const entries = Object.entries(data?.byReason ?? {})
+      .map(([code, count]) => ({ code, count: count ?? 0 }))
+      .filter((r) => r.count > 0)
+      .sort((a, b) => b.count - a.count);
+    const total = entries.reduce((acc, cur) => acc + cur.count, 0);
+    return entries.map((e) => ({
+      code: e.code,
+      reason: escalationReasonLabel(e.code),
+      count: e.count,
+      percentage: total > 0 ? Math.round((e.count / total) * 100) : 0,
+    }));
+  }, [data?.byReason]);
+
+  // ─── Top products (every product sold in range; real list only) ───────────
+  const topProductsList = useMemo(() => data?.topProducts ?? [], [data?.topProducts]);
+
+  // ─── Export Handler (CSV of the real values on screen; blank = not available) ──
   const handleExport = () => {
-    if (!data) return;
-    const filename = `analytics_${dayjs(data.from).format("YYYY-MM-DD")}_to_${dayjs(data.to).format("YYYY-MM-DD")}.csv`;
-    downloadCsv(filename, analyticsCsvRows(data));
+    const filename = `analytics_${dayjs(range.from).format("YYYY-MM-DD")}_to_${dayjs(range.to).format("YYYY-MM-DD")}.csv`;
+    const cell = (v: number | string | null) => (v === null ? "" : v);
+    const rows: Array<Array<string | number>> = [
+      ["Analytics Report", ""],
+      ["Date Range", `${dayjs(range.from).format("YYYY-MM-DD")} to ${dayjs(range.to).format("YYYY-MM-DD")}`],
+      ["Channel Filter", activeChannel.toUpperCase()],
+      [],
+      ["Key Metrics", "Value"],
+      ["Revenue (₹)", cell(revenueValue)],
+      ["Orders Confirmed", cell(ordersValue)],
+      ["Messages Total", cell(messagesValue)],
+      ["AI Reply Rate", autoReplyRateValue === null ? "" : `${autoReplyRateValue}%`],
+      ["Avg Resolve Time", cell(avgResolveText)],
+      ["Open Escalations", cell(openEscalationsCount)],
+      [],
+      ["Channel Breakdown", "Messages", "Revenue (₹)", "Orders"],
+      ...(channelsWhatsapp
+        ? [["WhatsApp", channelsWhatsapp.messages, channelsWhatsapp.revenue, channelsWhatsapp.orders]]
+        : []),
+      ...(channelsInstagram
+        ? [["Instagram", channelsInstagram.messages, channelsInstagram.revenue, channelsInstagram.orders]]
+        : []),
+      [],
+      ["AI Performance", "Count"],
+      ["Auto-Replies", cell(autoRepliesCount)],
+      ["Escalations", cell(escalationsCount)],
+      [],
+      ["Escalation Reasons", "Count", "Share %"],
+      ...escalationReasonsList.map((r) => [r.reason, r.count, `${r.percentage}%`]),
+      [],
+      ["Top Products", "Units Sold", "Revenue (₹)"],
+      ...topProductsList.map((p) => [p.name, p.units, p.revenue]),
+      [],
+      ["Daily Revenue", "Revenue (₹)", "Orders"],
+      ...(data?.revenue?.daily ?? []).map((d) => [d.date, d.revenue, d.orders]),
+      [],
+      ["Daily Messages", "Inbound", "Outbound"],
+      ...(data?.messagesDaily ?? []).map((d) => [d.date, d.inbound, d.outbound]),
+    ];
+
+    downloadCsv(filename, rows);
     toast.success("Analytics exported", { description: filename });
   };
 
@@ -280,940 +296,227 @@ export default function Analytics() {
     setShowCustomPicker(false);
   };
 
-  const formattedDate = new Intl.DateTimeFormat("en-IN", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  }).format(new Date());
+  // ─── Loading: card-shaped skeleton matching the real layout (no jump) ───────
+  if (isLoading && !data) {
+    return <AnalyticsSkeleton />;
+  }
 
-  const rangeLabel =
-    range.preset === "custom"
-      ? `${dayjs(range.from).format("D MMM")} – ${dayjs(range.to).format("D MMM YYYY")}`
-      : range.preset === "30d"
-        ? "Last 30 days"
-        : "Last 7 days";
-
-  // Channel split stats
-  const realWaCount = (data?.byChannel?.whatsapp?.inbound ?? 0) + (data?.byChannel?.whatsapp?.outbound ?? 0);
-  const realIgCount = (data?.byChannel?.instagram?.inbound ?? 0) + (data?.byChannel?.instagram?.outbound ?? 0);
-  const realChannelTotal = realWaCount + realIgCount;
-
-  const waCount = realChannelTotal > 0 ? realWaCount : sample.channelSplit.whatsapp.count;
-  const igCount = realChannelTotal > 0 ? realIgCount : sample.channelSplit.instagram.count;
-  const channelTotal = waCount + igCount;
-  const waPct = channelTotal > 0 ? Math.round((waCount / channelTotal) * 100) : sample.channelSplit.whatsapp.percentage;
-  const igPct = 100 - waPct;
-
-  // AI performance stats
-  const autoPct = data ? Math.round(data.autoReplyRate * 100) : 0;
-  const escPct = data ? Math.round(data.escalationRate * 100) : 0;
-  const reasonEntries = Object.entries(data?.byReason ?? {})
-    .map(([reason, count]) => ({ reason, count: count ?? 0 }))
-    .filter((r) => r.count > 0)
-    .sort((a, b) => b.count - a.count);
-  const reasonTotal = reasonEntries.reduce((sum, r) => sum + r.count, 0);
-
-  const effectiveAutoPct = autoPct > 0 ? autoPct : sample.aiPerformance.autoRepliedPercent;
-  const effectiveEscPct = escPct > 0 ? escPct : sample.aiPerformance.escalatedPercent;
-  const effectiveAutoReplies = data && data.autoReplies > 0 ? data.autoReplies : 320;
-  const effectiveEscalations = data && data.escalations > 0 ? data.escalations : 90;
-
-  const effectiveReasons = useMemo(() => {
-    if (reasonEntries.length > 0) {
-      return reasonEntries.map((r, idx) => ({
-        reason: escalationReasonLabel(r.reason),
-        percentage: Math.round((r.count / reasonTotal) * 100),
-        color: REASON_COLORS[idx % REASON_COLORS.length] ?? "#EF4444",
-      }));
-    }
-    return sample.aiPerformance.escalationReasons;
-  }, [reasonEntries, reasonTotal, sample.aiPerformance.escalationReasons]);
-
-  // Activity list combining real audit entries and sample activities
-  const displayActivities = useMemo(() => {
-    const list: Array<{
-      id: string;
-      icon: ReactNode;
-      title: string;
-      description?: string;
-      time: string;
-      onClick?: () => void;
-    }> = [];
-
-    if (activity.data?.entries && activity.data.entries.length > 0) {
-      for (const entry of activity.data.entries) {
-        const view = activityView(entry);
-        list.push({
-          id: entry.id,
-          icon: view.icon,
-          title: view.title,
-          ...(view.description ? { description: view.description } : {}),
-          time: formatRelative(entry.createdAt),
-          ...(entry.conversationId
-            ? {
-                onClick: () => {
-                  void navigate(`/inbox?c=${encodeURIComponent(entry.conversationId ?? "")}`);
-                },
-              }
-            : {}),
-        });
-      }
-    }
-
-    if (list.length < 8) {
-      for (const act of sample.recentActivity) {
-        if (!list.some((it) => it.title === act.title)) {
-          let icon = <Layers className="w-4 h-4 text-text-muted" />;
-          if (act.type === "takeover") icon = <UserCheck className="w-4 h-4 text-amber-500" />;
-          else if (act.type === "ai_reply") icon = <Bot className="w-4 h-4 text-violet-500" />;
-          else if (act.type === "order") icon = <CheckCircle2 className="w-4 h-4 text-emerald-500" />;
-          else if (act.type === "escalation") icon = <AlertTriangle className="w-4 h-4 text-red-500" />;
-          else if (act.type === "status_change") icon = <Clock className="w-4 h-4 text-blue-500" />;
-
-          list.push({
-            id: act.id,
-            icon,
-            title: act.title,
-            description: act.description,
-            time: act.time,
-          });
-        }
-      }
-    }
-
-    return list;
-  }, [activity.data?.entries, sample.recentActivity, navigate]);
-
-  const openEscalationCount = openEscalations.data?.length;
+  // ─── Error Fallback with Retry ──────────────────────────────────────────────
+  if (isError) {
+    return (
+      <div className="w-full h-full min-h-0 flex flex-col items-center justify-center p-6 text-center">
+        <div className="p-3 rounded-2xl bg-rose-500/10 text-rose-500 mb-3 border border-rose-500/20">
+          <AlertTriangle className="w-8 h-8" />
+        </div>
+        <h2 className="text-16 font-bold font-outfit text-text mb-1">Failed to load analytics</h2>
+        <p className="text-12 text-text-muted max-w-sm mb-4">
+          There was an error communicating with the analytics service. Please check your connection and try again.
+        </p>
+        <button
+          onClick={() => void analytics.refetch()}
+          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-12 font-medium hover:bg-amber-600 transition-colors shadow-2xs active:scale-95 cursor-pointer"
+        >
+          <RefreshCw className="w-3.5 h-3.5" />
+          <span>Retry</span>
+        </button>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-6 pb-12 w-full">
-      {/* ─── Page Header ──────────────────────────────────────────────────────── */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-24 md:text-28 font-bold font-outfit text-text tracking-tight">
-              {greeting()}
-              {user?.name ? `, ${user.name.split(" ")[0]}` : ""}
-            </h1>
-            {socket.connected && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-11 font-medium bg-primary/10 text-primary-text">
-                <Sparkles className="w-3 h-3" /> Live
-              </span>
-            )}
+    <div className="w-full min-h-0 flex flex-col p-4 lg:p-5 gap-4 [@media(min-width:1024px)_and_(min-height:760px)]:h-full [@media(min-width:1024px)_and_(min-height:760px)]:overflow-hidden">
+      {/* ─── Header Block (Greeting + Date + Controls + Attention Row) ────────── */}
+      <div className="flex flex-col gap-1 shrink-0 mb-1">
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 min-h-10 shrink-0 relative">
+          {/* Left: Greeting (date underneath) + attention chips on the same line */}
+          <div className="flex items-center gap-x-5 gap-y-2 flex-wrap min-w-0">
+            <div className="shrink-0">
+              <h1 className="text-20 sm:text-22 font-bold font-outfit text-text tracking-tight leading-tight">
+                {greeting()}{user?.name ? `, ${user.name.split(" ")[0]}` : ""}
+              </h1>
+              <p className="text-11 sm:text-12 text-text-muted font-medium">{formattedDate}</p>
+            </div>
+            <AttentionStrip data={attentionData} />
           </div>
-          <p className="text-13 text-text-muted mt-0.5">
-            {formattedDate} · {rangeLabel}
-            {activeChannel !== "all" && (
-              <span className="ml-1.5 px-1.5 py-0.5 rounded text-11 font-medium bg-surface-muted text-text uppercase">
-                {activeChannel}
-              </span>
-            )}
-          </p>
-        </div>
 
-        {/* Date Range Selector & Export Button */}
-        <div className="flex items-center flex-wrap gap-2.5">
-          <SegmentedControl
-            options={[
-              { value: "7d", label: "7 days" },
-              { value: "30d", label: "30 days" },
-              { value: "custom", label: "Custom" },
-            ]}
-            value={pickerPreset}
-            onChange={(val) => {
-              const v = val as RangePreset;
-              setPickerPreset(v);
-              if (v === "custom") {
-                setShowCustomPicker(true);
-              } else {
-                setShowCustomPicker(false);
-                setRange(presetRange(v));
-              }
-            }}
-          />
-
-          <button
-            onClick={handleExport}
-            disabled={!data || kpiLoading}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-surface hover:bg-surface-muted text-text text-13 font-medium transition-colors shadow-xs active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-primary cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-            title="Export analytics as CSV"
-          >
-            <Download className="w-3.5 h-3.5 text-text-muted" />
-            <span>Export</span>
-          </button>
-        </div>
-      </div>
-
-      {/* ─── Custom Date Range Popover ────────────────────────────────────────── */}
-      {showCustomPicker && (
-        <div className="p-4 rounded-xl border border-border bg-surface shadow-md flex flex-wrap items-center justify-between gap-3 animate-in fade-in slide-in-from-top-2 duration-200">
-          <div className="flex items-center gap-2 text-13 text-text-muted">
-            <Calendar className="w-4 h-4 text-primary" />
-            <span className="font-medium text-text">Custom Date Filter:</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <input
-              type="date"
-              value={customStartDate}
-              max={customEndDate || undefined}
-              onChange={(e) => setCustomStartDate(e.target.value)}
-              className="px-2.5 py-1 text-13 rounded-lg border border-border bg-surface-muted text-text focus:outline-none focus:ring-1 focus:ring-primary"
-            />
-            <span className="text-text-muted text-12">to</span>
-            <input
-              type="date"
-              value={customEndDate}
-              min={customStartDate || undefined}
-              onChange={(e) => setCustomEndDate(e.target.value)}
-              className="px-2.5 py-1 text-13 rounded-lg border border-border bg-surface-muted text-text focus:outline-none focus:ring-1 focus:ring-primary"
-            />
-            <button
-              onClick={applyCustomRange}
-              className="px-3 py-1 rounded-lg bg-primary text-primary-foreground text-12 font-medium hover:bg-amber-600 transition-colors cursor-pointer"
-            >
-              Apply
-            </button>
-            <button
-              onClick={() => {
-                setShowCustomPicker(false);
-                setPickerPreset(range.preset);
+          {/* Right: [All | WA | IG] [7d | 30d | Custom] [Export] */}
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            <SegmentedControl<"all" | "whatsapp" | "instagram">
+              size="sm"
+              options={[
+                { value: "all", label: "All" },
+                { value: "whatsapp", label: "WA" },
+                { value: "instagram", label: "IG" },
+              ]}
+              value={activeChannel}
+              onChange={(val) => {
+                setSearchParams(val === "all" ? {} : { channel: val });
               }}
-              className="p-1 rounded-lg hover:bg-surface-muted text-text-muted cursor-pointer"
-              aria-label="Close custom date filter"
+            />
+
+            <SegmentedControl<RangePreset>
+              size="sm"
+              options={[
+                { value: "7d", label: "7d" },
+                { value: "30d", label: "30d" },
+                { value: "custom", label: "Custom" },
+              ]}
+              value={pickerPreset}
+              onChange={(val) => {
+                setPickerPreset(val);
+                if (val === "custom") {
+                  setShowCustomPicker(true);
+                } else {
+                  setShowCustomPicker(false);
+                  setRange(presetRange(val));
+                }
+              }}
+            />
+
+            <button
+              type="button"
+              onClick={handleExport}
+              className="inline-flex items-center gap-1.5 h-7 px-2 sm:px-2.5 rounded-lg border border-border bg-surface hover:bg-surface-muted text-text text-11 font-medium transition-all shadow-2xs active:scale-[0.98] focus-visible:ring-1 focus-visible:ring-primary cursor-pointer select-none"
+              title="Export CSV of current dashboard data"
             >
-              <X className="w-4 h-4" />
+              <Download className="w-3 h-3 text-text-muted" />
+              <span className="hidden sm:inline">Export</span>
             </button>
           </div>
-        </div>
-      )}
 
-      {/* ─── Error Notification ──────────────────────────────────────────────── */}
-      {analytics.isError && (
-        <div
-          role="alert"
-          className="p-4 rounded-xl border border-danger/30 bg-danger/10 flex flex-wrap items-center justify-between gap-3 text-13"
-        >
-          <span className="flex items-center gap-2 font-medium text-danger">
-            <AlertTriangle className="w-4 h-4 shrink-0" />
-            Couldn't load real-time analytics: {analytics.error.message}
-          </span>
-          <button
-            onClick={() => void analytics.refetch()}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-surface hover:bg-surface-muted text-text text-12 font-medium cursor-pointer"
-          >
-            <RefreshCw className="w-3.5 h-3.5" /> Retry
-          </button>
-        </div>
-      )}
-
-      {/* ─── Section 1: KPI Grid (Equal Heights, Rich Sparklines & Trends) ───── */}
-      {kpiLoading && !analytics.isError ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 items-stretch">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="p-5 rounded-xl border border-border bg-surface space-y-3 h-[148px] flex flex-col justify-between">
-              <Skeleton className="h-4 w-28" />
-              <Skeleton className="h-9 w-36" />
-              <div className="pt-2 border-t border-border/40 flex justify-between">
-                <Skeleton className="h-4 w-16" />
-                <Skeleton className="h-6 w-20" />
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 items-stretch">
-          {/* 1. Total Revenue */}
-          <StatCard
-            label="Total revenue"
-            prefix="₹"
-            value={sample.kpis.revenue.value}
-            tag={<SampleDataBadge />}
-            trend={{
-              value: sample.kpis.revenue.trend,
-              isPositive: sample.kpis.revenue.isPositive,
-              label: "vs prev. period",
-            }}
-            color="amber"
-            onClick={() => navigate("/orders")}
-          />
-
-          {/* 2. Orders Confirmed */}
-          <StatCard
-            label="Orders confirmed"
-            value={sample.kpis.orders.value}
-            tag={<SampleDataBadge />}
-            trend={{
-              value: sample.kpis.orders.trend,
-              isPositive: sample.kpis.orders.isPositive,
-              label: "vs prev. period",
-            }}
-            color="emerald"
-            onClick={() => navigate("/orders")}
-          />
-
-          {/* 3. Messages Today */}
-          <StatCard
-            label="Messages today"
-            value={data && data.messages.total > 0 ? data.messages.total : sample.kpis.messages.value}
-            tag={(!data || data.messages.total === 0) ? <SampleDataBadge /> : undefined}
-            trend={{
-              value: sample.kpis.messages.trend,
-              isPositive: sample.kpis.messages.isPositive,
-              label: "vs prev. period",
-            }}
-            color="blue"
-            onClick={() => navigate("/inbox")}
-          />
-
-          {/* 4. Auto-reply Rate */}
-          <StatCard
-            label="Auto-reply rate"
-            value={effectiveAutoPct}
-            suffix="%"
-            radialProgress={effectiveAutoPct}
-            trend={{
-              value: sample.kpis.autoReplyRate.trend,
-              isPositive: sample.kpis.autoReplyRate.isPositive,
-              label: "AI handling",
-            }}
-            color="violet"
-          />
-
-          {/* 5. Open Escalations */}
-          <StatCard
-            label="Open escalations"
-            value={openEscalationCount && openEscalationCount > 0 ? openEscalationCount : sample.kpis.escalations.value}
-            pulsingDot={(openEscalationCount ?? 0) > 0 || sample.kpis.escalations.pulsing}
-            trend={{
-              value: sample.kpis.escalations.trend,
-              isPositive: sample.kpis.escalations.isPositive,
-              label: "vs yesterday",
-            }}
-            color="danger"
-            onClick={() => navigate("/escalations")}
-          />
-
-          {/* 6. Avg Response Time */}
-          <StatCard
-            label="Avg response time"
-            value={data?.avgResponseTimeSeconds ? formatDuration(data.avgResponseTimeSeconds) : sample.kpis.avgResponse.value}
-            trend={{
-              value: sample.kpis.avgResponse.trend,
-              isPositive: sample.kpis.avgResponse.isPositive,
-              label: "faster",
-            }}
-            color="teal"
-          />
-        </div>
-      )}
-
-      {/* ─── Section 2: Charts Row (Standardized 380px Height & Aligned Baselines) ─ */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-stretch">
-        {/* Daily Revenue Bar Chart */}
-        <div className="p-5 rounded-xl border border-border bg-surface flex flex-col justify-between h-[380px]">
-          <div className="h-[52px] shrink-0 mb-3 flex flex-col justify-between">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <h2 className="text-16 font-semibold font-outfit text-text">Daily revenue</h2>
-                <SampleDataBadge />
-              </div>
-              <span className="text-12 text-text-muted shrink-0">Last 14 days</span>
-            </div>
-            <p className="text-12 text-text-muted truncate">
-              Revenue per day in ₹ with order count on hover
-            </p>
-          </div>
-
-          <div className="h-[210px] w-full shrink-0">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={sample.dailyRevenue}
-                margin={{ top: 8, right: 8, left: -20, bottom: 0 }}
+          {/* Custom Date Range Floating Dropdown */}
+          {showCustomPicker && (
+            <div className="absolute right-0 top-10 z-50 p-3 rounded-xl border border-border bg-surface shadow-xl flex flex-wrap items-center gap-2 max-w-[calc(100vw-2rem)] animate-in fade-in slide-in-from-top-2 duration-150">
+              <Calendar className="w-4 h-4 text-primary shrink-0" />
+              <input
+                type="date"
+                value={customStartDate}
+                max={customEndDate || undefined}
+                onChange={(e) => setCustomStartDate(e.target.value)}
+                className="px-2 py-1 text-11 rounded-md border border-border bg-surface-muted text-text focus:outline-none focus:ring-1 focus:ring-primary"
+              />
+              <span className="text-text-muted text-11">to</span>
+              <input
+                type="date"
+                value={customEndDate}
+                min={customStartDate || undefined}
+                onChange={(e) => setCustomEndDate(e.target.value)}
+                className="px-2 py-1 text-11 rounded-md border border-border bg-surface-muted text-text focus:outline-none focus:ring-1 focus:ring-primary"
+              />
+              <button
+                type="button"
+                onClick={applyCustomRange}
+                className="px-2.5 py-1 rounded-md bg-primary text-primary-foreground text-11 font-medium hover:bg-amber-600 transition-colors cursor-pointer"
               >
-                <XAxis
-                  dataKey="date"
-                  tickLine={false}
-                  axisLine={false}
-                  tick={{ fontSize: 11, fill: "currentColor" }}
-                  className="text-text-muted"
-                />
-                <YAxis
-                  tickLine={false}
-                  axisLine={false}
-                  tick={{ fontSize: 11, fill: "currentColor" }}
-                  tickFormatter={(v: number) => `₹${v >= 1000 ? `${v / 1000}k` : v}`}
-                  className="text-text-muted"
-                />
-                <Tooltip
-                  cursor={{ fill: "rgba(245, 158, 11, 0.08)" }}
-                  content={({ active, payload, label }) => {
-                    if (active && payload && payload.length > 0 && payload[0]) {
-                      const point = payload[0].payload as DailyRevenuePoint;
-                      return (
-                        <div className="p-2.5 rounded-lg border border-border bg-surface shadow-lg text-12 backdrop-blur-md">
-                          <p className="font-semibold text-text mb-0.5">{label}</p>
-                          <p className="text-primary font-bold tabular-nums">
-                            ₹{point.revenue.toLocaleString("en-IN")}
-                          </p>
-                          <p className="text-text-muted text-11 mt-0.5">
-                            {point.orders} {point.orders === 1 ? "order" : "orders"}
-                          </p>
-                        </div>
-                      );
-                    }
-                    return null;
-                  }}
-                />
-                <Bar
-                  dataKey="revenue"
-                  fill={chartPalette.primary}
-                  radius={[4, 4, 0, 0]}
-                  className="transition-opacity hover:opacity-85"
-                />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-
-          <div className="h-[46px] flex items-center justify-between pt-3 border-t border-border/40 text-12 shrink-0">
-            <span className="text-text-muted">
-              Total in period: <strong className="text-text tabular-nums font-semibold">₹48,500</strong>
-            </span>
-            <span className="text-11 text-text-muted">
-              Avg daily: <strong className="text-text tabular-nums font-semibold">₹3,460</strong>
-            </span>
-          </div>
-        </div>
-
-        {/* Message Volume Area Chart */}
-        <div className="p-5 rounded-xl border border-border bg-surface flex flex-col justify-between h-[380px]">
-          <div className="h-[52px] shrink-0 mb-3 flex flex-col justify-between">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <h2 className="text-16 font-semibold font-outfit text-text">Message volume</h2>
-                <SampleDataBadge />
-              </div>
-              <div className="flex items-center gap-3 text-11 font-medium shrink-0">
-                <span className="flex items-center gap-1 text-amber-500">
-                  <span className="w-2 h-2 rounded-full bg-amber-500" /> Inbound
-                </span>
-                <span className="flex items-center gap-1 text-teal">
-                  <span className="w-2 h-2 rounded-full bg-teal" /> Outbound
-                </span>
-              </div>
-            </div>
-            <p className="text-12 text-text-muted truncate">
-              Daily customer queries vs AI and team replies
-            </p>
-          </div>
-
-          <div className="h-[210px] w-full shrink-0">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart
-                data={sample.messageVolume}
-                margin={{ top: 8, right: 8, left: -20, bottom: 0 }}
+                Apply
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowCustomPicker(false);
+                  setPickerPreset(range.preset);
+                }}
+                className="p-1 rounded-md hover:bg-surface-muted text-text-muted cursor-pointer"
+                aria-label="Close custom picker"
               >
-                <defs>
-                  <linearGradient id="inboundGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor={chartPalette.primary} stopOpacity={0.35} />
-                    <stop offset="95%" stopColor={chartPalette.primary} stopOpacity={0.0} />
-                  </linearGradient>
-                  <linearGradient id="outboundGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor={chartPalette.teal} stopOpacity={0.35} />
-                    <stop offset="95%" stopColor={chartPalette.teal} stopOpacity={0.0} />
-                  </linearGradient>
-                </defs>
-                <XAxis
-                  dataKey="date"
-                  tickLine={false}
-                  axisLine={false}
-                  tick={{ fontSize: 11, fill: "currentColor" }}
-                  className="text-text-muted"
-                />
-                <YAxis
-                  tickLine={false}
-                  axisLine={false}
-                  tick={{ fontSize: 11, fill: "currentColor" }}
-                  className="text-text-muted"
-                />
-                <Tooltip
-                  content={({ active, payload, label }) => {
-                    if (active && payload && payload.length > 0 && payload[0]) {
-                      const point = payload[0].payload as MessageVolumePoint;
-                      return (
-                        <div className="p-2.5 rounded-lg border border-border bg-surface shadow-lg text-12 backdrop-blur-md space-y-1">
-                          <p className="font-semibold text-text">{label}</p>
-                          <div className="flex items-center justify-between gap-4 text-amber-500 font-medium">
-                            <span>Inbound:</span>
-                            <span className="tabular-nums font-bold">{point.inbound}</span>
-                          </div>
-                          <div className="flex items-center justify-between gap-4 text-teal font-medium">
-                            <span>Outbound:</span>
-                            <span className="tabular-nums font-bold">{point.outbound}</span>
-                          </div>
-                        </div>
-                      );
-                    }
-                    return null;
-                  }}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="inbound"
-                  stroke={chartPalette.primary}
-                  strokeWidth={2}
-                  fillOpacity={1}
-                  fill="url(#inboundGrad)"
-                />
-                <Area
-                  type="monotone"
-                  dataKey="outbound"
-                  stroke={chartPalette.teal}
-                  strokeWidth={2}
-                  fillOpacity={1}
-                  fill="url(#outboundGrad)"
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-
-          <div className="h-[46px] flex items-center justify-between pt-3 border-t border-border/40 text-12 shrink-0">
-            <span className="text-text-muted">
-              Total volume: <strong className="text-text tabular-nums font-semibold">410 msgs</strong>
-            </span>
-            <span className="text-11 text-text-muted">
-              Ratio: <strong className="text-text tabular-nums font-semibold">1.1 : 1</strong>
-            </span>
-          </div>
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
         </div>
 
-        {/* Channel Split Donut Chart */}
-        <div className="p-5 rounded-xl border border-border bg-surface flex flex-col justify-between h-[380px]">
-          <div className="h-[52px] shrink-0 mb-3 flex flex-col justify-between">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <h2 className="text-16 font-semibold font-outfit text-text">Channel split</h2>
-                <SampleDataBadge />
-              </div>
-              <span className="text-12 text-text-muted shrink-0">By message share</span>
-            </div>
-            <p className="text-12 text-text-muted truncate">
-              Share of messages across WhatsApp & Instagram
-            </p>
-          </div>
+      </div>
 
-          <div className="h-[210px] w-full shrink-0 relative flex items-center justify-center">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={[
-                    { name: "WhatsApp", value: waCount, pct: waPct },
-                    { name: "Instagram", value: igCount, pct: igPct },
-                  ]}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={54}
-                  outerRadius={78}
-                  paddingAngle={3}
-                  dataKey="value"
-                >
-                  <Cell fill={brandChannels.whatsapp} />
-                  <Cell fill={brandChannels.instagram} />
-                </Pie>
-                <Tooltip
-                  content={({ active, payload }) => {
-                    if (active && payload && payload.length > 0 && payload[0]) {
-                      const slice = payload[0];
-                      const pct = (slice.payload as { pct?: number } | undefined)?.pct ?? 0;
-                      return (
-                        <div className="p-2 rounded-lg border border-border bg-surface shadow-md text-12 font-medium">
-                          <span>{slice.name}: </span>
-                          <span className="font-bold tabular-nums">
-                            {Number(slice.value).toLocaleString("en-IN")} ({pct}%)
-                          </span>
-                        </div>
-                      );
-                    }
-                    return null;
-                  }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
+      {/* ─── Row 1: KPI Row (6 StatCards, h-[104px], gap-4) ──────────────────── */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 shrink-0">
+        <StatCard
+          label="Revenue"
+          value={revenueValue ?? DASH}
+          prefix={revenueValue === null ? undefined : "₹"}
+          trend={revenueTrend}
+          color="amber"
+          icon={<TrendingUp className="w-3.5 h-3.5" />}
+        />
 
-            {/* Centre Text */}
-            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-              <span className="text-22 font-bold font-outfit text-text tabular-nums">{waPct}%</span>
-              <span className="text-10 uppercase tracking-wider text-text-muted font-medium">WhatsApp</span>
-            </div>
-          </div>
+        <StatCard
+          label="Orders"
+          value={ordersValue ?? DASH}
+          trend={ordersTrend}
+          tooltip={data?.orders?.confirmed !== undefined ? `${data.orders.confirmed} confirmed` : undefined}
+          color="blue"
+          icon={<Package className="w-3.5 h-3.5" />}
+          onClick={() => navigate("/orders")}
+        />
 
-          {/* Donut Legend Aligned with sibling footers */}
-          <div className="h-[46px] flex items-center justify-between pt-3 border-t border-border/40 text-12 shrink-0">
-            <div className="flex items-center gap-1.5 font-medium text-emerald-600 dark:text-emerald-400">
-              <ChannelIcon channel="whatsapp" size={13} />
-              <span>
-                WhatsApp: <strong className="text-text tabular-nums font-semibold">{waCount.toLocaleString("en-IN")}</strong> ({waPct}%)
-              </span>
-            </div>
-            <div className="flex items-center gap-1.5 font-medium text-pink-600 dark:text-pink-400">
-              <ChannelIcon channel="instagram" size={13} />
-              <span>
-                Instagram: <strong className="text-text tabular-nums font-semibold">{igCount.toLocaleString("en-IN")}</strong> ({igPct}%)
-              </span>
-            </div>
-          </div>
+        <StatCard
+          label="Messages"
+          value={messagesValue ?? DASH}
+          trend={messagesTrend}
+          color="teal"
+          icon={<Sparkles className="w-3.5 h-3.5" />}
+          onClick={() => navigate("/inbox")}
+        />
+
+        <StatCard
+          label="AI Reply Rate"
+          value={autoReplyRateValue ?? DASH}
+          suffix={autoReplyRateValue === null ? undefined : "%"}
+          trend={autoReplyTrend}
+          color="violet"
+          icon={<Bot className="w-3.5 h-3.5" />}
+        />
+
+        <StatCard
+          label="Avg Resolve"
+          value={avgResolveText ?? DASH}
+          trend={avgResolveTrend}
+          color="emerald"
+          icon={<Clock className="w-3.5 h-3.5" />}
+        />
+
+        <StatCard
+          label="Escalations"
+          value={openEscalationsCount ?? DASH}
+          color="danger"
+          pulsingDot={(openEscalationsCount ?? 0) > 0}
+          icon={<AlertTriangle className="w-3.5 h-3.5" />}
+          onClick={() => navigate("/escalations")}
+        />
+      </div>
+
+      {/* ─── Row 2: 3 Equal Cards (Chart · Channels · AI Health) ──────────── */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 [@media(min-width:1024px)_and_(min-height:760px)]:flex-[50] [@media(min-width:1024px)_and_(min-height:760px)]:min-h-0">
+        <div className="min-w-0 flex flex-col min-h-[300px] md:col-span-2 lg:col-span-1 [@media(min-width:1024px)_and_(min-height:760px)]:min-h-0">
+          <MainChartCard revenueData={revenueDailyData} messagesData={messagesDailyData} />
+        </div>
+
+        <div className="min-w-0 flex flex-col [@media(min-width:1024px)_and_(min-height:760px)]:min-h-0">
+          <ChannelsCard whatsapp={channelsWhatsapp} instagram={channelsInstagram} />
+        </div>
+
+        <div className="min-w-0 flex flex-col [@media(min-width:1024px)_and_(min-height:760px)]:min-h-0">
+          <AiHealthCard
+            autoReplyRate={autoReplyRateValue}
+            autoRepliesCount={autoRepliesCount}
+            escalationsCount={escalationsCount}
+            topReasons={escalationReasonsList}
+            openEscalationsCount={openEscalationsCount}
+            oldestWaitingText={oldestWaitingText}
+            avgResolveText={avgResolveText}
+            trendVsPrev={aiTrendText}
+            trendPositive={(aiTrendPct ?? 0) >= 0}
+          />
         </div>
       </div>
 
-      {/* ─── Section 3: Bottom 2×2 Grid ──────────────────────────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-stretch">
-        {/* Card 1: Revenue by Channel */}
-        <div className="p-5 rounded-xl border border-border bg-surface flex flex-col justify-between">
-          <div className="flex items-center justify-between mb-3.5">
-            <div>
-              <SectionHeading title="Revenue by channel" sample />
-              <p className="text-12 text-text-muted mt-0.5">Sales contribution by messaging channel</p>
-            </div>
-            <span className="text-12 text-text-muted font-medium bg-surface-muted px-2.5 py-1 rounded-full border border-border/50 shrink-0">
-              Proportion split
-            </span>
-          </div>
-
-          <div className="space-y-3.5 flex-1 flex flex-col justify-between">
-            {/* Top: Stat Cards Pair */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="p-3 rounded-xl border border-border/60 bg-surface-muted">
-                <div className="flex items-center justify-between gap-1 mb-1.5">
-                  <div className="flex items-center gap-1.5">
-                    <ChannelIcon channel="whatsapp" size={14} />
-                    <span className="text-12 text-text font-semibold">WhatsApp</span>
-                  </div>
-                  <span className="text-11 font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">
-                    {sample.channelSplit.whatsapp.percentage}%
-                  </span>
-                </div>
-                <p className="text-22 font-bold font-outfit text-text tabular-nums">
-                  ₹{sample.channelSplit.whatsapp.revenue.toLocaleString("en-IN")}
-                </p>
-                <p className="text-12 text-text-muted mt-1">
-                  {sample.channelSplit.whatsapp.orders} orders · ₹2,111 avg
-                </p>
-              </div>
-
-              <div className="p-3 rounded-xl border border-border/60 bg-surface-muted">
-                <div className="flex items-center justify-between gap-1 mb-1.5">
-                  <div className="flex items-center gap-1.5">
-                    <ChannelIcon channel="instagram" size={14} />
-                    <span className="text-12 text-text font-semibold">Instagram</span>
-                  </div>
-                  <span className="text-11 font-bold text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full">
-                    {sample.channelSplit.instagram.percentage}%
-                  </span>
-                </div>
-                <p className="text-22 font-bold font-outfit text-text tabular-nums">
-                  ₹{sample.channelSplit.instagram.revenue.toLocaleString("en-IN")}
-                </p>
-                <p className="text-12 text-text-muted mt-1">
-                  {sample.channelSplit.instagram.orders} orders · ₹2,100 avg
-                </p>
-              </div>
-            </div>
-
-            {/* Middle: Proportion Bar Graph */}
-            <div className="space-y-2 p-2.5 rounded-xl border border-border/40 bg-surface-muted/30">
-              <div className="flex justify-between text-12 font-medium">
-                <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-semibold">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500" /> WhatsApp ({sample.channelSplit.whatsapp.percentage}%)
-                </span>
-                <span className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400 font-semibold">
-                  <span className="w-2 h-2 rounded-full bg-amber-500" /> Instagram ({sample.channelSplit.instagram.percentage}%)
-                </span>
-              </div>
-              <div className="h-3 w-full bg-border/40 rounded-full overflow-hidden flex shadow-inner">
-                <div
-                  style={{ width: `${sample.channelSplit.whatsapp.percentage}%` }}
-                  className="bg-emerald-500 h-full rounded-l-full transition-all duration-500"
-                  title={`WhatsApp: ${sample.channelSplit.whatsapp.percentage}%`}
-                />
-                <div
-                  style={{ width: `${sample.channelSplit.instagram.percentage}%` }}
-                  className="bg-amber-500 h-full rounded-r-full transition-all duration-500"
-                  title={`Instagram: ${sample.channelSplit.instagram.percentage}%`}
-                />
-              </div>
-            </div>
-
-            {/* Bottom: Channel Orders Breakdown */}
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between text-12">
-                <p className="font-semibold text-text">
-                  Channel conversion details:
-                </p>
-                <span className="text-text-muted">Order distribution</span>
-              </div>
-              <div className="grid grid-cols-2 gap-2 text-12 font-medium">
-                <div className="flex items-center justify-between p-2 rounded-lg bg-surface-muted/60 border border-border/50">
-                  <span className="flex items-center gap-1.5 text-text truncate pr-1">
-                    <ChannelIcon channel="whatsapp" size={13} />
-                    <span className="truncate">WhatsApp Orders</span>
-                  </span>
-                  <span className="text-emerald-600 dark:text-emerald-400 font-bold tabular-nums shrink-0">
-                    {sample.channelSplit.whatsapp.orders} ({sample.channelSplit.whatsapp.percentage}%)
-                  </span>
-                </div>
-                <div className="flex items-center justify-between p-2 rounded-lg bg-surface-muted/60 border border-border/50">
-                  <span className="flex items-center gap-1.5 text-text truncate pr-1">
-                    <ChannelIcon channel="instagram" size={13} />
-                    <span className="truncate">Instagram Orders</span>
-                  </span>
-                  <span className="text-amber-600 dark:text-amber-400 font-bold tabular-nums shrink-0">
-                    {sample.channelSplit.instagram.orders} ({sample.channelSplit.instagram.percentage}%)
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Footer: Channel Insights */}
-            <div className="p-2.5 rounded-lg border border-border/40 bg-surface-muted/50 text-12 text-text-muted flex items-center justify-between">
-              <span className="inline-flex items-center gap-1.5 text-text font-medium">
-                <TrendingUp className="w-3.5 h-3.5 text-primary" /> Key Channel Trend:
-              </span>
-              <span className="truncate">WhatsApp leads repeat conversions (92%)</span>
-            </div>
-          </div>
+      {/* ─── Row 3: 2 Cards (64% Top Products, 36% Recent Activity) ─────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-[64fr_36fr] gap-4 [@media(min-width:1024px)_and_(min-height:760px)]:flex-[50] [@media(min-width:1024px)_and_(min-height:760px)]:min-h-0">
+        <div className="min-w-0 flex flex-col h-[400px] [@media(min-width:1024px)_and_(min-height:760px)]:h-auto [@media(min-width:1024px)_and_(min-height:760px)]:min-h-0">
+          <TopProductsCard products={topProductsList} />
         </div>
 
-        {/* Card 2: AI Performance */}
-        <div className="p-5 rounded-xl border border-border bg-surface flex flex-col justify-between">
-          <div className="flex items-center justify-between mb-3.5">
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-16 font-semibold font-outfit text-text">
-                  AI performance
-                </h2>
-                <SampleDataBadge />
-              </div>
-              <p className="text-12 text-text-muted mt-0.5">
-                Auto-replied vs escalated inbound inquiries
-              </p>
-            </div>
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-12 font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 shrink-0">
-              <Bot className="w-4 h-4" /> {effectiveAutoPct}% automation
-            </span>
-          </div>
-
-          <div className="space-y-3.5 flex-1 flex flex-col justify-between">
-            {/* Top: Stat Cards Pair matching Card 1 */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="p-3 rounded-xl border border-border/60 bg-surface-muted">
-                <div className="flex items-center justify-between gap-1 mb-1.5">
-                  <div className="flex items-center gap-1.5">
-                    <Bot className="w-3.5 h-3.5 text-emerald-500" />
-                    <span className="text-12 text-text font-semibold">Auto-replied</span>
-                  </div>
-                  <span className="text-11 font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">
-                    {effectiveAutoPct}%
-                  </span>
-                </div>
-                <p className="text-22 font-bold font-outfit text-text tabular-nums">
-                  {effectiveAutoReplies.toLocaleString("en-IN")}
-                </p>
-                <p className="text-12 text-text-muted mt-1">
-                  Resolved autonomously
-                </p>
-              </div>
-
-              <div className="p-3 rounded-xl border border-border/60 bg-surface-muted">
-                <div className="flex items-center justify-between gap-1 mb-1.5">
-                  <div className="flex items-center gap-1.5">
-                    <AlertTriangle className="w-3.5 h-3.5 text-rose-500" />
-                    <span className="text-12 text-text font-semibold">Escalated</span>
-                  </div>
-                  <span className="text-11 font-bold text-rose-600 dark:text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded-full">
-                    {effectiveEscPct}%
-                  </span>
-                </div>
-                <p className="text-22 font-bold font-outfit text-text tabular-nums">
-                  {effectiveEscalations.toLocaleString("en-IN")}
-                </p>
-                <p className="text-12 text-text-muted mt-1">
-                  Handed over to staff
-                </p>
-              </div>
-            </div>
-
-            {/* Middle: Proportion Bar Graph */}
-            <div className="space-y-2 p-2.5 rounded-xl border border-border/40 bg-surface-muted/30">
-              <div className="flex justify-between text-12 font-medium">
-                <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-semibold">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500" /> Auto-replied ({effectiveAutoPct}%)
-                </span>
-                <span className="flex items-center gap-1.5 text-rose-600 dark:text-rose-400 font-semibold">
-                  <span className="w-2 h-2 rounded-full bg-rose-500" /> Escalated ({effectiveEscPct}%)
-                </span>
-              </div>
-              <div className="h-3 w-full bg-border/40 rounded-full overflow-hidden flex shadow-inner">
-                <div
-                  style={{ width: `${Math.min(100, effectiveAutoPct)}%` }}
-                  className="bg-emerald-500 h-full rounded-l-full transition-all duration-500"
-                  title={`Auto-replied: ${effectiveAutoPct}%`}
-                />
-                <div
-                  style={{ width: `${Math.max(0, Math.min(100 - Math.min(100, effectiveAutoPct), effectiveEscPct))}%` }}
-                  className="bg-red-500 h-full rounded-r-full transition-all duration-500"
-                  title={`Escalated to human: ${effectiveEscPct}%`}
-                />
-              </div>
-            </div>
-
-            {/* Bottom: Escalation Reasons Breakdown */}
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between text-12">
-                <p className="font-semibold text-text">
-                  Escalation reasons breakdown:
-                </p>
-                <span className="text-text-muted">{effectiveReasons.length} categories</span>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                {effectiveReasons.map((r) => (
-                  <div
-                    key={r.reason}
-                    className="flex items-center justify-between p-2 rounded-lg bg-surface-muted/60 border border-border/50 text-12 font-medium"
-                    title={`${r.reason}: ${r.percentage}%`}
-                  >
-                    <span className="flex items-center gap-1.5 truncate pr-1">
-                      <span
-                        className="w-2 h-2 rounded-full shrink-0"
-                        style={{ backgroundColor: r.color }}
-                      />
-                      <span className="truncate text-text">{r.reason}</span>
-                    </span>
-                    <span className="text-text-muted tabular-nums shrink-0 font-semibold">
-                      {r.percentage}%
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Card 3: Top Products with inside scroll */}
-        <div className="p-5 rounded-xl border border-border bg-surface flex flex-col h-[360px]">
-          <div className="shrink-0 mb-3 flex items-center justify-between">
-            <div>
-              <SectionHeading title="Top products" sample />
-              <p className="text-12 text-text-muted">Ranked by revenue generation</p>
-            </div>
-            <button
-              onClick={() => navigate("/catalogue")}
-              className="text-12 font-medium text-primary-text hover:underline inline-flex items-center gap-1 cursor-pointer shrink-0"
-            >
-              Catalogue <ChevronRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
-
-          <div className="flex-1 min-h-0 overflow-y-auto pr-1 space-y-2 custom-scrollbar">
-            {sample.topProducts.map((p: TopProductMetric, idx: number) => (
-              <div
-                key={p.name}
-                className="p-2.5 rounded-lg border border-border/50 bg-surface-muted/50 hover:bg-surface-muted transition-colors flex items-center justify-between gap-3"
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <span className="text-12 font-bold font-outfit text-text-muted w-4 shrink-0">
-                    #{idx + 1}
-                  </span>
-                  <img
-                    src={p.image}
-                    alt={p.name}
-                    className="w-9 h-9 rounded-lg object-cover border border-border/60 shrink-0"
-                  />
-                  <div className="min-w-0">
-                    <p className="text-13 font-semibold text-text truncate">
-                      {p.name}
-                    </p>
-                    <p className="text-12 text-text-muted">
-                      {p.units} units · {p.leadTime} lead
-                    </p>
-                  </div>
-                </div>
-
-                <div className="text-right shrink-0">
-                  <p className="text-13 font-bold font-outfit text-text tabular-nums">
-                    ₹{p.revenue.toLocaleString("en-IN")}
-                  </p>
-                  <div className="w-16 h-1.5 bg-border rounded-full overflow-hidden mt-1 ml-auto">
-                    <div
-                      className="bg-primary h-full rounded-full"
-                      style={{ width: `${p.sharePercent * 2.5}%` }}
-                    />
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Card 4: Recent Activity with inside scroll */}
-        <div className="p-5 rounded-xl border border-border bg-surface flex flex-col h-[360px]">
-          <div className="shrink-0 mb-3 flex items-center justify-between">
-            <div>
-              <h2 className="text-16 font-semibold font-outfit text-text">
-                Recent activity
-              </h2>
-              <p className="text-12 text-text-muted">Latest actions by the AI and your team</p>
-            </div>
-            <button
-              onClick={() => navigate("/audit-log")}
-              className="text-12 font-medium text-primary-text hover:underline inline-flex items-center gap-1 cursor-pointer shrink-0"
-            >
-              View audit log <ArrowRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
-
-          <div className="flex-1 min-h-0 overflow-y-auto pr-1 space-y-1.5 custom-scrollbar">
-            {activity.isPending ? (
-              Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} className="flex items-center gap-3 p-2">
-                  <Skeleton className="h-8 w-8 rounded-lg shrink-0" />
-                  <div className="flex-1 space-y-1.5 min-w-0">
-                    <Skeleton className="h-3.5 w-2/3" />
-                    <Skeleton className="h-2.5 w-1/2" />
-                  </div>
-                </div>
-              ))
-            ) : activity.isError ? (
-              <p className="text-12 text-danger">Couldn't load recent activity.</p>
-            ) : displayActivities.length === 0 ? (
-              <p className="text-12 text-text-muted">No activity yet.</p>
-            ) : (
-              displayActivities.map((item) => (
-                <div
-                  key={item.id}
-                  onClick={item.onClick}
-                  role={item.onClick ? "button" : undefined}
-                  tabIndex={item.onClick ? 0 : undefined}
-                  className={`flex items-center gap-3 p-2 rounded-lg border border-transparent hover:border-border/60 hover:bg-surface-muted transition-colors ${
-                    item.onClick ? "cursor-pointer" : ""
-                  }`}
-                >
-                  <div className="w-8 h-8 rounded-lg bg-surface-muted border border-border/60 flex items-center justify-center shrink-0">
-                    {item.icon}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-13 font-medium text-text leading-snug truncate">{item.title}</p>
-                    {item.description && (
-                      <p className="text-12 text-text-muted truncate mt-0.5">{item.description}</p>
-                    )}
-                  </div>
-                  <span className="text-11 text-text-muted shrink-0 tabular-nums self-center">
-                    {item.time}
-                  </span>
-                </div>
-              ))
-            )}
-          </div>
+        <div className="min-w-0 flex flex-col h-[400px] lg:h-auto lg:[contain:size] [@media(min-width:1024px)_and_(min-height:760px)]:min-h-0">
+          <RecentActivityCard />
         </div>
       </div>
     </div>

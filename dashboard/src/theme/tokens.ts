@@ -1,58 +1,9 @@
 /**
  * Centralized Design System Tokens for Saba Art
  * 
- * Provides unified theme colors, typography scales, font sizes, line heights,
- * and chart palettes across the entire application for both TypeScript and CSS.
+ * Provides unified theme colors, brand channel colors and chart palettes for
+ * TypeScript consumers (typography lives in index.css).
  */
-
-export const fontFamilies = {
-  sans: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
-  display: "'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
-  outfit: "'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
-  mono: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
-} as const;
-
-export const fontWeights = {
-  normal: 400,
-  medium: 500,
-  semibold: 600,
-  bold: 700,
-  extrabold: 800,
-} as const;
-
-/**
- * Centralized Font Size Scale
- * Maps both semantic names (xs, sm, base, lg, etc.) and numeric pixel equivalents (10, 11, 12, 13, etc.)
- */
-export const fontSizes = {
-  // Numeric tokens (used in Tailwind classes text-10, text-11, etc.)
-  "10": { size: "0.625rem", lineHeight: "0.875rem", px: 10 },
-  "11": { size: "0.6875rem", lineHeight: "1rem", px: 11 },
-  "12": { size: "0.75rem", lineHeight: "1rem", px: 12 },
-  "13": { size: "0.8125rem", lineHeight: "1.125rem", px: 13 },
-  "14": { size: "0.875rem", lineHeight: "1.25rem", px: 14 },
-  "15": { size: "0.9375rem", lineHeight: "1.375rem", px: 15 },
-  "16": { size: "1rem", lineHeight: "1.5rem", px: 16 },
-  "18": { size: "1.125rem", lineHeight: "1.75rem", px: 18 },
-  "20": { size: "1.25rem", lineHeight: "1.75rem", px: 20 },
-  "24": { size: "1.5rem", lineHeight: "2rem", px: 24 },
-  "28": { size: "1.75rem", lineHeight: "2.25rem", px: 28 },
-  "32": { size: "2rem", lineHeight: "2.5rem", px: 32 },
-  "36": { size: "2.25rem", lineHeight: "2.75rem", px: 36 },
-
-  // Semantic aliases
-  micro: { size: "0.625rem", lineHeight: "0.875rem", px: 10 },
-  badge: { size: "0.6875rem", lineHeight: "1rem", px: 11 },
-  xs: { size: "0.75rem", lineHeight: "1rem", px: 12 },
-  bodySmall: { size: "0.8125rem", lineHeight: "1.125rem", px: 13 },
-  sm: { size: "0.875rem", lineHeight: "1.25rem", px: 14 },
-  base: { size: "1rem", lineHeight: "1.5rem", px: 16 },
-  lg: { size: "1.125rem", lineHeight: "1.75rem", px: 18 },
-  xl: { size: "1.25rem", lineHeight: "1.75rem", px: 20 },
-  "2xl": { size: "1.5rem", lineHeight: "2rem", px: 24 },
-  "3xl": { size: "1.75rem", lineHeight: "2.25rem", px: 28 },
-  "4xl": { size: "2rem", lineHeight: "2.5rem", px: 32 },
-} as const;
 
 export const themeColors = {
   light: {

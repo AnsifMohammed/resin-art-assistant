@@ -475,22 +475,25 @@ function TemplateEditor({
           <label htmlFor="tmpl-category" className={labelClass}>
             Category
           </label>
-          <select
-            id="tmpl-category"
-            value={category}
-            onChange={(e) => {
-              const v = e.target.value;
-              if (isTemplateCategory(v)) setCategory(v);
-              clearError("category");
-            }}
-            className={`${inputClass(Boolean(errors.category))} text-12 font-medium cursor-pointer`}
-          >
-            {TEMPLATE_CATEGORIES.map((c) => (
-              <option key={c} value={c}>
-                {templateCategoryLabels[c]}
-              </option>
-            ))}
-          </select>
+          <div className="relative">
+            <select
+              id="tmpl-category"
+              value={category}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (isTemplateCategory(v)) setCategory(v);
+                clearError("category");
+              }}
+              className={`${inputClass(Boolean(errors.category))} appearance-none pr-8 text-12 font-medium cursor-pointer`}
+            >
+              {TEMPLATE_CATEGORIES.map((c) => (
+                <option key={c} value={c}>
+                  {templateCategoryLabels[c]}
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted" aria-hidden />
+          </div>
           <FieldError message={errors.category} />
         </div>
 
@@ -498,26 +501,29 @@ function TemplateEditor({
           <label htmlFor="tmpl-channel" className={labelClass}>
             Channel
           </label>
-          <select
-            id="tmpl-channel"
-            value={channel}
-            onChange={(e) => {
-              const v = e.target.value;
-              if (isTemplateChannel(v)) {
-                setChannel(v);
-                if (v !== "both") setPreviewChannel(v);
-              }
-              clearError("channel");
-              clearError("body");
-            }}
-            className={`${inputClass(Boolean(errors.channel))} text-12 font-medium cursor-pointer`}
-          >
-            {TEMPLATE_CHANNELS.map((c) => (
-              <option key={c} value={c}>
-                {templateChannelLabels[c]}
-              </option>
-            ))}
-          </select>
+          <div className="relative">
+            <select
+              id="tmpl-channel"
+              value={channel}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (isTemplateChannel(v)) {
+                  setChannel(v);
+                  if (v !== "both") setPreviewChannel(v);
+                }
+                clearError("channel");
+                clearError("body");
+              }}
+              className={`${inputClass(Boolean(errors.channel))} appearance-none pr-8 text-12 font-medium cursor-pointer`}
+            >
+              {TEMPLATE_CHANNELS.map((c) => (
+                <option key={c} value={c}>
+                  {templateChannelLabels[c]}
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted" aria-hidden />
+          </div>
           <FieldError message={errors.channel} />
         </div>
       </div>
@@ -651,22 +657,25 @@ function TemplateEditor({
               <label htmlFor="tmpl-meta-status" className={labelClass}>
                 Approval status
               </label>
-              <select
-                id="tmpl-meta-status"
-                value={metaStatus}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  if (isMetaStatus(v)) setMetaStatus(v);
-                  clearError("metaStatus");
-                }}
-                className={`${inputClass(Boolean(errors.metaStatus))} text-12 font-medium cursor-pointer`}
-              >
-                {META_TEMPLATE_STATUSES.map((s) => (
-                  <option key={s} value={s}>
-                    {metaStatusLabels[s]}
-                  </option>
-                ))}
-              </select>
+              <div className="relative">
+                <select
+                  id="tmpl-meta-status"
+                  value={metaStatus}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (isMetaStatus(v)) setMetaStatus(v);
+                    clearError("metaStatus");
+                  }}
+                  className={`${inputClass(Boolean(errors.metaStatus))} appearance-none pr-8 text-12 font-medium cursor-pointer`}
+                >
+                  {META_TEMPLATE_STATUSES.map((s) => (
+                    <option key={s} value={s}>
+                      {metaStatusLabels[s]}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted" aria-hidden />
+              </div>
               <FieldError message={errors.metaStatus} />
             </div>
           </div>

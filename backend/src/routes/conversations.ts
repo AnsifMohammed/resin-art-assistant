@@ -12,12 +12,15 @@ import {
   customers,
   escalations,
   messages,
+  orderItems,
+  orders,
   users,
 } from "../db/schema.ts";
 import { AppError } from "../lib/errors.ts";
 import { authenticate } from "../middleware/authenticate.ts";
 import { requireAdmin } from "../middleware/requireAdmin.ts";
 import { requireStaffOrAdmin } from "../middleware/requireStaffOrAdmin.ts";
+import { staffCanAccessConversation } from "../realtime/access.ts";
 import { emitConversationUpdated } from "../realtime/events.ts";
 
 const conversationsQuerySchema = z.object({
@@ -405,4 +408,105 @@ export const conversationRoutes: FastifyPluginAsync = async (app: FastifyInstanc
       return changeState(request.user.sub, conv, ["paused"], "ai_active");
     },
   );
+
+  // GET /conversations/:id/orders - Customer orders for this conversation (admin + assigned staff)
+  app.get<{ Params: { id: string } }>(
+    "/conversations/:id/orders",
+    { preHandler: [authenticate, requireStaffOrAdmin] },
+    async (request) => {
+      const { id } = request.params;
+      const businessId = request.user.businessId;
+
+      const [conv] = await db
+        .select({
+          id: conversations.id,
+          customerId: conversations.customerId,
+          businessId: conversations.businessId,
+        })
+        .from(conversations)
+        .where(
+          and(
+            eq(conversations.id, id),
+            eq(conversations.businessId, businessId),
+          ),
+        );
+
+      if (!conv) {
+        throw new AppError(404, "Conversation not found", "NOT_FOUND");
+      }
+
+      if (request.user.role === "staff") {
+        const canAccess = await staffCanAccessConversation(
+          businessId,
+          request.user.sub,
+          id,
+        );
+        if (!canAccess) {
+          throw new AppError(403, "Not assigned to you", "FORBIDDEN");
+        }
+      }
+
+      if (!conv.customerId) {
+        return { orders: [] };
+      }
+
+      const customerOrders = await db
+        .select({
+          id: orders.id,
+          orderNo: orders.orderNo,
+          status: orders.status,
+          totalAmount: orders.totalAmount,
+          createdAt: orders.createdAt,
+          expectedDeliveryDate: orders.expectedDeliveryDate,
+        })
+        .from(orders)
+        .where(
+          and(
+            eq(orders.businessId, businessId),
+            eq(orders.customerId, conv.customerId),
+            eq(orders.isDeleted, false),
+          ),
+        )
+        .orderBy(desc(orders.createdAt));
+
+      if (customerOrders.length === 0) {
+        return { orders: [] };
+      }
+
+      const orderIds = customerOrders.map((o) => o.id);
+      const items = await db
+        .select({
+          orderId: orderItems.orderId,
+          productName: orderItems.productName,
+          quantity: orderItems.quantity,
+        })
+        .from(orderItems)
+        .where(
+          and(
+            inArray(orderItems.orderId, orderIds),
+            eq(orderItems.isDeleted, false),
+          ),
+        );
+
+      const itemsByOrderId = new Map<string, Array<{ productName: string; quantity: number }>>();
+      for (const item of items) {
+        const list = itemsByOrderId.get(item.orderId) ?? [];
+        list.push({ productName: item.productName, quantity: item.quantity });
+        itemsByOrderId.set(item.orderId, list);
+      }
+
+      const formattedOrders = customerOrders.map((o) => ({
+        id: o.id,
+        orderNo: o.orderNo,
+        status: o.status,
+        totalAmount: Number(o.totalAmount),
+        createdAt: o.createdAt,
+        expectedDeliveryDate: o.expectedDeliveryDate,
+        items: itemsByOrderId.get(o.id) ?? [],
+      }));
+
+      return { orders: formattedOrders };
+    },
+  );
 };
+

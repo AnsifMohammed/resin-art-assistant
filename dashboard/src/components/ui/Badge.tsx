@@ -3,29 +3,28 @@ import { cn } from "../../lib/cn.ts";
 import { humanize } from "../../lib/format.ts";
 import type { ConvState, ConvTag, Role } from "../../types/index.ts";
 
-/** Exact colour maps from CLAUDE.md → "Dashboard UI patterns". */
-export const stateColors: Record<ConvState, string> = {
-  ai_active: "bg-emerald-100 text-emerald-800",
-  escalated: "bg-red-100 text-red-800",
-  owner_handling: "bg-amber-100 text-amber-800",
-  paused: "bg-gray-100 text-gray-500",
+/** Theme-aware soft tint colours with subtle borders. */
+const stateColors: Record<ConvState, string> = {
+  ai_active: "bg-violet-500/10 text-violet-700 dark:text-violet-300 border-violet-500/20",
+  escalated: "bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-500/20",
+  owner_handling: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20",
+  paused: "bg-surface-muted text-text-muted border-border/70",
 };
 
-export const roleColors: Record<Role, string> = {
-  admin: "bg-emerald-100 text-emerald-800",
-  staff: "bg-violet-100 text-violet-800",
+const roleColors: Record<Role, string> = {
+  admin: "bg-primary-soft text-primary-text border-primary/25",
+  staff: "bg-teal-500/10 text-teal-700 dark:text-teal-300 border-teal-500/20",
 };
 
-/** Not specified in CLAUDE.md; chosen to stay distinct from the state colours. */
-export const tagColors: Record<ConvTag, string> = {
-  new_lead: "bg-sky-100 text-sky-800",
-  custom_order: "bg-fuchsia-100 text-fuchsia-800",
-  payment_pending: "bg-orange-100 text-orange-800",
-  order_confirmed: "bg-teal-100 text-teal-800",
-  follow_up: "bg-indigo-100 text-indigo-800",
+const tagColors: Record<ConvTag, string> = {
+  new_lead: "bg-sky-500/10 text-sky-700 dark:text-sky-300 border-sky-500/20",
+  custom_order: "bg-fuchsia-500/10 text-fuchsia-700 dark:text-fuchsia-300 border-fuchsia-500/20",
+  payment_pending: "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/20",
+  order_confirmed: "bg-teal-500/10 text-teal-700 dark:text-teal-300 border-teal-500/20",
+  follow_up: "bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border-indigo-500/20",
 };
 
-export const stateLabels: Record<ConvState, string> = {
+const stateLabels: Record<ConvState, string> = {
   ai_active: "AI active",
   escalated: "Escalated",
   owner_handling: "Owner handling",
@@ -36,8 +35,8 @@ export function Badge({ className, ...props }: HTMLAttributes<HTMLSpanElement>) 
   return (
     <span
       className={cn(
-        "inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium",
-        "bg-gray-100 text-gray-700",
+        "inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border px-1.5 py-0.5 text-10 font-medium transition-colors",
+        "border-border/70 bg-surface-muted text-text-muted",
         className,
       )}
       {...props}

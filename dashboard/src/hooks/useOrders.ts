@@ -2,7 +2,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   createOrder,
   deleteOrder,
-  getOrder,
   listOrders,
   updateOrder,
   updateOrderStatus,
@@ -16,18 +15,12 @@ import type {
   UpdateOrderStatusRequest,
 } from "../types/index.ts";
 
-export function useOrders(params?: ListOrdersQuery) {
+export function useOrders(params?: ListOrdersQuery, options: { enabled?: boolean } = {}) {
+  const { enabled = true } = options;
   return useQuery({
     queryKey: queryKeys.orders.list(params),
     queryFn: ({ signal }) => listOrders(params, signal),
-  });
-}
-
-export function useOrder(id: string) {
-  return useQuery({
-    queryKey: queryKeys.orders.detail(id),
-    queryFn: ({ signal }) => getOrder(id, signal),
-    enabled: Boolean(id),
+    enabled,
   });
 }
 

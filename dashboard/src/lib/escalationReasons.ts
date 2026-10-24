@@ -16,20 +16,20 @@ export const escalationReasonLabels: Record<EscalationReason, string> = {
   manual: "Manual",
 };
 
-/** Badge colours per reason. */
+/** Badge colours per reason with theme-aware soft tints and subtle borders. */
 export const escalationReasonColors: Record<EscalationReason, string> = {
-  intent_complaint: "bg-red-100 text-red-800",
-  intent_refund: "bg-rose-100 text-rose-800",
-  intent_unknown: "bg-slate-100 text-slate-700",
-  intent_off_topic: "bg-zinc-100 text-zinc-700",
-  intent_payment: "bg-lime-100 text-lime-800",
-  missing_facts: "bg-amber-100 text-amber-800",
-  always_escalate_phrase: "bg-orange-100 text-orange-800",
-  payment_claim: "bg-yellow-100 text-yellow-800",
-  unapproved_intent: "bg-purple-100 text-purple-800",
-  window_closed: "bg-cyan-100 text-cyan-800",
-  parse_error: "bg-gray-200 text-gray-700",
-  manual: "bg-blue-100 text-blue-800",
+  intent_complaint: "bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-500/20",
+  intent_refund: "bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-500/20",
+  intent_unknown: "bg-slate-500/10 text-slate-700 dark:text-slate-300 border-slate-500/20",
+  intent_off_topic: "bg-zinc-500/10 text-zinc-700 dark:text-zinc-300 border-zinc-500/20",
+  intent_payment: "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/20",
+  missing_facts: "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/20",
+  always_escalate_phrase: "bg-orange-500/10 text-orange-700 dark:text-orange-300 border-orange-500/20",
+  payment_claim: "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/20",
+  unapproved_intent: "bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-500/20",
+  window_closed: "bg-sky-500/10 text-sky-700 dark:text-sky-300 border-sky-500/20",
+  parse_error: "bg-surface-muted text-text-muted border-border/70",
+  manual: "bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/20",
 };
 
 const isKnownReason = (reason: string): reason is EscalationReason => reason in escalationReasonLabels;
@@ -41,7 +41,7 @@ export function escalationReasonLabel(reason: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-/** Badge colour for any reason string (neutral grey for unknown values). */
+/** Badge colour for any reason string (neutral surface for unknown values). */
 export function escalationReasonColor(reason: string): string {
-  return isKnownReason(reason) ? escalationReasonColors[reason] : "bg-gray-100 text-gray-700";
+  return isKnownReason(reason) ? escalationReasonColors[reason] : "bg-surface-muted text-text-muted border-border/70";
 }

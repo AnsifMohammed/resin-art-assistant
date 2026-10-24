@@ -8,6 +8,7 @@ import {
 } from "@tanstack/react-query";
 import {
   getConversation,
+  getConversationOrders,
   listConversations,
   markConversationRead,
   pauseConversation,
@@ -80,6 +81,16 @@ export function useConversation(id: string | undefined) {
     queryFn: ({ signal }) => getConversation(id as string, signal),
     enabled: Boolean(id),
     select: (res) => res.conversation,
+  });
+}
+
+/** Admin or assigned staff: GET /conversations/:id/orders */
+export function useConversationOrders(conversationId: string | null | undefined) {
+  return useQuery({
+    queryKey: queryKeys.conversations.orders(conversationId ?? ""),
+    queryFn: ({ signal }) => getConversationOrders(conversationId as string, signal),
+    select: (res) => res.orders,
+    enabled: Boolean(conversationId),
   });
 }
 

@@ -39,7 +39,7 @@ function connectionOptions() {
     password: decodeURIComponent(parsed.password),
     database: decodeURIComponent(parsed.pathname.slice(1)),
     ssl,
-    max: 5,
+    max: config.QUEUE_POOL_MAX,
   };
 }
 
