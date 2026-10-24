@@ -12,6 +12,7 @@ import {
   Moon,
   Sun,
   Monitor,
+  ChevronDown,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useTheme } from "../context/ThemeContext.tsx";
@@ -400,29 +401,35 @@ export default function Settings() {
                   <label className="block text-12 font-semibold uppercase tracking-wider text-text-muted mb-1.5">
                     Expiry Alert Threshold
                   </label>
-                  <select
-                    value={windowThreshold}
-                    onChange={(e) => setWindowThreshold(e.target.value)}
-                    className="w-full p-2.5 rounded-xl border border-border bg-surface-muted text-13 text-text font-medium cursor-pointer"
-                  >
-                    <option value="1h">1 hour remaining (Urgent)</option>
-                    <option value="2h">2 hours remaining (Standard)</option>
-                    <option value="4h">4 hours remaining (Early warning)</option>
-                  </select>
+                  <div className="relative">
+                    <select
+                      value={windowThreshold}
+                      onChange={(e) => setWindowThreshold(e.target.value)}
+                      className="w-full pl-3 pr-8 py-2.5 appearance-none rounded-xl border border-border bg-surface-muted text-13 text-text font-medium cursor-pointer focus:outline-none focus:ring-1 focus:ring-primary"
+                    >
+                      <option value="1h">1 hour remaining (Urgent)</option>
+                      <option value="2h">2 hours remaining (Standard)</option>
+                      <option value="4h">4 hours remaining (Early warning)</option>
+                    </select>
+                    <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" aria-hidden />
+                  </div>
                 </div>
 
                 <div>
                   <label className="block text-12 font-semibold uppercase tracking-wider text-text-muted mb-1.5">
                     Alert Destination
                   </label>
-                  <select
-                    value={alertTarget}
-                    onChange={(e) => setAlertTarget(e.target.value)}
-                    className="w-full p-2.5 rounded-xl border border-border bg-surface-muted text-13 text-text font-medium cursor-pointer"
-                  >
-                    <option value="Admin WhatsApp">Asha WhatsApp (+91 94421 00192)</option>
-                    <option value="Push">Browser & Device Push Notification</option>
-                  </select>
+                  <div className="relative">
+                    <select
+                      value={alertTarget}
+                      onChange={(e) => setAlertTarget(e.target.value)}
+                      className="w-full pl-3 pr-8 py-2.5 appearance-none rounded-xl border border-border bg-surface-muted text-13 text-text font-medium cursor-pointer focus:outline-none focus:ring-1 focus:ring-primary"
+                    >
+                      <option value="Admin WhatsApp">Asha WhatsApp (+91 94421 00192)</option>
+                      <option value="Push">Browser & Device Push Notification</option>
+                    </select>
+                    <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" aria-hidden />
+                  </div>
                 </div>
               </div>
             </div>

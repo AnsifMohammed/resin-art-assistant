@@ -1,5 +1,5 @@
 import type { FastifyInstance, FastifyPluginAsync } from "fastify";
-import { and, asc, desc, eq, isNotNull, isNull, or } from "drizzle-orm";
+import { and, asc, desc, eq, isNotNull, isNull, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../db/index.ts";
 import {
@@ -57,9 +57,27 @@ export const escalationRoutes: FastifyPluginAsync = async (app: FastifyInstance)
         );
       }
 
+      // Latest message per conversation, fetched in the same query (no per-row queries).
+      const lastMessage = db
+        .select({
+          content: messages.content,
+          senderType: messages.senderType,
+          createdAt: messages.createdAt,
+        })
+        .from(messages)
+        .where(eq(messages.conversationId, conversations.id))
+        .orderBy(desc(messages.createdAt))
+        .limit(1)
+        .as("last_message");
+
       // Sort: oldest open first (most urgent)
       const rows = await db
         .select({
+          lastMessage: {
+            content: lastMessage.content,
+            senderType: lastMessage.senderType,
+            createdAt: lastMessage.createdAt,
+          },
           escalation: escalations,
           conversation: conversations,
           customer: customers,
@@ -74,42 +92,31 @@ export const escalationRoutes: FastifyPluginAsync = async (app: FastifyInstance)
         .innerJoin(customers, eq(conversations.customerId, customers.id))
         .leftJoin(channels, eq(conversations.channelId, channels.id))
         .leftJoin(users, eq(escalations.assignedToUserId, users.id))
+        .leftJoinLateral(lastMessage, sql`true`)
         .where(whereClause)
         .orderBy(asc(escalations.createdAt));
 
-      const enriched = await Promise.all(
-        rows.map(async (row) => {
-          const [lastMsg] = await db
-            .select({
-              content: messages.content,
-              senderType: messages.senderType,
-              createdAt: messages.createdAt,
-            })
-            .from(messages)
-            .where(eq(messages.conversationId, row.conversation.id))
-            .orderBy(desc(messages.createdAt))
-            .limit(1);
-
-          return {
-            ...row.escalation,
-            assignedTo: row.assignedTo?.id ? row.assignedTo : null,
-            conversation: {
-              id: row.conversation.id,
-              state: row.conversation.state,
-              tag: row.conversation.tag,
-              windowClosesAt: row.conversation.windowClosesAt,
-              lastCustomerMessageAt: row.conversation.lastCustomerMessageAt,
-              channelType: (row.channel?.type || "whatsapp") as "instagram" | "whatsapp",
-              customer: {
-                id: row.customer.id,
-                name: row.customer.name,
-                handleOrPhone: row.customer.handleOrPhone,
-              },
-              lastMessage: lastMsg || null,
+      const enriched = rows.map((row) => {
+        const lastMsg = row.lastMessage?.createdAt ? row.lastMessage : null;
+        return {
+          ...row.escalation,
+          assignedTo: row.assignedTo?.id ? row.assignedTo : null,
+          conversation: {
+            id: row.conversation.id,
+            state: row.conversation.state,
+            tag: row.conversation.tag,
+            windowClosesAt: row.conversation.windowClosesAt,
+            lastCustomerMessageAt: row.conversation.lastCustomerMessageAt,
+            channelType: (row.channel?.type || "whatsapp") as "instagram" | "whatsapp",
+            customer: {
+              id: row.customer.id,
+              name: row.customer.name,
+              handleOrPhone: row.customer.handleOrPhone,
             },
-          };
-        }),
-      );
+            lastMessage: lastMsg,
+          },
+        };
+      });
 
       return { escalations: enriched };
     },

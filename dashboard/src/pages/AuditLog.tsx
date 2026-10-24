@@ -258,39 +258,45 @@ export default function AuditLog() {
         </div>
 
         {/* Actor Filter */}
-        <select
-          value={actorFilter}
-          aria-label="Filter by actor"
-          onChange={(e) => setFilter("actorId", e.target.value)}
-          className="bg-surface-muted border border-border text-text text-sm rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary/40 cursor-pointer"
-        >
-          <option value="">All actors</option>
-          {actorOptions.map((opt) => (
-            <option key={opt.id} value={opt.id}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
+        <div className="relative inline-flex items-center">
+          <select
+            value={actorFilter}
+            aria-label="Filter by actor"
+            onChange={(e) => setFilter("actorId", e.target.value)}
+            className="h-8 pl-3 pr-8 appearance-none bg-surface-muted border border-border text-text text-12 font-medium rounded-lg focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
+          >
+            <option value="">All actors</option>
+            {actorOptions.map((opt) => (
+              <option key={opt.id} value={opt.id}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+          <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted" aria-hidden />
+        </div>
 
         {/* Action Filter */}
-        <select
-          value={actionFilter}
-          aria-label="Filter by action"
-          onChange={(e) => setFilter("action", e.target.value)}
-          className="bg-surface-muted border border-border text-text text-sm rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary/40 cursor-pointer"
-        >
-          <option value="">All actions</option>
-          <option value="reply_sent">Reply sent</option>
-          <option value="auto_reply_sent">Auto-reply sent</option>
-          <option value="escalation_created">Escalation created</option>
-          <option value="escalation_assigned">Escalation assigned</option>
-          <option value="conversation_resolved">Resolved</option>
-          <option value="user_created">Staff added</option>
-          <option value="settings_changed">Settings changed</option>
-          <option value="knowledge_base_updated">Knowledge base updated</option>
-          <option value="automation_paused">Automation paused</option>
-          <option value="automation_resumed">Automation resumed</option>
-        </select>
+        <div className="relative inline-flex items-center">
+          <select
+            value={actionFilter}
+            aria-label="Filter by action"
+            onChange={(e) => setFilter("action", e.target.value)}
+            className="h-8 pl-3 pr-8 appearance-none bg-surface-muted border border-border text-text text-12 font-medium rounded-lg focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
+          >
+            <option value="">All actions</option>
+            <option value="reply_sent">Reply sent</option>
+            <option value="auto_reply_sent">Auto-reply sent</option>
+            <option value="escalation_created">Escalation created</option>
+            <option value="escalation_assigned">Escalation assigned</option>
+            <option value="conversation_resolved">Resolved</option>
+            <option value="user_created">Staff added</option>
+            <option value="settings_changed">Settings changed</option>
+            <option value="knowledge_base_updated">Knowledge base updated</option>
+            <option value="automation_paused">Automation paused</option>
+            <option value="automation_resumed">Automation resumed</option>
+          </select>
+          <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted" aria-hidden />
+        </div>
 
         {(actorFilter || actionFilter) && (
           <button

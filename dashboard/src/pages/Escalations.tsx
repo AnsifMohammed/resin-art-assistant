@@ -10,6 +10,7 @@ import {
   Table as TableIcon,
   CheckCircle2,
   Loader2,
+  ChevronDown,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "../context/AuthContext.tsx";
@@ -515,21 +516,25 @@ export default function Escalations() {
           </button>
         </div>
 
-        <label className="flex items-center gap-2">
+        <div className="flex items-center gap-2">
           <span className="text-12 text-text-muted font-medium">Reason:</span>
-          <select
-            value={reasonFilter}
-            onChange={(ev) => setReasonFilter(ev.target.value)}
-            className="px-2.5 py-1.5 rounded-lg border border-border bg-surface-muted text-12 text-text font-medium focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
-          >
-            <option value="all">All reasons</option>
-            {reasonOptions.map((r) => (
-              <option key={r} value={r}>
-                {escalationReasonLabel(r)}
-              </option>
-            ))}
-          </select>
-        </label>
+          <div className="relative inline-flex items-center">
+            <select
+              value={reasonFilter}
+              aria-label="Filter by escalation reason"
+              onChange={(ev) => setReasonFilter(ev.target.value)}
+              className="h-8 pl-2.5 pr-7.5 appearance-none rounded-lg border border-border bg-surface-muted text-12 text-text font-medium focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
+            >
+              <option value="all">All reasons</option>
+              {reasonOptions.map((r) => (
+                <option key={r} value={r}>
+                  {escalationReasonLabel(r)}
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted" aria-hidden />
+          </div>
+        </div>
       </div>
 
       {/* ─── Content: Cards vs Table ─────────────────────────────────────────── */}

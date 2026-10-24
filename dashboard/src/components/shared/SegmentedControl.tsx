@@ -23,14 +23,14 @@ export function SegmentedControl<T extends string>({
   size = "md",
   disabled = false,
 }: SegmentedControlProps<T>) {
-  const sizeClasses = size === "sm" ? "p-0.5 text-xs" : "p-1 text-xs";
-  const itemPadding = size === "sm" ? "px-2 sm:px-2.5 py-1" : "px-2.5 sm:px-3 py-1.5";
+  const sizeClasses = size === "sm" ? "p-0.5 h-8 text-11" : "p-1 text-xs";
+  const itemPadding = size === "sm" ? "px-2 sm:px-2.5 h-[26px] text-11" : "px-2.5 sm:px-3 py-1.5";
 
   return (
     <div
       role="radiogroup"
       aria-disabled={disabled || undefined}
-      className={`inline-flex items-center rounded-lg bg-surface-muted border border-border ${sizeClasses} ${disabled ? "opacity-50 cursor-not-allowed" : ""} ${className}`}
+      className={`inline-flex items-center rounded-lg bg-surface-muted/90 border border-border/80 shadow-2xs ${sizeClasses} ${disabled ? "opacity-50 cursor-not-allowed" : ""} ${className}`}
     >
       {options.map((opt) => {
         const isSelected = opt.value === value;
@@ -45,10 +45,10 @@ export function SegmentedControl<T extends string>({
             title={optTitle}
             disabled={disabled}
             onClick={() => onChange(opt.value)}
-            className={`relative flex items-center justify-center font-medium rounded-md transition-all duration-150 select-none ${itemPadding} ${
+            className={`relative flex items-center justify-center font-medium rounded-[6px] transition-all duration-150 select-none ${itemPadding} ${
               isSelected
-                ? "bg-surface text-text shadow-xs font-semibold"
-                : "text-text-muted hover:text-text"
+                ? "bg-surface text-text shadow-xs font-semibold border border-border/50"
+                : "text-text-muted hover:text-text hover:bg-surface/40"
             } ${disabled ? "pointer-events-none" : ""}`}
           >
             {opt.label}

@@ -95,7 +95,7 @@ function ConnectionDot() {
 function ChannelFilterControl({ pathname }: { pathname: string }) {
   const [params, setParams] = useSearchParams();
 
-  if (pathname === "/inbox" || pathname === "/analytics") {
+  if (pathname === "/inbox") {
     const raw = params.get("channel");
     const value: ChannelFilter = raw === "whatsapp" || raw === "instagram" ? raw : "all";
     return (
@@ -378,13 +378,13 @@ export function TopBar({ onOpenSearch, automation }: TopBarProps) {
         <h1 className="font-display font-bold text-sm sm:text-base md:text-lg text-text truncate">{pageMeta.title}</h1>
       </div>
 
-      {/* Centre: Channel Filter Segmented Control (responsive on both mobile and desktop) */}
-      <div className="flex items-center mx-1 sm:mx-2 shrink-0">
-        <ChannelFilterControl pathname={currentPath} />
-      </div>
-
       {/* Right: Actions */}
-      <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+      <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+        {/* Channel Filter (on /inbox or /analytics, neatly grouped with controls) */}
+        <div className="hidden sm:flex items-center">
+          <ChannelFilterControl pathname={currentPath} />
+        </div>
+
         {/* ⌘K Search Button */}
         <button
           type="button"
@@ -393,8 +393,8 @@ export function TopBar({ onOpenSearch, automation }: TopBarProps) {
           title="Search or jump to page (⌘K)"
         >
           <Search size={14} className="shrink-0" />
-          <span className="hidden xl:inline">Search</span>
-          <kbd className="hidden xl:inline text-[10px] font-mono text-text-muted bg-surface px-1 py-0.5 rounded border border-border">
+          <span className="hidden sm:inline">Search</span>
+          <kbd className="hidden md:inline text-[10px] font-mono text-text-muted bg-surface px-1 py-0.5 rounded border border-border">
             ⌘K
           </kbd>
         </button>

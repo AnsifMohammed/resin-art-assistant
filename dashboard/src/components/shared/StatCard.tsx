@@ -1,5 +1,4 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { ArrowUpRight, ArrowDownRight } from "lucide-react";
 import { themeColors } from "../../theme/index.ts";
 
 export interface StatCardProps {
@@ -12,15 +11,17 @@ export interface StatCardProps {
     isPositive: boolean;
     label?: string;
   };
-  sparkline?: number[];
   color?: "amber" | "emerald" | "blue" | "violet" | "danger" | "teal";
-  radialProgress?: number; // 0 - 100
   pulsingDot?: boolean;
   onClick?: () => void;
   className?: string;
   icon?: ReactNode;
-  /** Small tag shown next to the label (e.g. <SampleDataBadge />). */
+  /** Small tag shown next to the label (e.g. <SampleDataBadge />).
+   *  In StatCard this is rendered as a tiny indicator icon, not a wide pill,
+   *  so the label never gets truncated. */
   tag?: ReactNode;
+  /** @deprecated  Radial ring removed — pass nothing; kept for compat. */
+  radialProgress?: number;
 }
 
 const colorMap = {
@@ -29,83 +30,44 @@ const colorMap = {
     bg: "bg-amber-500/10",
     border: "border-amber-500/30",
     sparklineStroke: themeColors.light.primary,
-    sparklineFill: "rgba(245, 158, 11, 0.15)",
+    sparklineFill: "rgba(245, 158, 11, 0.12)",
   },
   emerald: {
     accent: "text-emerald-500",
     bg: "bg-emerald-500/10",
     border: "border-emerald-500/30",
     sparklineStroke: "#10B981",
-    sparklineFill: "rgba(16, 185, 129, 0.15)",
+    sparklineFill: "rgba(16, 185, 129, 0.12)",
   },
   blue: {
     accent: "text-blue-500",
     bg: "bg-blue-500/10",
     border: "border-blue-500/30",
     sparklineStroke: "#3B82F6",
-    sparklineFill: "rgba(59, 130, 246, 0.15)",
+    sparklineFill: "rgba(59, 130, 246, 0.12)",
   },
   violet: {
     accent: "text-violet-500",
     bg: "bg-violet-500/10",
     border: "border-violet-500/30",
     sparklineStroke: "#8B5CF6",
-    sparklineFill: "rgba(139, 92, 246, 0.15)",
+    sparklineFill: "rgba(139, 92, 246, 0.12)",
   },
   danger: {
-    accent: "text-danger",
-    bg: "bg-red-500/10",
-    border: "border-red-500/30",
+    accent: "text-rose-500",
+    bg: "bg-rose-500/10",
+    border: "border-rose-500/30",
     sparklineStroke: themeColors.light.danger,
-    sparklineFill: "rgba(185, 28, 28, 0.15)",
+    sparklineFill: "rgba(225, 29, 72, 0.12)",
   },
   teal: {
     accent: "text-teal",
     bg: "bg-teal-500/10",
     border: "border-teal-500/30",
     sparklineStroke: themeColors.light.teal,
-    sparklineFill: "rgba(15, 118, 110, 0.15)",
+    sparklineFill: "rgba(15, 118, 110, 0.12)",
   },
 };
-
-
-
-function MiniRadialRing({ progress, color }: { progress: number; color: string }) {
-  const radius = 13;
-  const circumference = 2 * Math.PI * radius;
-  const strokeDashoffset = circumference - (Math.min(100, Math.max(0, progress)) / 100) * circumference;
-
-  return (
-    <div className="relative inline-flex items-center justify-center">
-      <svg width="34" height="34" className="rotate-[-90deg]">
-        <circle
-          cx="17"
-          cy="17"
-          r={radius}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="3"
-          className="text-border"
-        />
-        <circle
-          cx="17"
-          cy="17"
-          r={radius}
-          fill="none"
-          stroke={color}
-          strokeWidth="3"
-          strokeDasharray={circumference}
-          strokeDashoffset={strokeDashoffset}
-          strokeLinecap="round"
-          className="transition-all duration-700 ease-out"
-        />
-      </svg>
-      <span className="absolute text-[10px] font-semibold tabular-nums text-text">
-        {Math.round(progress)}
-      </span>
-    </div>
-  );
-}
 
 export function StatCard({
   label,
@@ -114,12 +76,12 @@ export function StatCard({
   suffix,
   trend,
   color = "amber",
-  radialProgress,
   pulsingDot,
   onClick,
   className = "",
   icon,
   tag,
+  // radialProgress kept for compat but no longer rendered
 }: StatCardProps) {
   const c = colorMap[color];
   const [displayValue, setDisplayValue] = useState<string | number>(
@@ -132,7 +94,6 @@ export function StatCard({
       return;
     }
     const duration = 650;
-    const start = 0;
     const end = value;
     const startTime = performance.now();
 
@@ -141,12 +102,9 @@ export function StatCard({
       const progress = Math.min(elapsed / duration, 1);
       // easeOutExpo
       const ease = progress === 1 ? 1 : 1 - Math.pow(2, -10 * progress);
-      const current = Math.round(start + (end - start) * ease);
+      const current = Math.round(end * ease);
       setDisplayValue(current);
-
-      if (progress < 1) {
-        requestAnimationFrame(animate);
-      }
+      if (progress < 1) requestAnimationFrame(animate);
     };
     requestAnimationFrame(animate);
   }, [value]);
@@ -155,6 +113,21 @@ export function StatCard({
     typeof displayValue === "number"
       ? displayValue.toLocaleString("en-IN")
       : displayValue;
+
+  // Hide the trend chip when there's no previous-period value or value is zero
+  const isZeroValue =
+    value === 0 ||
+    value === "0" ||
+    value === "0%" ||
+    displayValue === 0 ||
+    displayValue === "0";
+  const hasValidTrend = Boolean(
+    trend &&
+      trend.value &&
+      trend.value !== "0%" &&
+      trend.value !== "+0%" &&
+      !isZeroValue
+  );
 
   return (
     <div
@@ -167,81 +140,96 @@ export function StatCard({
           onClick();
         }
       }}
-      className={`relative p-5 rounded-xl border border-border bg-surface transition-all duration-200 outline-none select-none h-full flex flex-col justify-between ${
+      className={`@container relative p-4 lg:p-3 xl:p-4 rounded-xl border border-border bg-surface transition-all duration-200 outline-none select-none h-[104px] flex flex-col justify-between min-w-0 ${
         onClick
-          ? "cursor-pointer hover:-translate-y-0.5 hover:shadow-md hover:border-border/80 active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-primary"
+          ? "cursor-pointer hover:border-primary/50 hover:shadow-xs active:scale-[0.99] focus-visible:ring-1 focus-visible:ring-primary"
           : ""
       } ${className}`}
     >
-      {/* Top Header */}
-      <div className="flex items-center justify-between gap-2 mb-2 min-h-[28px] shrink-0">
-        <div className="flex items-center gap-2 min-w-0">
-          {pulsingDot && (
-            <span className="relative flex h-2.5 w-2.5 shrink-0">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
-              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500" />
-            </span>
-          )}
-          <span className="text-13 font-medium text-text-muted truncate">{label}</span>
-          {tag}
-        </div>
-
+      {/* ─── Top Row: Icon + Label + sample flask + trend chip ──────────────────
+            Narrow cards (< 12rem content) move the label to its own line below,
+            so neither the label nor the value is ever truncated. */}
+      <div className="flex items-center gap-1.5 shrink-0 min-w-0">
         {icon && (
-          <div className={`p-1.5 rounded-lg shrink-0 ${c.bg} ${c.accent}`}>
+          <div
+            className={`w-6 h-6 rounded-md shrink-0 flex items-center justify-center ${c.bg} ${c.accent}`}
+          >
             {icon}
           </div>
         )}
-
-        {radialProgress !== undefined && (
-          <div className="shrink-0">
-            <MiniRadialRing progress={radialProgress} color={c.sparklineStroke} />
-          </div>
+        {pulsingDot && (
+          <span className="relative flex h-2 w-2 shrink-0">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75" />
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500" />
+          </span>
+        )}
+        {/* Label — single line, full text in the tooltip (wide cards only) */}
+        <span
+          title={label}
+          className="hidden @min-[12rem]:block text-11 uppercase tracking-wide font-semibold text-text-muted leading-tight truncate flex-1 min-w-0"
+        >
+          {label}
+        </span>
+        <span className="flex-1 @min-[12rem]:hidden" aria-hidden />
+        {/* Sample indicator: tiny flask icon, no text, no wide pill */}
+        {tag && (
+          <span className="shrink-0 opacity-60 hover:opacity-100 transition-opacity" title="Sample data">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="11"
+              height="11"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="text-primary"
+              aria-hidden
+            >
+              <path d="M9 3h6l2 6-5 13L7 9z" />
+              <path d="M3 9h18" />
+            </svg>
+          </span>
+        )}
+        {/* Trend chip lives in the top row so the value gets the full card width */}
+        {hasValidTrend && trend && (
+          <span
+            title={trend.label ? `vs ${trend.label}` : "vs previous 7 days"}
+            className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold shrink-0 cursor-default whitespace-nowrap ${
+              trend.isPositive
+                ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                : "bg-rose-500/10 text-rose-600 dark:text-rose-400"
+            }`}
+          >
+            {trend.isPositive ? "↑" : "↓"}
+            <span>{trend.value.replace(/^[↑↓+\-\s]+/, "")}</span>
+          </span>
         )}
       </div>
 
-      {/* Main KPI Number */}
-      <div className="flex-1 flex items-baseline gap-1 my-1">
+      {/* ─── Label line for narrow cards ─────────────────────────────────────── */}
+      <span
+        title={label}
+        className="@min-[12rem]:hidden text-11 uppercase tracking-wide font-semibold text-text-muted leading-tight truncate min-w-0"
+      >
+        {label}
+      </span>
+
+      {/* ─── Bottom Row: Value (full width, never truncated) ─────────────────── */}
+      <div className="flex items-baseline gap-0.5 mt-auto min-w-0 whitespace-nowrap">
         {prefix && (
-          <span className="text-xl font-semibold font-outfit text-text-muted">
+          <span className="text-15 sm:text-[17px] lg:text-15 xl:text-[17px] font-semibold font-outfit text-text-muted">
             {prefix}
           </span>
         )}
-        <span className="text-32 md:text-36 font-bold font-outfit text-text tabular-nums tracking-tight">
+        <span className="text-[22px] sm:text-28 lg:text-[22px] xl:text-28 font-bold font-outfit text-text tracking-tight leading-none">
           {formattedDisplay}
         </span>
         {suffix && (
-          <span className="text-lg font-semibold font-outfit text-text-muted ml-0.5">
+          <span className="text-13 sm:text-15 lg:text-13 xl:text-15 font-semibold font-outfit text-text-muted ml-0.5">
             {suffix}
           </span>
-        )}
-      </div>
-
-      {/* Footer: Trend chip */}
-      <div className="flex items-center justify-between pt-2 border-t border-border/40 mt-3 min-h-[34px] shrink-0">
-        {trend ? (
-          <div className="flex items-center gap-1.5 min-w-0">
-            <span
-              className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-12 font-medium tabular-nums shrink-0 ${
-                trend.isPositive
-                  ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                  : "bg-red-500/10 text-red-600 dark:text-red-400"
-              }`}
-            >
-              {trend.isPositive ? (
-                <ArrowUpRight className="w-3.5 h-3.5 stroke-[2.5]" />
-              ) : (
-                <ArrowDownRight className="w-3.5 h-3.5 stroke-[2.5]" />
-              )}
-              {trend.value.replace(/^[↑↓+\-\s]+/, "")}
-            </span>
-            {trend.label && (
-              <span className="text-11 text-text-muted truncate">
-                {trend.label}
-              </span>
-            )}
-          </div>
-        ) : (
-          <div />
         )}
       </div>
     </div>

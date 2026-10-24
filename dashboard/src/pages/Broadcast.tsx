@@ -18,6 +18,7 @@ import {
   Trash2,
   Users,
   XCircle,
+  ChevronDown,
 } from "lucide-react";
 import { toast } from "sonner";
 import { isApiError } from "../api/client.ts";
@@ -653,18 +654,21 @@ export default function BroadcastPage() {
               </div>
               <div>
                 <span className="text-11 text-text-muted block mb-0.5">Language</span>
-                <select
-                  value={language}
-                  onChange={(e) => setLanguage(e.target.value)}
-                  className="w-full p-2 rounded-lg border border-border bg-surface-muted text-text focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
-                >
-                  <option value="">Any language</option>
-                  {CUSTOMER_LANGUAGES.map((l) => (
-                    <option key={l} value={l}>
-                      {languageLabel(l)}
-                    </option>
-                  ))}
-                </select>
+                <div className="relative">
+                  <select
+                    value={language}
+                    onChange={(e) => setLanguage(e.target.value)}
+                    className="w-full pl-3 pr-8 py-2 appearance-none rounded-lg border border-border bg-surface-muted text-12 text-text focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
+                  >
+                    <option value="">Any language</option>
+                    {CUSTOMER_LANGUAGES.map((l) => (
+                      <option key={l} value={l}>
+                        {languageLabel(l)}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted" aria-hidden />
+                </div>
                 <FieldError message={fieldErrors.language} />
               </div>
             </div>
@@ -797,26 +801,29 @@ export default function BroadcastPage() {
                 >
                   Approved WhatsApp Template
                 </label>
-                <select
-                  id="broadcast-template"
-                  value={templateId}
-                  onChange={(e) => {
-                    setTemplateId(e.target.value);
-                    setFieldErrors((prev) => ({ ...prev, templateId: "" }));
-                  }}
-                  className="w-full p-2.5 rounded-xl border border-border bg-surface-muted text-13 font-medium text-text focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
-                >
-                  {!activeTemplate && (
-                    <option value={templateId} disabled>
-                      {templateId ? "Template not available" : "Choose a template"}
-                    </option>
-                  )}
-                  {approvedTemplates.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.name} ({humanize(t.category)})
-                    </option>
-                  ))}
-                </select>
+                <div className="relative">
+                  <select
+                    id="broadcast-template"
+                    value={templateId}
+                    onChange={(e) => {
+                      setTemplateId(e.target.value);
+                      setFieldErrors((prev) => ({ ...prev, templateId: "" }));
+                    }}
+                    className="w-full pl-3 pr-9 py-2.5 appearance-none rounded-xl border border-border bg-surface-muted text-13 font-medium text-text focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
+                  >
+                    {!activeTemplate && (
+                      <option value={templateId} disabled>
+                        {templateId ? "Template not available" : "Choose a template"}
+                      </option>
+                    )}
+                    {approvedTemplates.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name} ({humanize(t.category)})
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" aria-hidden />
+                </div>
                 <FieldError message={fieldErrors.templateId} />
               </div>
 

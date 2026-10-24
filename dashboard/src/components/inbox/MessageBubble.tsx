@@ -6,7 +6,7 @@ import { formatTime, humanize } from "../../lib/format.ts";
 import type { AiDecisionSummary, Message, SenderType } from "../../types/index.ts";
 
 /** Bubble styles (new design; theme tokens so they work in light and dark). */
-export const bubbleStyles: Record<SenderType, string> = {
+const bubbleStyles: Record<SenderType, string> = {
   customer: "bg-surface border border-border text-text self-start rounded-2xl rounded-tl-sm",
   ai: "bg-gradient-to-br from-violet-600/90 to-violet-700 text-white self-end rounded-2xl rounded-tr-sm",
   owner: "bg-primary text-primary-foreground self-end rounded-2xl rounded-tr-sm",
@@ -131,7 +131,7 @@ export function MessageBubble({ message, senderLabel, pending = false }: Message
     <div
       className={cn(
         bubbleStyles[senderType],
-        "max-w-[85%] px-3.5 py-2 text-14 leading-relaxed shadow-xs sm:max-w-[70%]",
+        "max-w-[85%] px-3.5 py-2 text-13 leading-relaxed shadow-xs sm:max-w-[70%]",
         message.aiDecision && "max-w-full sm:max-w-full",
         pending && "opacity-70",
       )}
@@ -166,7 +166,7 @@ export function MessageBubble({ message, senderLabel, pending = false }: Message
 
       {message.content && <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{message.content}</p>}
 
-      <p className={cn("mt-1 flex items-center justify-end gap-1 text-[11px]", metaTone[senderType])}>
+      <p className={cn("mt-1 flex items-center justify-end gap-1 text-11", metaTone[senderType])}>
         {failed && (
           <span className="inline-flex items-center gap-0.5 font-medium">
             <AlertCircle className="h-3 w-3" aria-hidden /> Not delivered ·

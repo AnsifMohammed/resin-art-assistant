@@ -44,15 +44,19 @@ export function formatDayLabel(date: DateInput): string {
   return d.isSame(now, "year") ? d.format("ddd, D MMM") : d.format("D MMM YYYY");
 }
 
-/** "1h 5m", "12m", "45s" */
+/** "45s", "12m", "5h 20m", "25d 9h" — max 2 units */
 export function formatDuration(totalSeconds: number | null | undefined): string {
   if (totalSeconds === null || totalSeconds === undefined || !Number.isFinite(totalSeconds)) return "–";
   const s = Math.max(0, Math.round(totalSeconds));
-  const h = Math.floor(s / 3600);
-  const m = Math.floor((s % 3600) / 60);
-  if (h > 0) return m > 0 ? `${h}h ${m}m` : `${h}h`;
-  if (m > 0) return `${m}m`;
-  return `${s}s`;
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
+  const remM = m % 60;
+  if (h < 24) return remM > 0 ? `${h}h ${remM}m` : `${h}h`;
+  const d = Math.floor(h / 24);
+  const remH = h % 24;
+  return remH > 0 ? `${d}d ${remH}h` : `${d}d`;
 }
 
 export const WINDOW_URGENT_MS = 2 * 60 * 60 * 1000;

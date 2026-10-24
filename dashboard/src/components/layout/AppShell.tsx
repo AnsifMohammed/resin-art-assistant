@@ -20,9 +20,16 @@ export interface AutomationControl {
   requestToggle: () => void;
 }
 
-/** Pages that manage their own scrolling (list + chat panes) and need the full viewport height. */
+/** Pages that manage their own scrolling (list + chat panes, virtual tables, kanban boards) and need the full viewport height. */
 function isFullHeightRoute(pathname: string): boolean {
-  return pathname === "/inbox" || pathname.startsWith("/conversations/");
+  return (
+    pathname === "/inbox" ||
+    pathname.startsWith("/conversations/") ||
+    pathname === "/orders" ||
+    pathname.startsWith("/orders/") ||
+    pathname === "/customers" ||
+    pathname.startsWith("/customers/")
+  );
 }
 
 export function AppShell() {
@@ -96,6 +103,12 @@ export function AppShell() {
           {fullHeight ? (
             <main className="min-h-0 flex-1 overflow-hidden pb-16 md:pb-0">
               <div className="h-full">
+                <Outlet />
+              </div>
+            </main>
+          ) : location.pathname === "/analytics" ? (
+            <main className="min-h-0 flex-1 overflow-y-auto [@media(min-width:1024px)_and_(min-height:760px)]:overflow-hidden pb-16 md:pb-0">
+              <div className="h-full w-full">
                 <Outlet />
               </div>
             </main>

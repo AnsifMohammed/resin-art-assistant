@@ -97,57 +97,62 @@ function ConversationRow({
       aria-current={selected ? "true" : undefined}
       data-conversation-id={item.id}
       className={cn(
-        "relative block w-full p-3.5 text-left transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary",
+        "relative flex w-full items-start gap-2.5 p-2.5 sm:p-3 text-left transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary",
         selected
-          ? "border-l-4 border-l-primary bg-primary/10"
+          ? "border-l-[3px] border-l-primary bg-primary-soft/50 dark:bg-primary-soft/20 shadow-2xs"
           : item.state === "escalated"
-            ? "border-l-4 border-l-red-500 bg-surface hover:bg-surface-muted"
-            : "border-l-4 border-l-transparent bg-surface hover:bg-surface-muted",
+            ? "border-l-[3px] border-l-rose-500 bg-surface hover:bg-surface-muted/80"
+            : "border-l-[3px] border-l-transparent bg-surface hover:bg-surface-muted/80",
       )}
     >
-      <div className="mb-1 flex items-start justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-2">
-          <div className="relative">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border bg-surface-muted font-outfit text-13 font-bold text-text">
-              {name.charAt(0).toUpperCase() || "?"}
-            </div>
-            <span className="absolute -bottom-0.5 -right-0.5">
-              <ChannelIcon channel={item.channelType} size={11} />
-            </span>
-          </div>
-          <div className="min-w-0">
-            <span className={cn("block truncate text-14 text-text font-outfit", item.unread ? "font-bold" : "font-semibold")}>
-              {name}
-            </span>
-            {item.customer.name && <p className="truncate text-12 text-text-muted">{item.customer.handleOrPhone}</p>}
-          </div>
+      {/* Avatar Column */}
+      <div className="relative shrink-0 mt-0.5">
+        <div className="flex h-8 w-8 items-center justify-center rounded-full border border-primary/20 bg-primary/10 font-outfit text-12 font-bold text-primary-text">
+          {name.charAt(0).toUpperCase() || "?"}
         </div>
-
-        <div className="shrink-0 text-right">
-          <time dateTime={when} title={formatDateTime(when)} className="text-12 text-text-muted">
-            {formatRelative(when)}
-          </time>
-          {item.unread && (
-            <span className="ml-auto mt-1 block h-2 w-2 rounded-full bg-primary" aria-label="Unread" role="img" />
-          )}
-        </div>
+        <span className="absolute -bottom-0.5 -right-0.5 rounded-full bg-surface p-0.5 shadow-2xs">
+          <ChannelIcon channel={item.channelType} size={10} />
+        </span>
       </div>
 
-      <p className={cn("mt-1 line-clamp-1 pl-10 text-13", item.unread ? "text-text font-medium" : "text-text-muted")}>
-        {item.lastMessage ? (
-          content ? (
-            `${previewPrefix(item)}${content}`
-          ) : (
-            <span className="italic">{previewPrefix(item)}Attachment</span>
-          )
-        ) : (
-          <span className="italic">No messages yet</span>
-        )}
-      </p>
+      {/* Content Column */}
+      <div className="min-w-0 flex-1 space-y-0.5">
+        <div className="flex items-start justify-between gap-1.5">
+          <div className="min-w-0">
+            <span className={cn("block truncate text-13 text-text", item.unread ? "font-bold" : "font-semibold")}>
+              {name}
+            </span>
+            {item.customer.name && (
+              <p className="truncate text-11 text-text-muted">{item.customer.handleOrPhone}</p>
+            )}
+          </div>
 
-      <div className="mt-2 flex flex-wrap items-center gap-1.5 pl-10 text-11">
-        <ConvStateChip state={item.state} />
-        {item.openEscalation && <EscalationBadge reason={item.openEscalation.reason} className="text-11" />}
+          <div className="shrink-0 text-right pt-0.5">
+            <time dateTime={when} title={formatDateTime(when)} className="text-11 text-text-muted tabular-nums">
+              {formatRelative(when)}
+            </time>
+            {item.unread && (
+              <span className="ml-auto mt-1 block h-1.5 w-1.5 rounded-full bg-primary" aria-label="Unread" role="img" />
+            )}
+          </div>
+        </div>
+
+        <p className={cn("line-clamp-1 text-12 leading-snug", item.unread ? "text-text font-medium" : "text-text-muted")}>
+          {item.lastMessage ? (
+            content ? (
+              `${previewPrefix(item)}${content}`
+            ) : (
+              <span className="italic">{previewPrefix(item)}Attachment</span>
+            )
+          ) : (
+            <span className="italic">No messages yet</span>
+          )}
+        </p>
+
+        <div className="flex flex-wrap items-center gap-1 pt-0.5 text-10">
+          <ConvStateChip state={item.state} />
+          {item.openEscalation && <EscalationBadge reason={item.openEscalation.reason} />}
+        </div>
       </div>
     </button>
   );
@@ -443,8 +448,8 @@ function CustomerPanel({ conversation, onClose }: { conversation: ConversationDe
           <div className="mx-auto mb-2 flex h-14 w-14 items-center justify-center rounded-full border-2 border-primary bg-primary/20 font-outfit text-22 font-bold text-primary-text">
             {name.charAt(0).toUpperCase() || "?"}
           </div>
-          <h4 className="font-outfit text-16 font-bold text-text">{name}</h4>
-          <div className="mt-0.5 flex items-center justify-center gap-1.5 text-12 text-text-muted">
+          <h4 className="font-outfit text-15 font-bold text-text">{name}</h4>
+          <div className="mt-0.5 flex items-center justify-center gap-1.5 text-11 text-text-muted">
             <ChannelIcon channel={conversation.channelType} size={12} />
             <span className="truncate">{customer.handleOrPhone}</span>
           </div>
@@ -554,6 +559,16 @@ export default function Inbox() {
     setOpenConversation(undefined);
   }, [selectedId]);
 
+  // Desktop auto-selection: on tablet/desktop (>= 768px), auto-select first conversation if none selected
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (window.innerWidth < 768) return;
+    const first = conversations[0];
+    if (!selectedId && first && !query.isLoading) {
+      updateParams({ c: first.id }, true);
+    }
+  }, [selectedId, conversations, query.isLoading, updateParams]);
+
   // J/K (or arrows) move through the list.
   useEffect(() => {
     const handleKeyDown = (e: globalThis.KeyboardEvent) => {
@@ -606,7 +621,7 @@ export default function Inbox() {
       <div
         className={cn(
           selectedId ? "hidden md:flex" : "flex",
-          "z-10 h-full w-full shrink-0 flex-col border-r border-border bg-surface md:w-[300px] lg:w-[320px] xl:w-[340px]",
+          "z-10 h-full w-full shrink-0 flex-col border-r border-border bg-surface md:w-[320px] lg:w-[340px] xl:w-[360px]",
         )}
       >
         <div className="shrink-0 space-y-2 border-b border-border/70 p-3 sm:p-3.5">

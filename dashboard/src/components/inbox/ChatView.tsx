@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, CheckCircle2, MessageSquare, PauseCircle, PlayCircle } from "lucide-react";
-import { EscalationBadge } from "../escalations/EscalationBadge.tsx";
+import { ArrowLeft, AlertTriangle, CheckCircle2, MessageSquare, PauseCircle, PlayCircle } from "lucide-react";
+import { escalationReasonLabel } from "../../lib/escalationReasons.ts";
 import { ChannelIcon } from "../shared/ChannelIcon.tsx";
 import { ConfirmDialog } from "../shared/ConfirmDialog.tsx";
 import { TagBadge } from "../ui/Badge.tsx";
@@ -41,7 +41,7 @@ function sameDay(a: string, b: string): boolean {
 }
 
 const headerButton =
-  "inline-flex items-center gap-1 rounded-lg border border-border bg-surface px-2 py-1.5 text-xs font-medium text-text transition-colors " +
+  "inline-flex items-center gap-1 rounded-lg border border-border bg-surface px-2 py-1 text-11 font-medium text-text transition-colors " +
   "hover:bg-surface-muted cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 sm:gap-1.5 sm:px-2.5 " +
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary";
 
@@ -185,9 +185,9 @@ export function ChatView({ conversation, onBack, backOnlyOnMobile = false, onRes
   return (
     <section className="flex h-full min-h-0 flex-col bg-surface-muted/30" aria-label={`Conversation with ${name}`}>
       {/* Header */}
-      <header className="shrink-0 border-b border-border bg-surface p-3 sm:p-3.5">
+      <header className="shrink-0 border-b border-border bg-surface p-2.5 sm:p-3">
         <div className="flex items-center justify-between gap-2 sm:gap-3">
-          <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+          <div className="flex min-w-0 items-center gap-2 sm:gap-2.5">
             {onBack && (
               <button
                 type="button"
@@ -199,21 +199,43 @@ export function ChatView({ conversation, onBack, backOnlyOnMobile = false, onRes
                 }
                 aria-label="Back"
               >
-                <ArrowLeft className="h-5 w-5" />
+                <ArrowLeft className="h-4 w-4" />
               </button>
             )}
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-primary/20 bg-primary/10 font-outfit text-14 font-bold text-primary-text sm:h-9 sm:w-9">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-primary/20 bg-primary/10 font-outfit text-13 font-bold text-primary-text">
               {name.charAt(0).toUpperCase() || "?"}
             </div>
             <div className="min-w-0">
-              <div className="flex items-center gap-1.5 sm:gap-2">
-                <h2 className="truncate font-outfit text-15 font-bold text-text">{name}</h2>
+              {/* Row 1: Customer Name, Channel, and Handle */}
+              <div className="flex items-center gap-1.5 min-w-0">
+                <h2 className="truncate font-outfit text-14 sm:text-15 font-semibold text-text">{name}</h2>
                 <ChannelIcon channel={conversation.channelType} size={12} className="shrink-0" />
-                <ConvStateChip state={conversation.state} className="hidden sm:inline-flex" />
+                {conversation.customer.name && conversation.customer.handleOrPhone && (
+                  <span className="truncate text-12 text-text-muted">
+                    • {conversation.customer.handleOrPhone}
+                  </span>
+                )}
               </div>
-              <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-12 text-text-muted">
-                {conversation.customer.name && <span className="truncate">{conversation.customer.handleOrPhone}</span>}
-                <WindowCountdown windowClosesAt={conversation.windowClosesAt} className="py-0" />
+
+              {/* Row 2: Status, Tag, Countdown, Assignee - neatly aligned together */}
+              <div className="mt-1 flex flex-wrap items-center gap-1.5 text-11">
+                {esc ? (
+                  <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border border-rose-500/20 bg-rose-500/10 px-2 py-0.5 text-10 font-medium text-rose-700 dark:text-rose-300">
+                    <AlertTriangle className="h-2.5 w-2.5 shrink-0" aria-hidden />
+                    <span>Escalated · {escalationReasonLabel(esc.reason)}</span>
+                  </span>
+                ) : (
+                  <ConvStateChip state={conversation.state} />
+                )}
+                {conversation.tag && <TagBadge tag={conversation.tag} />}
+                <WindowCountdown windowClosesAt={conversation.windowClosesAt} />
+                {esc && (
+                  <span className="text-11 text-text-muted truncate">
+                    • {esc.assignedTo
+                      ? `Assigned to ${esc.assignedTo.id === user?.id ? "you" : esc.assignedTo.name}`
+                      : "Unassigned"}
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -226,10 +248,10 @@ export function ChatView({ conversation, onBack, backOnlyOnMobile = false, onRes
                 onClick={() => setConfirmResolve(true)}
                 disabled={resolve.isPending || reply.isPending}
                 aria-busy={resolve.isPending || undefined}
-                className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1.5 text-12 font-medium text-white shadow-xs transition-colors hover:bg-emerald-700 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 sm:gap-1.5 sm:px-3"
+                className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1 text-11 font-medium text-white shadow-xs transition-colors hover:bg-emerald-700 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 sm:gap-1.5 sm:px-3"
                 title="Mark resolved and hand back to the AI"
               >
-                <CheckCircle2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                <CheckCircle2 className="h-3 w-3 shrink-0" aria-hidden />
                 <span className="hidden sm:inline">{resolve.isPending ? "Resolving…" : "Mark resolved"}</span>
                 <span className="sm:hidden">Resolve</span>
               </button>
@@ -237,22 +259,6 @@ export function ChatView({ conversation, onBack, backOnlyOnMobile = false, onRes
             {headerActions}
           </div>
         </div>
-
-        {(conversation.tag || esc) && (
-          <div className="mt-2 flex flex-wrap items-center gap-1.5">
-            {conversation.tag && <TagBadge tag={conversation.tag} />}
-            {esc && (
-              <>
-                <EscalationBadge reason={esc.reason} />
-                <span className="text-xs text-text-muted">
-                  {esc.assignedTo
-                    ? `Assigned to ${esc.assignedTo.id === user?.id ? "you" : esc.assignedTo.name}`
-                    : "Unassigned"}
-                </span>
-              </>
-            )}
-          </div>
-        )}
       </header>
 
       {/* Thread */}

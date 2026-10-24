@@ -545,8 +545,9 @@ export interface KnowledgeBasePutRequest {
 // ─── Analytics (admin only) ────────────────────────────────────────
 
 export interface AnalyticsParams {
-  from?: ISODateString;
-  to?: ISODateString;
+  from?: ISODateString | undefined;
+  to?: ISODateString | undefined;
+  channel?: "whatsapp" | "instagram" | undefined;
 }
 
 export interface AnalyticsResponse {
@@ -570,13 +571,48 @@ export interface AnalyticsResponse {
   byChannel?: Record<ChannelType, { inbound: number; outbound: number }>;
   byReason?: Partial<Record<EscalationReason, number>>;
   daily?: Array<{ date: string; inbound: number; autoReplies: number; escalations: number }>;
+
+  /* Optional extended contract fields from backend /analytics */
+  revenue?: {
+    total: number;
+    previous: number;
+    daily: { date: string; revenue: number; orders: number }[];
+  };
+  orders?: {
+    confirmed: number;
+    previousConfirmed: number;
+    pending: number;
+  };
+  messagesDaily?: { date: string; inbound: number; outbound: number }[];
+  channels?: {
+    whatsapp: { messages: number; revenue: number; orders: number };
+    instagram: { messages: number; revenue: number; orders: number };
+  };
+  topProducts?: {
+    productId: string | null;
+    name: string;
+    imageUrl: string | null;
+    units: number;
+    revenue: number;
+  }[];
+  attention?: {
+    openEscalations: number;
+    windowsClosingSoon: number;
+    pendingOrders: number;
+    unpaidBalance: number;
+  };
+  trends?: Record<
+    "revenue" | "orders" | "messages" | "autoReplyRate" | "avgResponseTimeSeconds",
+    { current: number; previous: number; changePct: number | null }
+  >;
 }
 
 // ─── Audit log (admin only) ────────────────────────────────────────
 
 export interface AuditLogParams extends PageParams {
-  actorId?: string;
-  action?: string;
+  actorId?: string | undefined;
+  action?: string | undefined;
+  actorType?: string | undefined;
 }
 
 export interface AuditLogResponse {
