@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Sparkles,
@@ -169,6 +169,25 @@ export default function KnowledgeBase() {
   const [activeSection, setActiveSection] = useState<SectionId>("custom-orders");
   const [confirmDiscard, setConfirmDiscard] = useState(false);
 
+  // Detail pane is the only scroll region on md+; start each section at the top.
+  const paneRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (paneRef.current) paneRef.current.scrollTop = 0;
+  }, [activeSection]);
+
+  // Per-section unsaved indicator (each section edits exactly one top-level KB key).
+  const sectionDirty = useMemo<Record<SectionId, boolean>>(() => {
+    const differs = (k: keyof KnowledgeBaseData) =>
+      draft !== null && base !== null && canonical(draft[k]) !== canonical(base[k]);
+    return {
+      "custom-orders": differs("custom_orders"),
+      delivery: differs("delivery"),
+      policies: differs("policies"),
+      "tone-examples": differs("tone_examples"),
+      "always-escalate": differs("escalate_always"),
+    };
+  }, [draft, base]);
+
   // Policy edit view toggles (returns, cancellation, care, warranty)
   const [editingPolicies, setEditingPolicies] = useState<Record<string, boolean>>({
     returns: false,
@@ -314,9 +333,9 @@ export default function KnowledgeBase() {
   };
 
   return (
-    <div className="space-y-6 pb-28 w-full">
+    <div className="h-full w-full flex flex-col gap-6 p-4 sm:p-6 lg:p-8 overflow-y-auto md:overflow-hidden">
       {/* ─── Page Header ──────────────────────────────────────────────────────── */}
-      <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+      <div className="shrink-0 flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
         <div>
           <div className="flex items-center gap-2.5">
             <h1 className="text-24 md:text-28 font-bold font-outfit text-text tracking-tight">
@@ -349,7 +368,7 @@ export default function KnowledgeBase() {
       </div>
 
       {/* ─── Summary Strip ───────────────────────────────────────────────────── */}
-      <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-xl border border-border bg-surface shadow-xs">
+      <div className="shrink-0 flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-xl border border-border bg-surface shadow-xs">
         <div className="flex flex-wrap items-center gap-2 text-13 text-text">
           <button
             type="button"
@@ -383,11 +402,14 @@ export default function KnowledgeBase() {
         </div>
       </div>
 
-      {/* ─── Two-Column Layout ───────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-[240px_1fr] gap-6 items-start">
-        {/* Sticky Section List (Desktop) & Horizontal Scrolling Row (Mobile) */}
-        <aside className="sticky top-20 z-10 lg:block overflow-x-auto lg:overflow-x-visible">
-          <nav className="flex lg:flex-col gap-1.5 p-1 rounded-xl bg-surface border border-border">
+      {/* ─── Master–Detail Layout ────────────────────────────────────────────── */}
+      <div className="flex flex-col md:flex-row gap-4 md:gap-6 md:flex-1 md:min-h-0">
+        {/* Section List: fixed column (md+) / sticky horizontal chip row (mobile) */}
+        <aside className="sticky top-0 z-10 -mx-4 px-4 py-2 sm:-mx-6 sm:px-6 bg-bg md:static md:mx-0 md:px-0 md:py-0 md:bg-transparent md:w-60 md:shrink-0 md:self-start">
+          <nav
+            aria-label="Knowledge base sections"
+            className="flex md:flex-col gap-1.5 p-1 rounded-xl bg-surface border border-border overflow-x-auto md:overflow-x-visible"
+          >
             {SECTIONS.map((sec, idx) => {
               const Icon = sec.icon;
               const isActive = activeSection === sec.id;
@@ -396,17 +418,15 @@ export default function KnowledgeBase() {
               if (sec.id === "policies") countLabel = "4";
               if (sec.id === "tone-examples") countLabel = `${toneCount}`;
               if (sec.id === "always-escalate") countLabel = `${topicsCount}`;
+              const hasChanges = sectionDirty[sec.id];
 
               return (
                 <button
                   key={sec.id}
                   type="button"
-                  onClick={() => {
-                    setActiveSection(sec.id);
-                    const el = document.getElementById(sec.id);
-                    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
-                  }}
-                  className={`flex items-center justify-between gap-2.5 px-3 py-2 rounded-lg text-13 font-medium transition-colors whitespace-nowrap cursor-pointer text-left ${
+                  aria-current={isActive ? "page" : undefined}
+                  onClick={() => setActiveSection(sec.id)}
+                  className={`shrink-0 flex items-center justify-between gap-2.5 px-3 py-2 rounded-lg text-13 font-medium transition-colors whitespace-nowrap cursor-pointer text-left ${
                     isActive
                       ? "bg-primary-soft text-primary-text font-semibold"
                       : "text-text-muted hover:text-text hover:bg-surface-muted"
@@ -417,10 +437,21 @@ export default function KnowledgeBase() {
                     <Icon className="w-4 h-4 shrink-0" />
                     <span>{sec.label}</span>
                   </div>
-                  {countLabel && (
-                    <span className="text-11 font-mono px-1.5 py-0.5 rounded-full bg-surface-muted text-text-muted">
-                      {countLabel}
-                    </span>
+                  {(countLabel || hasChanges) && (
+                    <div className="flex items-center gap-1.5">
+                      {hasChanges && (
+                        <span
+                          className="w-2 h-2 rounded-full bg-amber-500"
+                          title="Unsaved changes"
+                          aria-label="Unsaved changes"
+                        />
+                      )}
+                      {countLabel && (
+                        <span className="text-11 font-mono px-1.5 py-0.5 rounded-full bg-surface-muted text-text-muted">
+                          {countLabel}
+                        </span>
+                      )}
+                    </div>
                   )}
                 </button>
               );
@@ -428,638 +459,608 @@ export default function KnowledgeBase() {
           </nav>
         </aside>
 
-        {/* Section Contents */}
-        <div className="space-y-8 min-w-0">
-          {/* 1. Custom Orders */}
-          <section
-            id="custom-orders"
-            className="rounded-xl border border-border bg-surface p-6 shadow-xs space-y-5"
+        {/* Detail column: selected section (scrolls on md+) + unsaved-changes footer */}
+        <div className="flex flex-col min-w-0 md:flex-1 md:min-h-0">
+          <div
+            ref={paneRef}
+            className="md:flex-1 md:min-h-0 md:overflow-y-auto custom-scrollbar md:pr-1 md:pb-1"
           >
-            <div className="flex items-center gap-2 pb-3 border-b border-border">
-              <Sparkles className="w-5 h-5 text-primary" />
-              <div>
-                <h2 className="text-16 font-bold font-outfit text-text">1. Custom orders</h2>
-                <p className="text-12 text-text-muted">
-                  Rules for bespoke personalized resin requests
-                </p>
-              </div>
-            </div>
-
-            {/* Note text */}
-            <div className="space-y-1.5">
-              <label className="block text-13 font-semibold text-text">
-                Custom Orders General Note
-              </label>
-              <textarea
-                rows={2}
-                value={d.custom_orders.note}
-                onChange={(e) =>
-                  update((cur) => ({
-                    ...cur,
-                    custom_orders: { ...cur.custom_orders, note: e.target.value },
-                  }))
-                }
-                className="w-full px-3 py-2 text-13 rounded-lg bg-surface-muted border border-border text-text focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary"
-              />
-            </div>
-
-            {/* Bulk discount & Lead time grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="space-y-1.5">
-                <label className="block text-13 font-semibold text-text">
-                  Bulk Minimum Pieces
-                </label>
-                <div className="relative">
-                  <input
-                    type="number"
-                    min="1"
-                    value={d.custom_orders.bulk_discount_qty ?? 10}
-                    onChange={(e) =>
-                      update((cur) => ({
-                        ...cur,
-                        custom_orders: {
-                          ...cur.custom_orders,
-                          bulk_discount_qty: Number(e.target.value),
-                        },
-                      }))
-                    }
-                    className="w-full px-3 py-2 text-13 rounded-lg bg-surface-muted border border-border text-text tabular-nums focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary"
-                  />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-11 text-text-muted">
-                    pieces
-                  </span>
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="block text-13 font-semibold text-text">
-                  Bulk Discount (%)
-                </label>
-                <div className="relative">
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    value={d.custom_orders.bulk_discount_percent ?? 10}
-                    onChange={(e) =>
-                      update((cur) => ({
-                        ...cur,
-                        custom_orders: {
-                          ...cur.custom_orders,
-                          bulk_discount_percent: Number(e.target.value),
-                        },
-                      }))
-                    }
-                    className="w-full px-3 py-2 text-13 rounded-lg bg-surface-muted border border-border text-text tabular-nums focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary"
-                  />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-11 text-text-muted">
-                    % off
-                  </span>
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="block text-13 font-semibold text-text">
-                  Extra Lead Time
-                </label>
-                <div className="relative">
-                  <input
-                    type="number"
-                    min="0"
-                    value={d.custom_orders.lead_time_extra_days}
-                    onChange={(e) =>
-                      update((cur) => ({
-                        ...cur,
-                        custom_orders: {
-                          ...cur.custom_orders,
-                          lead_time_extra_days: Number(e.target.value),
-                        },
-                      }))
-                    }
-                    className="w-full px-3 py-2 text-13 rounded-lg bg-surface-muted border border-border text-text tabular-nums focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary"
-                  />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-11 text-text-muted">
-                    days
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Locked-on row */}
-            <div className="flex items-center justify-between p-3.5 rounded-xl border border-border bg-surface-muted/60">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
-                  <Lock className="w-4 h-4" />
-                </div>
-                <div>
-                  <p className="text-13 font-semibold text-text">
-                    Items not in your product list → always handed to you
-                  </p>
-                  <p className="text-11 text-text-muted" title="This keeps the assistant from inventing prices.">
-                    This keeps the assistant from inventing prices. Handed over as "Unknown product".
-                  </p>
-                </div>
-              </div>
-              <span className="px-2.5 py-1 rounded-full text-11 font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 shrink-0">
-                Active & Enforced
-              </span>
-            </div>
-          </section>
-
-          {/* 2. Delivery */}
-          <section
-            id="delivery"
-            className="rounded-xl border border-border bg-surface p-6 shadow-xs space-y-5"
-          >
-            <div className="flex items-center justify-between pb-3 border-b border-border">
-              <div className="flex items-center gap-2">
-                <Truck className="w-5 h-5 text-primary" />
-                <div>
-                  <h2 className="text-16 font-bold font-outfit text-text">2. Delivery</h2>
-                  <p className="text-12 text-text-muted">
-                    Courier partners, turnaround times and shipping fees
-                  </p>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={handleAddZone}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-surface-muted text-text text-12 font-semibold hover:bg-surface transition-colors cursor-pointer"
+            {/* 1. Custom Orders */}
+            {activeSection === "custom-orders" && (
+              <section
+                id="custom-orders"
+                className="rounded-xl border border-border bg-surface p-6 shadow-xs space-y-5"
               >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Add zone</span>
-              </button>
-            </div>
+                <div className="flex items-center gap-2 pb-3 border-b border-border">
+                  <Sparkles className="w-5 h-5 text-primary" />
+                  <div>
+                    <h2 className="text-16 font-bold font-outfit text-text">1. Custom orders</h2>
+                    <p className="text-12 text-text-muted">
+                      Rules for bespoke personalized resin requests
+                    </p>
+                  </div>
+                </div>
 
-            {/* Courier name field */}
-            <div className="space-y-1.5">
-              <label className="block text-13 font-semibold text-text">
-                Courier Partner Name
-              </label>
-              <input
-                type="text"
-                value={d.delivery.courier}
-                onChange={(e) =>
-                  update((cur) => ({
-                    ...cur,
-                    delivery: { ...cur.delivery, courier: e.target.value },
-                  }))
-                }
-                placeholder="e.g. Shiprocket (DTDC / Delhivery)"
-                className="w-full max-w-md px-3 py-2 text-13 rounded-lg bg-surface-muted border border-border text-text focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary"
-              />
-            </div>
+                {/* Note text */}
+                <div className="space-y-1.5">
+                  <label className="block text-13 font-semibold text-text">
+                    Custom Orders General Note
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={d.custom_orders.note}
+                    onChange={(e) =>
+                      update((cur) => ({
+                        ...cur,
+                        custom_orders: { ...cur.custom_orders, note: e.target.value },
+                      }))
+                    }
+                    className="w-full px-3 py-2 text-13 rounded-lg bg-surface-muted border border-border text-text focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary"
+                  />
+                </div>
 
-            {/* Editable table of zones */}
-            <div className="overflow-x-auto rounded-lg border border-border">
-              <table className="w-full text-left text-13">
-                <thead className="bg-surface-muted text-text-muted text-11 font-semibold uppercase tracking-wider border-b border-border">
-                  <tr>
-                    <th className="px-4 py-2.5">Area / Region</th>
-                    <th className="px-3 py-2.5">Delivery Time</th>
-                    <th className="px-3 py-2.5">Charge (₹)</th>
-                    <th className="px-3 py-2.5 text-center">We deliver here</th>
-                    <th className="px-3 py-2.5 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {d.delivery.zones.map((z, idx) => (
-                    <tr key={idx} className="hover:bg-surface-muted/30">
-                      <td className="px-4 py-2.5">
-                        <input
-                          type="text"
-                          value={z.area}
-                          onChange={(e) => handleUpdateZone(idx, { area: e.target.value })}
-                          placeholder="e.g. Coimbatore city"
-                          className="w-full px-2.5 py-1 text-13 rounded-md bg-surface-muted border border-border text-text focus:outline-none focus:ring-2 focus:ring-primary/40"
-                        />
-                      </td>
-                      <td className="px-3 py-2.5">
-                        <input
-                          type="text"
-                          value={z.days}
-                          disabled={!z.available}
-                          onChange={(e) => handleUpdateZone(idx, { days: e.target.value })}
-                          placeholder="e.g. 1–2 days"
-                          className="w-28 px-2.5 py-1 text-13 rounded-md bg-surface-muted border border-border text-text disabled:opacity-40 focus:outline-none focus:ring-2 focus:ring-primary/40"
-                        />
-                      </td>
-                      <td className="px-3 py-2.5">
-                        <div className="relative">
-                          <input
-                            type="number"
-                            min="0"
-                            disabled={!z.available}
-                            value={z.charge}
-                            onChange={(e) =>
-                              handleUpdateZone(idx, { charge: Number(e.target.value) })
-                            }
-                            className="w-24 px-2.5 py-1 text-13 rounded-md bg-surface-muted border border-border text-text tabular-nums disabled:opacity-40 focus:outline-none focus:ring-2 focus:ring-primary/40"
-                          />
-                          <span className="text-11 text-text-muted ml-1.5">
-                            {z.charge === 0 ? "(Free)" : ""}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-3 py-2.5 text-center">
-                        <button
-                          type="button"
-                          role="switch"
-                          aria-checked={z.available !== false}
-                          onClick={() => handleUpdateZone(idx, { available: !z.available })}
-                          className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors cursor-pointer ${
-                            z.available !== false ? "bg-primary" : "bg-border"
-                          }`}
-                        >
-                          <span
-                            className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
-                              z.available !== false ? "translate-x-4.5" : "translate-x-0.5"
-                            }`}
-                          />
-                        </button>
-                      </td>
-                      <td className="px-3 py-2.5 text-right">
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteZone(idx)}
-                          className="p-1 rounded-md text-text-muted hover:text-danger hover:bg-danger/10 cursor-pointer transition-colors"
-                          title="Remove zone"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </section>
+                {/* Bulk discount & Lead time grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="block text-13 font-semibold text-text">
+                      Bulk Minimum Pieces
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        min="1"
+                        value={d.custom_orders.bulk_discount_qty ?? 10}
+                        onChange={(e) =>
+                          update((cur) => ({
+                            ...cur,
+                            custom_orders: {
+                              ...cur.custom_orders,
+                              bulk_discount_qty: Number(e.target.value),
+                            },
+                          }))
+                        }
+                        className="w-full px-3 py-2 text-13 rounded-lg bg-surface-muted border border-border text-text tabular-nums focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary"
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-11 text-text-muted">
+                        pieces
+                      </span>
+                    </div>
+                  </div>
 
-          {/* 3. Policies */}
-          <section
-            id="policies"
-            className="rounded-xl border border-border bg-surface p-6 shadow-xs space-y-5"
-          >
-            <div className="flex items-center gap-2 pb-3 border-b border-border">
-              <FileText className="w-5 h-5 text-primary" />
-              <div>
-                <h2 className="text-16 font-bold font-outfit text-text">3. Policies</h2>
-                <p className="text-12 text-text-muted">
-                  Four core studio policies quoted by the AI
-                </p>
-              </div>
-            </div>
+                  <div className="space-y-1.5">
+                    <label className="block text-13 font-semibold text-text">
+                      Bulk Discount (%)
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={d.custom_orders.bulk_discount_percent ?? 10}
+                        onChange={(e) =>
+                          update((cur) => ({
+                            ...cur,
+                            custom_orders: {
+                              ...cur.custom_orders,
+                              bulk_discount_percent: Number(e.target.value),
+                            },
+                          }))
+                        }
+                        className="w-full px-3 py-2 text-13 rounded-lg bg-surface-muted border border-border text-text tabular-nums focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary"
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-11 text-text-muted">
+                        % off
+                      </span>
+                    </div>
+                  </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {(["returns", "cancellation", "care", "warranty"] as const).map((polKey) => {
-                const titleMap: Record<string, string> = {
-                  returns: "Returns Policy",
-                  cancellation: "Cancellation Policy",
-                  care: "Resin Care Instructions",
-                  warranty: "Warranty & Durability",
-                };
-                const isEditing = editingPolicies[polKey];
+                  <div className="space-y-1.5">
+                    <label className="block text-13 font-semibold text-text">
+                      Extra Lead Time
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        min="0"
+                        value={d.custom_orders.lead_time_extra_days}
+                        onChange={(e) =>
+                          update((cur) => ({
+                            ...cur,
+                            custom_orders: {
+                              ...cur.custom_orders,
+                              lead_time_extra_days: Number(e.target.value),
+                            },
+                          }))
+                        }
+                        className="w-full px-3 py-2 text-13 rounded-lg bg-surface-muted border border-border text-text tabular-nums focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary"
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-11 text-text-muted">
+                        days
+                      </span>
+                    </div>
+                  </div>
+                </div>
 
-                return (
-                  <div
-                    key={polKey}
-                    className="p-4 rounded-xl border border-border bg-surface-muted/40 space-y-2.5 flex flex-col justify-between"
-                  >
+                {/* Locked-on row */}
+                <div className="flex items-center justify-between p-3.5 rounded-xl border border-border bg-surface-muted/60">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                      <Lock className="w-4 h-4" />
+                    </div>
                     <div>
-                      <div className="flex items-center justify-between">
-                        <h3 className="text-13 font-bold font-outfit text-text">
-                          {titleMap[polKey]}
-                        </h3>
+                      <p className="text-13 font-semibold text-text">
+                        Items not in your product list → always handed to you
+                      </p>
+                      <p className="text-11 text-text-muted" title="This keeps the assistant from inventing prices.">
+                        This keeps the assistant from inventing prices. Handed over as "Unknown product".
+                      </p>
+                    </div>
+                  </div>
+                  <span className="px-2.5 py-1 rounded-full text-11 font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 shrink-0">
+                    Active & Enforced
+                  </span>
+                </div>
+              </section>
+            )}
+
+            {/* 2. Delivery */}
+            {activeSection === "delivery" && (
+              <section
+                id="delivery"
+                className="rounded-xl border border-border bg-surface p-6 shadow-xs space-y-5"
+              >
+                <div className="flex items-center justify-between pb-3 border-b border-border">
+                  <div className="flex items-center gap-2">
+                    <Truck className="w-5 h-5 text-primary" />
+                    <div>
+                      <h2 className="text-16 font-bold font-outfit text-text">2. Delivery</h2>
+                      <p className="text-12 text-text-muted">
+                        Courier partners, turnaround times and shipping fees
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleAddZone}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-surface-muted text-text text-12 font-semibold hover:bg-surface transition-colors cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Add zone</span>
+                  </button>
+                </div>
+
+                {/* Courier name field */}
+                <div className="space-y-1.5">
+                  <label className="block text-13 font-semibold text-text">
+                    Courier Partner Name
+                  </label>
+                  <input
+                    type="text"
+                    value={d.delivery.courier}
+                    onChange={(e) =>
+                      update((cur) => ({
+                        ...cur,
+                        delivery: { ...cur.delivery, courier: e.target.value },
+                      }))
+                    }
+                    placeholder="e.g. Shiprocket (DTDC / Delhivery)"
+                    className="w-full max-w-md px-3 py-2 text-13 rounded-lg bg-surface-muted border border-border text-text focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary"
+                  />
+                </div>
+
+                {/* Editable table of zones */}
+                <div className="overflow-x-auto rounded-lg border border-border">
+                  <table className="w-full text-left text-13">
+                    <thead className="bg-surface-muted text-text-muted text-11 font-semibold uppercase tracking-wider border-b border-border">
+                      <tr>
+                        <th className="px-4 py-2.5">Area / Region</th>
+                        <th className="px-3 py-2.5">Delivery Time</th>
+                        <th className="px-3 py-2.5">Charge (₹)</th>
+                        <th className="px-3 py-2.5 text-center">We deliver here</th>
+                        <th className="px-3 py-2.5 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {d.delivery.zones.map((z, idx) => (
+                        <tr key={idx} className="hover:bg-surface-muted/30">
+                          <td className="px-4 py-2.5">
+                            <input
+                              type="text"
+                              value={z.area}
+                              onChange={(e) => handleUpdateZone(idx, { area: e.target.value })}
+                              placeholder="e.g. Coimbatore city"
+                              className="w-full px-2.5 py-1 text-13 rounded-md bg-surface-muted border border-border text-text focus:outline-none focus:ring-2 focus:ring-primary/40"
+                            />
+                          </td>
+                          <td className="px-3 py-2.5">
+                            <input
+                              type="text"
+                              value={z.days}
+                              disabled={!z.available}
+                              onChange={(e) => handleUpdateZone(idx, { days: e.target.value })}
+                              placeholder="e.g. 1–2 days"
+                              className="w-28 px-2.5 py-1 text-13 rounded-md bg-surface-muted border border-border text-text disabled:opacity-40 focus:outline-none focus:ring-2 focus:ring-primary/40"
+                            />
+                          </td>
+                          <td className="px-3 py-2.5">
+                            <div className="relative">
+                              <input
+                                type="number"
+                                min="0"
+                                disabled={!z.available}
+                                value={z.charge}
+                                onChange={(e) =>
+                                  handleUpdateZone(idx, { charge: Number(e.target.value) })
+                                }
+                                className="w-24 px-2.5 py-1 text-13 rounded-md bg-surface-muted border border-border text-text tabular-nums disabled:opacity-40 focus:outline-none focus:ring-2 focus:ring-primary/40"
+                              />
+                              <span className="text-11 text-text-muted ml-1.5">
+                                {z.charge === 0 ? "(Free)" : ""}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="px-3 py-2.5 text-center">
+                            <button
+                              type="button"
+                              role="switch"
+                              aria-checked={z.available !== false}
+                              onClick={() => handleUpdateZone(idx, { available: !z.available })}
+                              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors cursor-pointer ${
+                                z.available !== false ? "bg-primary" : "bg-border"
+                              }`}
+                            >
+                              <span
+                                className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
+                                  z.available !== false ? "translate-x-4.5" : "translate-x-0.5"
+                                }`}
+                              />
+                            </button>
+                          </td>
+                          <td className="px-3 py-2.5 text-right">
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteZone(idx)}
+                              className="p-1 rounded-md text-text-muted hover:text-danger hover:bg-danger/10 cursor-pointer transition-colors"
+                              title="Remove zone"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            )}
+
+            {/* 3. Policies */}
+            {activeSection === "policies" && (
+              <section
+                id="policies"
+                className="rounded-xl border border-border bg-surface p-6 shadow-xs space-y-5"
+              >
+                <div className="flex items-center gap-2 pb-3 border-b border-border">
+                  <FileText className="w-5 h-5 text-primary" />
+                  <div>
+                    <h2 className="text-16 font-bold font-outfit text-text">3. Policies</h2>
+                    <p className="text-12 text-text-muted">
+                      Four core studio policies quoted by the AI
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {(["returns", "cancellation", "care", "warranty"] as const).map((polKey) => {
+                    const titleMap: Record<string, string> = {
+                      returns: "Returns Policy",
+                      cancellation: "Cancellation Policy",
+                      care: "Resin Care Instructions",
+                      warranty: "Warranty & Durability",
+                    };
+                    const isEditing = editingPolicies[polKey];
+
+                    return (
+                      <div
+                        key={polKey}
+                        className="p-4 rounded-xl border border-border bg-surface-muted/40 space-y-2.5 flex flex-col justify-between"
+                      >
+                        <div>
+                          <div className="flex items-center justify-between">
+                            <h3 className="text-13 font-bold font-outfit text-text">
+                              {titleMap[polKey]}
+                            </h3>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setEditingPolicies({
+                                  ...editingPolicies,
+                                  [polKey]: !isEditing,
+                                })
+                              }
+                              className="p-1 rounded-md text-text-muted hover:text-text hover:bg-surface cursor-pointer text-11 flex items-center gap-1 font-medium"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                              <span>{isEditing ? "Done" : "Edit"}</span>
+                            </button>
+                          </div>
+
+                          {isEditing ? (
+                            <textarea
+                              rows={4}
+                              value={d.policies[polKey] || ""}
+                              onChange={(e) =>
+                                update((cur) => ({
+                                  ...cur,
+                                  policies: { ...cur.policies, [polKey]: e.target.value },
+                                }))
+                              }
+                              className="w-full mt-2 p-2.5 text-12 rounded-lg bg-surface border border-border text-text focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary"
+                            />
+                          ) : (
+                            <p className="text-12 text-text-muted mt-2 leading-relaxed">
+                              {d.policies[polKey] || "No policy specified."}
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="pt-2 border-t border-border flex items-center justify-between text-11 text-text-muted">
+                          <span>{updatedAt ? `Saved ${formatRelative(updatedAt)}` : ""}</span>
+                          <span className="text-primary-text font-medium">Auto-quoted</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+            )}
+
+            {/* 4. Tone Examples */}
+            {activeSection === "tone-examples" && (
+              <section
+                id="tone-examples"
+                className="rounded-xl border border-border bg-surface p-6 shadow-xs space-y-5"
+              >
+                <div className="flex items-center justify-between pb-3 border-b border-border">
+                  <div className="flex items-center gap-2">
+                    <MessageSquareQuote className="w-5 h-5 text-primary" />
+                    <div>
+                      <h2 className="text-16 font-bold font-outfit text-text">4. Tone examples</h2>
+                      <p className="text-12 text-text-muted">
+                        3–6 examples work best. Write replies exactly the way you talk to customers.
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowAddTone((prev) => !prev)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-surface-muted text-text text-12 font-semibold hover:bg-surface transition-colors cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>{showAddTone ? "Close" : "Add pair"}</span>
+                  </button>
+                </div>
+
+                {/* Add Tone Form - Placed right at top so clicking Add pair is immediately visible */}
+                {showAddTone && (
+                  <div className="p-4 rounded-xl border border-primary/30 bg-primary-soft/10 space-y-3 animate-in fade-in">
+                    <h4 className="text-13 font-semibold text-text">Add Customer ↔ AI Pair</h4>
+                    <div className="space-y-1.5">
+                      <label className="block text-12 font-medium text-text-muted">
+                        Customer asks:
+                      </label>
+                      <input
+                        type="text"
+                        autoFocus
+                        value={newToneCustomer}
+                        onChange={(e) => setNewToneCustomer(e.target.value)}
+                        placeholder="e.g. Do you make geode style coasters?"
+                        className="w-full px-3 py-1.5 text-13 rounded-lg bg-surface border border-border text-text focus:outline-none focus:ring-2 focus:ring-primary/40"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="block text-12 font-medium text-text-muted">
+                        You reply:
+                      </label>
+                      <textarea
+                        rows={2}
+                        value={newToneReply}
+                        onChange={(e) => setNewToneReply(e.target.value)}
+                        placeholder="e.g. Yes! 💕 Our geode pieces with quartz crystals are super popular..."
+                        className="w-full px-3 py-1.5 text-13 rounded-lg bg-surface border border-border text-text focus:outline-none focus:ring-2 focus:ring-primary/40"
+                      />
+                    </div>
+                    <div className="flex justify-end gap-2 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowAddTone(false);
+                          setNewToneCustomer("");
+                          setNewToneReply("");
+                        }}
+                        className="px-3 py-1.5 rounded-lg border border-border text-12 text-text hover:bg-surface cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleAddToneExample}
+                        className="px-3.5 py-1.5 rounded-lg bg-primary text-primary-foreground font-semibold text-12 cursor-pointer shadow-xs hover:bg-primary-hover"
+                      >
+                        Add Example
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Empty state when no tone examples */}
+                {d.tone_examples.length === 0 && !showAddTone && (
+                  <div className="text-center py-8 px-4 rounded-xl border border-dashed border-border bg-surface-muted/20 space-y-3">
+                    <p className="text-13 text-text-muted">No tone examples added yet.</p>
+                    <button
+                      type="button"
+                      onClick={() => setShowAddTone(true)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-12 font-semibold cursor-pointer shadow-xs hover:bg-primary-hover"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Add your first example</span>
+                    </button>
+                  </div>
+                )}
+
+                {/* List of pairs */}
+                <div className="space-y-4">
+                  {d.tone_examples.map((t, idx) => (
+                    <div
+                      key={idx}
+                      className="p-4 rounded-xl border border-border bg-surface-muted/30 space-y-3 relative group"
+                    >
+                      <div className="flex items-start justify-between">
+                        <span className="text-11 font-mono text-text-muted">Example {idx + 1}</span>
                         <button
                           type="button"
-                          onClick={() =>
-                            setEditingPolicies({
-                              ...editingPolicies,
-                              [polKey]: !isEditing,
-                            })
-                          }
-                          className="p-1 rounded-md text-text-muted hover:text-text hover:bg-surface cursor-pointer text-11 flex items-center gap-1 font-medium"
+                          onClick={() => handleDeleteTone(idx)}
+                          className="p-1 rounded text-text-muted hover:text-danger cursor-pointer transition-colors"
+                          title="Delete example"
                         >
-                          <Pencil className="w-3.5 h-3.5" />
-                          <span>{isEditing ? "Done" : "Edit"}</span>
+                          <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </div>
 
-                      {isEditing ? (
-                        <textarea
-                          rows={4}
-                          value={d.policies[polKey] || ""}
-                          onChange={(e) =>
-                            update((cur) => ({
-                              ...cur,
-                              policies: { ...cur.policies, [polKey]: e.target.value },
-                            }))
-                          }
-                          className="w-full mt-2 p-2.5 text-12 rounded-lg bg-surface border border-border text-text focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary"
-                        />
-                      ) : (
-                        <p className="text-12 text-text-muted mt-2 leading-relaxed">
-                          {d.policies[polKey] || "No policy specified."}
-                        </p>
-                      )}
-                    </div>
+                      {/* Customer bubble (Left) */}
+                      <div className="flex items-start gap-2 max-w-[85%]">
+                        <div className="w-6 h-6 rounded-full bg-border text-text-muted flex items-center justify-center text-10 font-bold shrink-0">
+                          C
+                        </div>
+                        <div className="p-3 rounded-2xl rounded-tl-xs bg-surface-muted border border-border text-13 text-text">
+                          {t.customer}
+                        </div>
+                      </div>
 
-                    <div className="pt-2 border-t border-border flex items-center justify-between text-11 text-text-muted">
-                      <span>{updatedAt ? `Saved ${formatRelative(updatedAt)}` : ""}</span>
-                      <span className="text-primary-text font-medium">Auto-quoted</span>
+                      {/* AI bubble (Right) */}
+                      <div className="flex items-start gap-2 justify-end max-w-[85%] ml-auto">
+                        <div className="p-3 rounded-2xl rounded-tr-xs bg-primary-soft text-text border border-primary/20 text-13 space-y-1">
+                          <div className="flex items-center justify-end gap-1 text-10 font-bold text-primary-text uppercase tracking-wider">
+                            <span>AI Assistant</span>
+                          </div>
+                          <p>{t.reply}</p>
+                        </div>
+                        <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-10 font-bold shrink-0">
+                          AI
+                        </div>
+                      </div>
                     </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* 5. Always Hand Over */}
+            {activeSection === "always-escalate" && (
+              <section
+                id="always-escalate"
+                className="rounded-xl border border-border bg-surface p-6 shadow-xs space-y-5"
+              >
+                <div className="flex items-center gap-2 pb-3 border-b border-border">
+                  <ShieldAlert className="w-5 h-5 text-danger" />
+                  <div>
+                    <h2 className="text-16 font-bold font-outfit text-text">5. Always hand over</h2>
+                    <p className="text-12 text-text-muted">
+                      Topic phrases the assistant never answers itself
+                    </p>
                   </div>
-                );
-              })}
-            </div>
-          </section>
+                </div>
 
-          {/* 4. Tone Examples */}
-          <section
-            id="tone-examples"
-            className="rounded-xl border border-border bg-surface p-6 shadow-xs space-y-5"
-          >
-            <div className="flex items-center justify-between pb-3 border-b border-border">
-              <div className="flex items-center gap-2">
-                <MessageSquareQuote className="w-5 h-5 text-primary" />
-                <div>
-                  <h2 className="text-16 font-bold font-outfit text-text">4. Tone examples</h2>
-                  <p className="text-12 text-text-muted">
-                    3–6 examples work best. Write replies exactly the way you talk to customers.
+                {/* Chip input */}
+                <div className="space-y-3">
+                  <div className="flex gap-2 max-w-md">
+                    <input
+                      type="text"
+                      value={escalateDraft}
+                      onChange={(e) => setEscalateDraft(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          handleAddEscalateTopic();
+                        }
+                      }}
+                      placeholder="Type phrase and press Enter..."
+                      className="flex-1 px-3 py-2 text-13 rounded-lg bg-surface-muted border border-border text-text focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddEscalateTopic}
+                      className="px-4 py-2 rounded-lg bg-surface-muted border border-border text-13 font-semibold text-text hover:bg-surface cursor-pointer"
+                    >
+                      Add phrase
+                    </button>
+                  </div>
+
+                  {/* Badges list */}
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    {d.escalate_always.map((topic, i) => (
+                      <span
+                        key={i}
+                        className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-12 font-medium bg-red-500/10 text-red-700 dark:text-red-400 border border-red-500/20"
+                      >
+                        <span>{topic}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveEscalateTopic(topic)}
+                          className="text-red-500/60 hover:text-red-700 ml-1 cursor-pointer font-bold"
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Info note */}
+                <div className="p-3.5 rounded-xl border border-border bg-surface-muted/60 text-12 text-text-muted">
+                  <p className="font-semibold text-text">Guaranteed Escalation Fallback</p>
+                  <p className="mt-0.5">
+                    Refunds, complaints and payment claims are always handed over, even if you remove
+                    them here.
                   </p>
                 </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setShowAddTone((prev) => !prev)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-surface-muted text-text text-12 font-semibold hover:bg-surface transition-colors cursor-pointer"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>{showAddTone ? "Close" : "Add pair"}</span>
-              </button>
-            </div>
-
-            {/* Add Tone Form - Placed right at top so clicking Add pair is immediately visible */}
-            {showAddTone && (
-              <div className="p-4 rounded-xl border border-primary/30 bg-primary-soft/10 space-y-3 animate-in fade-in">
-                <h4 className="text-13 font-semibold text-text">Add Customer ↔ AI Pair</h4>
-                <div className="space-y-1.5">
-                  <label className="block text-12 font-medium text-text-muted">
-                    Customer asks:
-                  </label>
-                  <input
-                    type="text"
-                    autoFocus
-                    value={newToneCustomer}
-                    onChange={(e) => setNewToneCustomer(e.target.value)}
-                    placeholder="e.g. Do you make geode style coasters?"
-                    className="w-full px-3 py-1.5 text-13 rounded-lg bg-surface border border-border text-text focus:outline-none focus:ring-2 focus:ring-primary/40"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="block text-12 font-medium text-text-muted">
-                    You reply:
-                  </label>
-                  <textarea
-                    rows={2}
-                    value={newToneReply}
-                    onChange={(e) => setNewToneReply(e.target.value)}
-                    placeholder="e.g. Yes! 💕 Our geode pieces with quartz crystals are super popular..."
-                    className="w-full px-3 py-1.5 text-13 rounded-lg bg-surface border border-border text-text focus:outline-none focus:ring-2 focus:ring-primary/40"
-                  />
-                </div>
-                <div className="flex justify-end gap-2 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowAddTone(false);
-                      setNewToneCustomer("");
-                      setNewToneReply("");
-                    }}
-                    className="px-3 py-1.5 rounded-lg border border-border text-12 text-text hover:bg-surface cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleAddToneExample}
-                    className="px-3.5 py-1.5 rounded-lg bg-primary text-primary-foreground font-semibold text-12 cursor-pointer shadow-xs hover:bg-primary-hover"
-                  >
-                    Add Example
-                  </button>
-                </div>
-              </div>
+              </section>
             )}
+          </div>
 
-            {/* Empty state when no tone examples */}
-            {d.tone_examples.length === 0 && !showAddTone && (
-              <div className="text-center py-8 px-4 rounded-xl border border-dashed border-border bg-surface-muted/20 space-y-3">
-                <p className="text-13 text-text-muted">No tone examples added yet.</p>
-                <button
-                  type="button"
-                  onClick={() => setShowAddTone(true)}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-12 font-semibold cursor-pointer shadow-xs hover:bg-primary-hover"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Add your first example</span>
-                </button>
-              </div>
-            )}
-
-            {/* List of pairs */}
-            <div className="space-y-4">
-              {d.tone_examples.map((t, idx) => (
-                <div
-                  key={idx}
-                  className="p-4 rounded-xl border border-border bg-surface-muted/30 space-y-3 relative group"
-                >
-                  <div className="flex items-start justify-between">
-                    <span className="text-11 font-mono text-text-muted">Example {idx + 1}</span>
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteTone(idx)}
-                      className="p-1 rounded text-text-muted hover:text-danger cursor-pointer transition-colors"
-                      title="Delete example"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-
-                  {/* Customer bubble (Left) */}
-                  <div className="flex items-start gap-2 max-w-[85%]">
-                    <div className="w-6 h-6 rounded-full bg-border text-text-muted flex items-center justify-center text-10 font-bold shrink-0">
-                      C
-                    </div>
-                    <div className="p-3 rounded-2xl rounded-tl-xs bg-surface-muted border border-border text-13 text-text">
-                      {t.customer}
-                    </div>
-                  </div>
-
-                  {/* AI bubble (Right) */}
-                  <div className="flex items-start gap-2 justify-end max-w-[85%] ml-auto">
-                    <div className="p-3 rounded-2xl rounded-tr-xs bg-primary-soft text-text border border-primary/20 text-13 space-y-1">
-                      <div className="flex items-center justify-end gap-1 text-10 font-bold text-primary-text uppercase tracking-wider">
-                        <span>AI Assistant</span>
-                      </div>
-                      <p>{t.reply}</p>
-                    </div>
-                    <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-10 font-bold shrink-0">
-                      AI
-                    </div>
-                  </div>
+          {/* ─── Unsaved Changes Footer (bottom of detail column) ─────────────── */}
+          {dirty && (
+            <div className="shrink-0 mt-4 sticky bottom-0 z-10 md:static rounded-xl bg-surface/95 backdrop-blur-md border border-border shadow-lg p-3 sm:p-4 animate-in slide-in-from-bottom">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-2 text-13 font-semibold text-amber-700 dark:text-amber-400">
+                  <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse" />
+                  <span>You have unsaved changes</span>
                 </div>
-              ))}
-            </div>
-          </section>
-    {/* Add Tone Form Modal/Inline */}
-            {showAddTone && (
-              <div className="p-4 rounded-xl border border-primary/30 bg-primary-soft/10 space-y-3 animate-in fade-in">
-                <h4 className="text-13 font-semibold text-text">Add Customer ↔ AI Pair</h4>
-                <div className="space-y-1.5">
-                  <label className="block text-12 font-medium text-text-muted">
-                    Customer asks:
-                  </label>
-                  <input
-                    type="text"
-                    value={newToneCustomer}
-                    onChange={(e) => setNewToneCustomer(e.target.value)}
-                    placeholder="e.g. Do you make geode style coasters?"
-                    className="w-full px-3 py-1.5 text-13 rounded-lg bg-surface border border-border text-text focus:outline-none focus:ring-2 focus:ring-primary/40"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="block text-12 font-medium text-text-muted">
-                    You reply:
-                  </label>
-                  <textarea
-                    rows={2}
-                    value={newToneReply}
-                    onChange={(e) => setNewToneReply(e.target.value)}
-                    placeholder="e.g. Yes! 💕 Our geode pieces with quartz crystals are super popular..."
-                    className="w-full px-3 py-1.5 text-13 rounded-lg bg-surface border border-border text-text focus:outline-none focus:ring-2 focus:ring-primary/40"
-                  />
-                </div>
-                <div className="flex justify-end gap-2 pt-2">
+
+                <div className="flex items-center gap-3">
                   <button
                     type="button"
-                    onClick={() => setShowAddTone(false)}
-                    className="px-3 py-1.5 rounded-lg border border-border text-12 text-text hover:bg-surface cursor-pointer"
+                    onClick={() => setConfirmDiscard(true)}
+                    className="px-4 py-2 rounded-lg border border-border bg-surface text-text text-13 font-semibold hover:bg-surface-muted cursor-pointer transition-colors"
                   >
-                    Cancel
+                    Discard
                   </button>
                   <button
                     type="button"
-                    onClick={handleAddToneExample}
-                    className="px-3.5 py-1.5 rounded-lg bg-primary text-primary-foreground font-semibold text-12 cursor-pointer shadow-xs"
+                    onClick={handleSave}
+                    disabled={put.isPending}
+                    className="px-5 py-2 rounded-lg bg-primary text-primary-foreground text-13 font-bold shadow-xs hover:brightness-105 cursor-pointer transition-all"
                   >
-                    Add Example
+                    {put.isPending ? "Saving..." : "Save changes"}
                   </button>
                 </div>
               </div>
-            )}
-          {/* 5. Always Hand Over */}
-          <section
-            id="always-escalate"
-            className="rounded-xl border border-border bg-surface p-6 shadow-xs space-y-5"
-          >
-            <div className="flex items-center gap-2 pb-3 border-b border-border">
-              <ShieldAlert className="w-5 h-5 text-danger" />
-              <div>
-                <h2 className="text-16 font-bold font-outfit text-text">5. Always hand over</h2>
-                <p className="text-12 text-text-muted">
-                  Topic phrases the assistant never answers itself
-                </p>
-              </div>
             </div>
-
-            {/* Chip input */}
-            <div className="space-y-3">
-              <div className="flex gap-2 max-w-md">
-                <input
-                  type="text"
-                  value={escalateDraft}
-                  onChange={(e) => setEscalateDraft(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      handleAddEscalateTopic();
-                    }
-                  }}
-                  placeholder="Type phrase and press Enter..."
-                  className="flex-1 px-3 py-2 text-13 rounded-lg bg-surface-muted border border-border text-text focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary"
-                />
-                <button
-                  type="button"
-                  onClick={handleAddEscalateTopic}
-                  className="px-4 py-2 rounded-lg bg-surface-muted border border-border text-13 font-semibold text-text hover:bg-surface cursor-pointer"
-                >
-                  Add phrase
-                </button>
-              </div>
-
-              {/* Badges list */}
-              <div className="flex flex-wrap gap-2 pt-1">
-                {d.escalate_always.map((topic, i) => (
-                  <span
-                    key={i}
-                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-12 font-medium bg-red-500/10 text-red-700 dark:text-red-400 border border-red-500/20"
-                  >
-                    <span>{topic}</span>
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveEscalateTopic(topic)}
-                      className="text-red-500/60 hover:text-red-700 ml-1 cursor-pointer font-bold"
-                    >
-                      ×
-                    </button>
-                  </span>
-                ))}
-              </div>
-            </div>
-
-            {/* Info note */}
-            <div className="p-3.5 rounded-xl border border-border bg-surface-muted/60 text-12 text-text-muted">
-              <p className="font-semibold text-text">Guaranteed Escalation Fallback</p>
-              <p className="mt-0.5">
-                Refunds, complaints and payment claims are always handed over, even if you remove
-                them here.
-              </p>
-            </div>
-          </section>
+          )}
         </div>
       </div>
-
-      {/* ─── Sticky Bottom Bar (Unsaved Changes) ─────────────────────────────── */}
-      {dirty && (
-        <div className="fixed bottom-0 left-0 right-0 z-40 bg-surface/95 backdrop-blur-md border-t border-border shadow-2xl p-4 animate-in slide-in-from-bottom">
-          <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
-            <div className="flex items-center gap-2 text-13 font-semibold text-amber-700 dark:text-amber-400">
-              <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse" />
-              <span>You have unsaved changes</span>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => setConfirmDiscard(true)}
-                className="px-4 py-2 rounded-lg border border-border bg-surface text-text text-13 font-semibold hover:bg-surface-muted cursor-pointer transition-colors"
-              >
-                Discard
-              </button>
-              <button
-                type="button"
-                onClick={handleSave}
-                disabled={put.isPending}
-                className="px-5 py-2 rounded-lg bg-primary text-primary-foreground text-13 font-bold shadow-xs hover:brightness-105 cursor-pointer transition-all"
-              >
-                {put.isPending ? "Saving..." : "Save changes"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ─── Confirm Discard Dialog ─────────────────────────────────────────── */}
       <ConfirmDialog

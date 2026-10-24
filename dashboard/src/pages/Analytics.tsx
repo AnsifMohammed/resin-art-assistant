@@ -18,7 +18,6 @@ import { useAuth } from "../context/AuthContext.tsx";
 import { StatCard, type StatCardProps } from "../components/shared/StatCard.tsx";
 import { SegmentedControl } from "../components/shared/SegmentedControl.tsx";
 import { useAnalytics } from "../hooks/useAnalytics.ts";
-import { useEscalations } from "../hooks/useEscalations.ts";
 import { formatDuration } from "../lib/format.ts";
 import { escalationReasonLabel } from "../lib/escalationReasons.ts";
 import type { AnalyticsTrend } from "../types/index.ts";
@@ -139,7 +138,6 @@ export default function Analytics() {
     to: range.to,
     channel: activeChannel === "all" ? undefined : activeChannel,
   });
-  const openEscalations = useEscalations();
 
   const data = analytics.data;
   const isLoading = analytics.isLoading;
@@ -167,17 +165,16 @@ export default function Analytics() {
     [data?.messagesDaily]
   );
 
-  // ─── Escalations: live open list (GET /escalations), else the API's count ───
-  const openList = openEscalations.data;
-  const openEscalationsCount: number | null = openList?.length ?? data?.attention?.openEscalations ?? null;
+  // ─── Escalations: from analytics attention (channel-filtered) ─────────────
+  const openEscalationsCount: number | null = data?.attention?.openEscalations ?? null;
 
   const oldestWaitingText = useMemo(() => {
-    if (!openList || openList.length === 0) return null;
-    const oldest = Math.min(...openList.map((e) => new Date(e.createdAt).getTime()));
+    const oldest = data?.attention?.oldestOpenEscalationAt;
+    if (!oldest) return null;
     const seconds = Math.max(60, dayjs().diff(dayjs(oldest), "second"));
     // Whole days once past a day, so the small tile never truncates ("26d", not "25d 23h").
     return seconds >= 86_400 ? `${Math.floor(seconds / 86_400)}d` : formatDuration(seconds);
-  }, [openList]);
+  }, [data?.attention?.oldestOpenEscalationAt]);
 
   // ─── Attention strip (null = not available, never faked) ──────────────────
   const attentionData: AttentionData = {
@@ -189,7 +186,7 @@ export default function Analytics() {
 
   // ─── KPI values: zero stays 0; missing → "—" with no trend chip ────────────
   const revenueValue = data?.revenue ? data.revenue.total : null;
-  const ordersValue = data?.orders ? data.orders.confirmed : null;
+  const ordersValue = data?.orders ? (data.orders.total ?? data.orders.confirmed) : null;
   const messagesValue = data?.messages ? data.messages.total : null;
 
   const autoRepliesCount = data ? data.autoReplies : null;
@@ -445,6 +442,7 @@ export default function Analytics() {
           label="Orders"
           value={ordersValue ?? DASH}
           trend={ordersTrend}
+          tooltip={data?.orders?.confirmed !== undefined ? `${data.orders.confirmed} confirmed` : undefined}
           color="blue"
           icon={<Package className="w-3.5 h-3.5" />}
           onClick={() => navigate("/orders")}
@@ -502,7 +500,7 @@ export default function Analytics() {
             autoRepliesCount={autoRepliesCount}
             escalationsCount={escalationsCount}
             topReasons={escalationReasonsList}
-            openEscalationsCount={openList ? openList.length : null}
+            openEscalationsCount={openEscalationsCount}
             oldestWaitingText={oldestWaitingText}
             avgResolveText={avgResolveText}
             trendVsPrev={aiTrendText}

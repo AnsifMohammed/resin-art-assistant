@@ -22,6 +22,8 @@ export interface StatCardProps {
   onClick?: () => void;
   className?: string;
   icon?: ReactNode;
+  /** Hover tooltip for the card. Defaults to label. */
+  tooltip?: string | undefined;
   /** Marks the card as sample data: rendered as a tiny flask icon next to the label.
    *  Kept for compatibility; Analytics shows real data only and never passes it. */
   tag?: ReactNode;
@@ -86,6 +88,7 @@ export function StatCard({
   className = "",
   icon,
   tag,
+  tooltip,
   // radialProgress kept for compat but no longer rendered
 }: StatCardProps) {
   const c = colorMap[color];
@@ -128,6 +131,7 @@ export function StatCard({
       onClick={onClick}
       role={onClick ? "button" : undefined}
       tabIndex={onClick ? 0 : undefined}
+      title={tooltip ?? label}
       onKeyDown={(e) => {
         if (onClick && (e.key === "Enter" || e.key === " ")) {
           e.preventDefault();
@@ -159,7 +163,7 @@ export function StatCard({
         )}
         {/* Label — single line, full text in the tooltip (wide cards only) */}
         <span
-          title={label}
+          title={tooltip ?? label}
           className="hidden @min-[12rem]:block text-11 uppercase tracking-wide font-semibold text-text-muted leading-tight truncate flex-1 min-w-0"
         >
           {label}
@@ -204,7 +208,7 @@ export function StatCard({
 
       {/* ─── Label line for narrow cards ─────────────────────────────────────── */}
       <span
-        title={label}
+        title={tooltip ?? label}
         className="@min-[12rem]:hidden text-11 uppercase tracking-wide font-semibold text-text-muted leading-tight truncate min-w-0"
       >
         {label}

@@ -263,7 +263,10 @@ export const analyticsRoutes: FastifyPluginAsync = async (app: FastifyInstance) 
 
         // Attention (current, not range-bound)
         db
-          .select({ openEscalations: sql<number>`count(*)::int` })
+          .select({
+            openEscalations: sql<number>`count(*)::int`,
+            oldestOpenEscalationAt: sql<Date | null>`min(${escalations.createdAt})`,
+          })
           .from(escalations)
           .where(and(eq(escalations.businessId, businessId), isNull(escalations.resolvedAt), ...escChannel)),
         db
@@ -354,6 +357,8 @@ export const analyticsRoutes: FastifyPluginAsync = async (app: FastifyInstance) 
         revenue: rupees(orderByDay.get(date)?.revenue),
         orders: num(orderByDay.get(date)?.orders),
       }));
+      const ordersTotal = num(orderRows[0]?.orders);
+      const ordersPreviousTotal = num(prevOrderRows[0]?.orders);
       const confirmed = num(orderRows[0]?.confirmed);
       const previousConfirmed = num(prevOrderRows[0]?.confirmed);
       const pendingOrders = num(orderStateRows[0]?.pendingOrders);
@@ -374,6 +379,8 @@ export const analyticsRoutes: FastifyPluginAsync = async (app: FastifyInstance) 
         staff: num(msgStats?.sentByStaff),
         system: num(msgStats?.sentBySystem),
       };
+
+      const oldestOpenEsc = openEscRows[0]?.oldestOpenEscalationAt;
 
       return {
         from,
@@ -397,6 +404,8 @@ export const analyticsRoutes: FastifyPluginAsync = async (app: FastifyInstance) 
           daily: revenueDaily,
         },
         orders: {
+          total: ordersTotal,
+          previousTotal: ordersPreviousTotal,
           confirmed,
           previousConfirmed,
           pending: pendingOrders,
@@ -405,13 +414,14 @@ export const analyticsRoutes: FastifyPluginAsync = async (app: FastifyInstance) 
         topProducts,
         attention: {
           openEscalations: num(openEscRows[0]?.openEscalations),
+          oldestOpenEscalationAt: oldestOpenEsc ? new Date(oldestOpenEsc).toISOString() : null,
           windowsClosingSoon: num(windowRows[0]?.windowsClosingSoon),
           pendingOrders,
           unpaidBalance: rupees(orderStateRows[0]?.unpaidBalance),
         },
         trends: {
           revenue: trend(revenueTotal, revenuePrevious),
-          orders: trend(confirmed, previousConfirmed),
+          orders: trend(ordersTotal, ordersPreviousTotal),
           messages: trend(total, prevTotal),
           autoReplyRate: trend(autoReplyRate, prevAutoReplyRate),
           avgResponseTimeSeconds: {

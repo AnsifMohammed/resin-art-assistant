@@ -24,6 +24,10 @@ export interface AutomationControl {
 function isFullHeightRoute(pathname: string): boolean {
   return (
     pathname === "/inbox" ||
+    pathname === "/escalations" ||
+    pathname === "/broadcast" ||
+    pathname === "/knowledge-base" ||
+    pathname === "/audit-log" ||
     pathname.startsWith("/conversations/") ||
     pathname === "/orders" ||
     pathname.startsWith("/orders/") ||
@@ -69,7 +73,7 @@ export function AppShell() {
 
   return (
     <PageTitleProvider>
-      <div className="flex h-dvh overflow-hidden bg-bg text-text">
+      <div className="relative flex h-dvh overflow-hidden bg-bg text-text">
         {/* Desktop & Tablet Sidebar */}
         <Sidebar />
 

@@ -861,7 +861,7 @@ function CustomerKpiRibbon({
 
   if (loading) {
     return (
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3 shrink-0">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 shrink-0">
         {Array.from({ length: 4 }).map((_, i) => (
           <div key={i} className="p-3 sm:p-3.5 rounded-xl border border-border bg-surface flex flex-col justify-between space-y-2">
             <div className="flex items-center justify-between">
@@ -882,7 +882,7 @@ function CustomerKpiRibbon({
   const isNew = activeSegment === "new";
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3 shrink-0">
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 shrink-0">
       {/* 1. All Directory */}
       <button
         type="button"
@@ -1330,21 +1330,21 @@ export default function Customers() {
   }
 
   return (
-    <div className="h-full flex flex-col p-3 sm:p-4 lg:p-5 gap-2 overflow-hidden w-full">
+    <div className="h-full flex flex-col p-4 sm:p-6 lg:p-8 gap-6 overflow-hidden w-full">
       {/* ─── Page Header ──────────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between gap-3 shrink-0">
-        <div className="flex items-center gap-2.5 min-w-0">
-          <h1 className="text-18 md:text-20 font-bold font-outfit text-text tracking-tight flex items-center gap-2 truncate">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 shrink-0">
+        <div className="min-w-0">
+          <h1 className="text-24 md:text-28 font-bold font-outfit text-text tracking-tight flex items-center gap-2 truncate">
             <span>Customer Directory</span>
             {counts && (
-              <span className="px-2 py-0.5 rounded-full text-11 font-bold bg-primary/10 text-primary-text shrink-0">
+              <span className="px-2 py-0.5 rounded-full text-12 font-bold bg-primary/10 text-primary-text shrink-0">
                 {counts.all}
               </span>
             )}
           </h1>
-          <span className="hidden md:inline-block text-12 text-text-muted border-l border-border pl-2.5 truncate">
+          <p className="text-13 text-text-muted mt-0.5 truncate">
             Buyer segments, spend & conversations
-          </span>
+          </p>
         </div>
 
         {/* View Mode Toggle & Total Counter */}

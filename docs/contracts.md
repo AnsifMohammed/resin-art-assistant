@@ -162,6 +162,24 @@ Same access rule. Sets `state = "ai_active"`, sets `resolvedAt/resolvedByUserId`
 200 { conversation: { id, state: "ai_active" }, escalation: Escalation | null }
 ```
 
+### GET /conversations/:id/orders (admin + staff)
+Admin: any conversation of the business; staff: only if assigned to an open escalation or unassigned
+(`staffCanAccessConversation`), else `403 FORBIDDEN` ("Not assigned to you").
+Returns non-deleted orders for that conversation's customer (`orders.customerId = conversation.customerId`), newest first. Read-only.
+```ts
+200 {
+  orders: Array<{
+    id: string,
+    orderNo: string,
+    status: OrderStatus,
+    totalAmount: number,
+    createdAt: string,
+    expectedDeliveryDate: string | null,
+    items: Array<{ productName: string, quantity: number }>
+  }>
+}
+```
+
 ## Message templates
 
 Ready-made messages inserted into replies. `{variableName}` placeholders (`\w+`); `variables` is always computed from
@@ -515,6 +533,8 @@ Days are IST calendar days (`Asia/Kolkata`), `"YYYY-MM-DD"`, one entry for **eve
     daily: Array<{ date: "YYYY-MM-DD", revenue: number, orders: number }>  // orders = count of those orders
   },
   orders: {
+    total: number,                     // count of non-deleted, non-cancelled orders created in range (same rule as revenue.daily)
+    previousTotal: number,             // same, previous period
     confirmed: number,                 // orders in range with status confirmed|in_production|ready|dispatched|delivered
     previousConfirmed: number,         // same, previous period
     pending: number                    // CURRENT non-deleted orders with status pending (not range-bound)
@@ -532,13 +552,14 @@ Days are IST calendar days (`Asia/Kolkata`), `"YYYY-MM-DD"`, one entry for **eve
   }>,                                  // (non-deleted items of non-deleted, non-cancelled orders in range)
   attention: {                         // CURRENT values, not range-bound
     openEscalations: number,           // unresolved escalations
+    oldestOpenEscalationAt: string | null, // ISO timestamp of the oldest unresolved escalation (or null)
     windowsClosingSoon: number,        // conversations in escalated|owner_handling with windowClosesAt in [now, now + 2h]
     pendingOrders: number,             // = orders.pending
     unpaidBalance: number              // Σ over non-deleted, non-cancelled orders of max(0, totalAmount − Σ paid payments)
   },
   trends: Record<"revenue" | "orders" | "messages" | "autoReplyRate" | "avgResponseTimeSeconds",
                  { current: number, previous: number, changePct: number | null }>,
-    // revenue = revenue.total/previous; orders = orders.confirmed/previousConfirmed;
+    // revenue = revenue.total/previous; orders = orders.total/previousTotal;
     // messages = messages.total vs previous period; autoReplyRate = rate (0..1) vs previous period rate;
     // avgResponseTimeSeconds: null → 0 in current/previous, changePct null if either is null.
     // changePct = round((current − previous) / previous × 100); null when previous is 0 (or null).

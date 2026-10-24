@@ -562,9 +562,9 @@ export default function BroadcastPage() {
   const primaryAction: BroadcastAction = mode === "schedule" ? "schedule" : "send_now";
 
   return (
-    <div ref={topRef} className="space-y-8 pb-12 w-full">
+    <div className="h-full w-full flex flex-col gap-6 p-4 sm:p-6 lg:p-8 overflow-y-auto md:overflow-hidden">
       {/* ─── Page Header ──────────────────────────────────────────────────────── */}
-      <div>
+      <div className="shrink-0">
         <h1 className="text-24 md:text-28 font-bold font-outfit text-text tracking-tight flex items-center gap-2">
           <span>Broadcast Campaigns</span>
           <span className="px-2 py-0.5 rounded-full text-11 font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
@@ -576,6 +576,9 @@ export default function BroadcastPage() {
         </p>
       </div>
 
+      {/* ─── Scroll region: composer + history (the only part that scrolls on md+) ─── */}
+      <div className="md:flex-1 md:min-h-0 md:overflow-y-auto custom-scrollbar md:pr-1 md:pb-1">
+      <div ref={topRef} className="space-y-8">
       {editingId && (
         <div className="p-3 rounded-xl border border-primary/30 bg-primary/10 flex items-center justify-between gap-3 text-13 text-text">
           <span className="flex items-center gap-2">
@@ -1121,6 +1124,9 @@ export default function BroadcastPage() {
             onPage={setHistoryPage}
           />
         )}
+      </div>
+
+      </div>
       </div>
 
       {/* ─── Confirmation Modal ───────────────────────────────────────────────── */}

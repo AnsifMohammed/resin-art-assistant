@@ -159,7 +159,28 @@ export const settingsRoutes: FastifyPluginAsync = async (app: FastifyInstance) =
     { preHandler: [authenticate, requireAdmin] },
     async (request) => {
       const businessId = request.user.businessId;
-      return settingsResponse(businessId, await loadSettings(businessId));
+      const [[biz], bizChannels] = await Promise.all([
+        db
+          .select({ settings: businesses.settings })
+          .from(businesses)
+          .where(eq(businesses.id, businessId)),
+        db
+          .select({
+            id: channels.id,
+            type: channels.type,
+            identifier: channels.identifier,
+            status: channels.status,
+            tokenExpiresAt: channels.tokenExpiresAt,
+          })
+          .from(channels)
+          .where(eq(channels.businessId, businessId)),
+      ]);
+      const stored = (biz?.settings as Record<string, unknown>) || {};
+      return {
+        paused: Boolean(stored.automation_paused),
+        channels: bizChannels,
+        ...readSections(stored),
+      };
     },
   );
 

@@ -27,6 +27,7 @@ import { Skeleton, SkeletonTableRow } from "../components/shared/Skeleton.tsx";
 import { TagBadge } from "../components/ui/Badge.tsx";
 import {
   useConversation,
+  useConversationOrders,
   useInfiniteConversations,
   useMarkRead,
   type ConversationFilters,
@@ -266,10 +267,20 @@ function DetailRow({ label, children }: { label: string; children: ReactNode }) 
 }
 
 /** Admin-only customer data for the panel: flags, city, spend, recent orders, editable notes. */
-function CustomerInsights({ customerId, fallbackNotes }: { customerId: string; fallbackNotes: string | null }) {
+function CustomerInsights({
+  conversationId,
+  customerId,
+  fallbackNotes,
+}: {
+  conversationId?: string;
+  customerId: string;
+  fallbackNotes: string | null;
+}) {
   const navigate = useNavigate();
   const customerQuery = useCustomer(customerId);
-  const ordersQuery = useCustomerOrders(customerId);
+  const convOrders = useConversationOrders(conversationId);
+  const custOrders = useCustomerOrders(!conversationId ? customerId : null);
+  const ordersQuery = conversationId ? convOrders : custOrders;
   const update = useUpdateCustomer();
   const c = customerQuery.data;
 
@@ -460,7 +471,12 @@ function CustomerPanel({ conversation, onClose }: { conversation: ConversationDe
           <DetailRow label="Customer since">{formatShortDate(customer.createdAt)}</DetailRow>
         </dl>
 
-        <CustomerInsights key={conversation.customerId} customerId={conversation.customerId} fallbackNotes={customer.notes} />
+        <CustomerInsights
+          key={conversation.customerId}
+          conversationId={conversation.id}
+          customerId={conversation.customerId}
+          fallbackNotes={customer.notes}
+        />
       </aside>
     </>
   );

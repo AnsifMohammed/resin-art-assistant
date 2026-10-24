@@ -10,5 +10,6 @@ export function useAnalytics(params: AnalyticsParams = {}) {
     queryFn: ({ signal }) => getAnalytics(params, signal),
     placeholderData: keepPreviousData,
     staleTime: 60_000,
+    refetchOnWindowFocus: false,
   });
 }

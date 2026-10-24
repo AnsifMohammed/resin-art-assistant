@@ -49,6 +49,7 @@ interface Answers {
   orderByChannel: Array<Record<string, unknown>>;
   top: Array<Record<string, unknown>>;
   openEsc: number;
+  oldestEsc: string | null;
   windows: number;
   orderState: Record<string, unknown>;
 }
@@ -86,6 +87,7 @@ function baseAnswers(): Answers {
       { productId: "prod-1", name: "Ocean Coaster Set of 4", imageUrl: "https://img/1.jpg", units: 3, revenue: "3600.4" },
     ],
     openEsc: 4,
+    oldestEsc: "2026-10-01T10:00:00.000Z",
     windows: 1,
     orderState: { pendingOrders: 5, unpaidBalance: "1500.6" },
   };
@@ -104,7 +106,7 @@ function answer(q: FakeQuery): any[] | undefined {
     case "escalations":
       if ("totalEscalations" in f) return [isPrevious(q, "escalations") ? answers.prevEsc : answers.esc];
       if ("reason" in f) return answers.reasons;
-      if ("openEscalations" in f) return [{ openEscalations: answers.openEsc }];
+      if ("openEscalations" in f) return [{ openEscalations: answers.openEsc, oldestOpenEscalationAt: answers.oldestEsc }];
       return undefined;
     case "orders":
       if ("confirmed" in f) return [isPrevious(q, "orders") ? answers.prevOrders : answers.orders];
@@ -210,14 +212,20 @@ describe("GET /analytics", () => {
     const body = (await get()).json();
     expect(body.revenue.total).toBe(4800);
     expect(body.revenue.previous).toBe(2400);
-    expect(body.orders).toEqual({ confirmed: 2, previousConfirmed: 1, pending: 5 });
+    expect(body.orders).toEqual({
+      total: 3,
+      previousTotal: 2,
+      confirmed: 2,
+      previousConfirmed: 1,
+      pending: 5,
+    });
     expect(body.channels).toEqual({
       whatsapp: { messages: 15, revenue: 3600, orders: 2 },
       instagram: { messages: 5, revenue: 1200, orders: 1 },
     });
     expect(body.trends).toEqual({
       revenue: { current: 4800, previous: 2400, changePct: 100 },
-      orders: { current: 2, previous: 1, changePct: 100 },
+      orders: { current: 3, previous: 2, changePct: 50 },
       messages: { current: 20, previous: 10, changePct: 100 },
       // prev: 3 / (3 + 1) = 0.75 → current 0.75
       autoReplyRate: { current: 0.75, previous: 0.75, changePct: 0 },
@@ -288,7 +296,13 @@ describe("GET /analytics", () => {
 
   it("returns attention, repliesBySender and delivery", async () => {
     const body = (await get()).json();
-    expect(body.attention).toEqual({ openEscalations: 4, windowsClosingSoon: 1, pendingOrders: 5, unpaidBalance: 1501 });
+    expect(body.attention).toEqual({
+      openEscalations: 4,
+      oldestOpenEscalationAt: "2026-10-01T10:00:00.000Z",
+      windowsClosingSoon: 1,
+      pendingOrders: 5,
+      unpaidBalance: 1501,
+    });
     expect(body.repliesBySender).toEqual({ ai: 6, owner: 1, staff: 1, system: 0 });
     expect(body.delivery).toEqual({ failed: 1, read: 4 });
 

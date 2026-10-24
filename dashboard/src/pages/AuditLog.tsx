@@ -242,11 +242,11 @@ export default function AuditLog() {
   }, [currentUser, staffQuery.data]);
 
   return (
-    <div className="space-y-6 pb-12 w-full">
+    <div className="h-full w-full flex flex-col gap-6 p-4 sm:p-6 lg:p-8 overflow-y-auto md:overflow-hidden">
       {/* ─── Page Header ──────────────────────────────────────────────────────── */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="shrink-0 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold font-display text-text tracking-tight flex items-center gap-2">
+          <h1 className="text-24 md:text-28 font-bold font-outfit text-text tracking-tight flex items-center gap-2">
             <span>Audit log</span>
             {total > 0 && (
               <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-primary/10 text-primary-text">
@@ -254,7 +254,7 @@ export default function AuditLog() {
               </span>
             )}
           </h1>
-          <p className="text-sm text-text-muted mt-0.5">
+          <p className="text-13 text-text-muted mt-0.5">
             Every reply, hand-over and change, with who did it
           </p>
         </div>
@@ -271,7 +271,7 @@ export default function AuditLog() {
       </div>
 
       {/* ─── Filters Row (Actor & Action only) ─────────────────────────────────── */}
-      <div className="flex flex-wrap items-center gap-3 p-3 rounded-xl border border-border bg-surface shadow-xs">
+      <div className="shrink-0 sticky top-0 z-10 md:static flex flex-wrap items-center gap-3 p-3 rounded-xl border border-border bg-surface shadow-xs">
         <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-text-muted pl-1">
           <Filter className="w-3.5 h-3.5 text-primary" />
           <span>Filters:</span>
@@ -339,10 +339,11 @@ export default function AuditLog() {
         )}
       </div>
 
-      {/* ─── DataTable / Skeletons / Empty State ──────────────────────────────── */}
+      {/* ─── DataTable / Skeletons / Empty State — the only part that scrolls on md+ ─── */}
+      <div className="md:flex-1 md:min-h-0 md:flex md:flex-col">
       {logQuery.isPending ? (
         /* Loading Skeletons */
-        <div className="rounded-xl border border-border bg-surface p-4 divide-y divide-border">
+        <div className="rounded-xl border border-border bg-surface p-4 divide-y divide-border md:overflow-y-auto custom-scrollbar">
           {[1, 2, 3, 4, 5].map((i) => (
             <div key={i} className="py-3 flex items-center justify-between gap-4 animate-pulse">
               <div className="flex items-center gap-3">
@@ -357,7 +358,7 @@ export default function AuditLog() {
         </div>
       ) : entries.length === 0 ? (
         /* Empty State */
-        <div className="rounded-xl border border-border bg-surface p-12 text-center space-y-4">
+        <div className="rounded-xl border border-border bg-surface p-12 text-center space-y-4 md:overflow-y-auto custom-scrollbar">
           <div className="w-12 h-12 rounded-full bg-surface-muted text-text-muted flex items-center justify-center mx-auto">
             <ClipboardList className="w-6 h-6" />
           </div>
@@ -373,9 +374,9 @@ export default function AuditLog() {
       ) : (
         <>
           {/* Desktop Table (hidden on mobile) */}
-          <div className="hidden md:block rounded-xl border border-border bg-surface shadow-xs overflow-hidden">
+          <div className="hidden md:block rounded-xl border border-border bg-surface shadow-xs overflow-auto md:max-h-full custom-scrollbar">
             <table className="w-full text-left text-sm">
-              <thead className="bg-surface-muted text-text-muted text-xs font-semibold uppercase tracking-wider border-b border-border">
+              <thead className="sticky top-0 z-[1] bg-surface-muted text-text-muted text-xs font-semibold uppercase tracking-wider border-b border-border">
                 <tr>
                   <th className="px-4 py-3">Actor</th>
                   <th className="px-4 py-3">Action</th>
@@ -533,39 +534,40 @@ export default function AuditLog() {
               );
             })}
           </div>
-
-          {/* ─── Pagination Bar ─────────────────────────────────────────────── */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between p-3 rounded-xl border border-border bg-surface text-sm text-text-muted">
-              <span className="text-xs">
-                Page <span className="font-semibold text-text">{page}</span> of{" "}
-                <span className="font-semibold text-text">{totalPages}</span> ({total} items)
-              </span>
-
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  disabled={page <= 1}
-                  onClick={() => handlePageChange(page - 1)}
-                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-border bg-surface-muted text-text hover:bg-surface text-xs font-semibold cursor-pointer disabled:opacity-40 transition"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                  <span>Previous</span>
-                </button>
-
-                <button
-                  type="button"
-                  disabled={page >= totalPages}
-                  onClick={() => handlePageChange(page + 1)}
-                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-border bg-surface-muted text-text hover:bg-surface text-xs font-semibold cursor-pointer disabled:opacity-40 transition"
-                >
-                  <span>Next</span>
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          )}
         </>
+      )}
+      </div>
+
+      {/* ─── Pagination Bar ─────────────────────────────────────────────── */}
+      {!logQuery.isPending && entries.length > 0 && totalPages > 1 && (
+        <div className="shrink-0 flex items-center justify-between p-3 rounded-xl border border-border bg-surface text-sm text-text-muted">
+          <span className="text-xs">
+            Page <span className="font-semibold text-text">{page}</span> of{" "}
+            <span className="font-semibold text-text">{totalPages}</span> ({total} items)
+          </span>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              disabled={page <= 1}
+              onClick={() => handlePageChange(page - 1)}
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-border bg-surface-muted text-text hover:bg-surface text-xs font-semibold cursor-pointer disabled:opacity-40 transition"
+            >
+              <ChevronLeft className="w-4 h-4" />
+              <span>Previous</span>
+            </button>
+
+            <button
+              type="button"
+              disabled={page >= totalPages}
+              onClick={() => handlePageChange(page + 1)}
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-border bg-surface-muted text-text hover:bg-surface text-xs font-semibold cursor-pointer disabled:opacity-40 transition"
+            >
+              <span>Next</span>
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );

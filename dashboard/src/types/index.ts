@@ -376,6 +376,25 @@ export interface ResolveResponse {
   escalation: Escalation | null;
 }
 
+export interface ConversationOrderItem {
+  productName: string;
+  quantity: number;
+}
+
+export interface ConversationOrder {
+  id: string;
+  orderNo: string;
+  status: OrderStatus;
+  totalAmount: number;
+  createdAt: ISODateString;
+  expectedDeliveryDate: string | null;
+  items: ConversationOrderItem[];
+}
+
+export interface ConversationOrdersResponse {
+  orders: ConversationOrder[];
+}
+
 // ─── Message templates ─────────────────────────────────────────────
 
 export interface TemplateListParams {
@@ -614,6 +633,8 @@ export interface AnalyticsResponse {
     daily: AnalyticsDailyRevenue[];
   };
   orders?: {
+    total?: number;
+    previousTotal?: number;
     confirmed: number;
     previousConfirmed: number;
     pending: number;
@@ -655,6 +676,7 @@ export interface AnalyticsTopProduct {
 
 export interface AnalyticsAttention {
   openEscalations: number;
+  oldestOpenEscalationAt?: ISODateString | null;
   windowsClosingSoon: number;
   pendingOrders: number;
   unpaidBalance: number;

@@ -21,6 +21,7 @@ export const queryKeys = {
     list: (params: ConversationListParams) => [...queryKeys.conversations.lists(), params] as const,
     details: () => [...queryKeys.conversations.all, "detail"] as const,
     detail: (id: string) => [...queryKeys.conversations.details(), id] as const,
+    orders: (id: string) => [...queryKeys.conversations.all, "orders", id] as const,
   },
   escalations: {
     all: ["escalations"] as const,

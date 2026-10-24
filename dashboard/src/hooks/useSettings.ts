@@ -9,6 +9,8 @@ export function useSettings(opts: { enabled?: boolean } = {}) {
     queryKey: queryKeys.settings.all,
     queryFn: ({ signal }) => getSettings(signal),
     enabled: opts.enabled ?? true,
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
   });
 }
 
