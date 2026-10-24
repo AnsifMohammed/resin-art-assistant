@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import {
   Plus,
   Search,
@@ -8,15 +8,25 @@ import {
   Package,
   Pencil,
   Trash2,
-  Check,
+  Upload,
+  X,
+  ImageIcon,
+  Loader2,
+  Star,
 } from "lucide-react";
 import { toast } from "sonner";
-import { mockProducts, type Product } from "../data/mockData.ts";
+import {
+  useCreateProduct,
+  useDeleteProduct,
+  useProducts,
+  useUpdateProduct,
+} from "../hooks/useProducts.ts";
+import { uploadToCloudinary } from "../api/products.ts";
+import type { Product, ProductSize } from "../types/index.ts";
 import { SlideOver } from "../components/shared/SlideOver.tsx";
 import { ConfirmDialog } from "../components/shared/ConfirmDialog.tsx";
-import { SampleDataBadge } from "../components/shared/SampleDataBadge.tsx";
 
-const PRESET_IMAGES = [
+const FALLBACK_PRESET_IMAGES = [
   "https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?w=600&auto=format&fit=crop&q=80",
   "https://images.unsplash.com/photo-1563861826100-9cb868fdbe1c?w=600&auto=format&fit=crop&q=80",
   "https://images.unsplash.com/photo-1615529182904-14819c35db37?w=600&auto=format&fit=crop&q=80",
@@ -26,7 +36,13 @@ const PRESET_IMAGES = [
 ];
 
 export default function Catalogue() {
-  const [products, setProducts] = useState<Product[]>(mockProducts);
+  const { data, isLoading, isError, refetch } = useProducts({ active: "true" });
+  const products = useMemo(() => data?.products ?? [], [data?.products]);
+
+  const createMutation = useCreateProduct();
+  const updateMutation = useUpdateProduct();
+  const deleteMutation = useDeleteProduct();
+
   const [searchQuery, setSearchQuery] = useState("");
   const [customizableOnly, setCustomizableOnly] = useState(false);
   const [sortBy, setSortBy] = useState<"name" | "price-asc" | "price-desc" | "lead-time">("name");
@@ -39,35 +55,42 @@ export default function Catalogue() {
 
   // Form state for Add/Edit
   const [formName, setFormName] = useState("");
-  const [formPrice, setFormPrice] = useState<number>(1200);
-  const [formLeadTime, setFormLeadTime] = useState<number>(5);
-  const [formCustomizable, setFormCustomizable] = useState(true);
-  const [formSizes, setFormSizes] = useState<string[]>([]);
+  const [formDescription, setFormDescription] = useState("");
+  const [formLeadTime, setFormLeadTime] = useState<number>(3);
+  const [formCustomizable, setFormCustomizable] = useState(false);
+  const [formSizes, setFormSizes] = useState<ProductSize[]>([
+    { name: "Standard", price: 1200 },
+  ]);
   const [formOptions, setFormOptions] = useState<string[]>([]);
-  const [formImage, setFormImage] = useState("");
+  const [formImages, setFormImages] = useState<string[]>([]);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
 
   // Input draft states for chip inputs
-  const [sizeDraft, setSizeDraft] = useState("");
   const [optionDraft, setOptionDraft] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Filter & sort products
   const filteredProducts = useMemo(() => {
     let result = products.filter((p) => {
-      if (customizableOnly && !p.isCustomizable) return false;
+      if (customizableOnly && !p.customizable) return false;
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         const matchName = p.name.toLowerCase().includes(q);
-        const matchSizes = p.sizes?.some((s) => s.toLowerCase().includes(q));
-        const matchOptions = p.options.some((o) => o.toLowerCase().includes(q));
-        return matchName || matchSizes || matchOptions;
+        const matchDesc = p.description?.toLowerCase().includes(q);
+        const matchSizes = p.sizes?.some((s) => s.name.toLowerCase().includes(q));
+        const matchOptions = p.customOptions?.some((o) => o.toLowerCase().includes(q));
+        return matchName || matchDesc || matchSizes || matchOptions;
       }
       return true;
     });
 
     result = [...result].sort((a, b) => {
+      const aMinPrice = Math.min(...(a.sizes.map((s) => s.price) || [0]));
+      const bMinPrice = Math.min(...(b.sizes.map((s) => s.price) || [0]));
+
       if (sortBy === "name") return a.name.localeCompare(b.name);
-      if (sortBy === "price-asc") return a.price - b.price;
-      if (sortBy === "price-desc") return b.price - a.price;
+      if (sortBy === "price-asc") return aMinPrice - bMinPrice;
+      if (sortBy === "price-desc") return bMinPrice - aMinPrice;
       if (sortBy === "lead-time") return a.leadTimeDays - b.leadTimeDays;
       return 0;
     });
@@ -86,12 +109,14 @@ export default function Catalogue() {
   const handleStartEdit = (p: Product) => {
     setSelectedProduct(p);
     setFormName(p.name);
-    setFormPrice(p.price);
+    setFormDescription(p.description || "");
     setFormLeadTime(p.leadTimeDays);
-    setFormCustomizable(p.isCustomizable);
-    setFormSizes(p.sizes || []);
-    setFormOptions(p.options || []);
-    setFormImage(p.image);
+    setFormCustomizable(p.customizable);
+    setFormSizes(
+      p.sizes && p.sizes.length > 0 ? p.sizes : [{ name: "Standard", price: 1200 }],
+    );
+    setFormOptions(p.customOptions || []);
+    setFormImages(p.images || []);
     setIsEditing(true);
     setIsAddingNew(false);
   };
@@ -100,12 +125,12 @@ export default function Catalogue() {
   const handleStartAdd = () => {
     setSelectedProduct(null);
     setFormName("");
-    setFormPrice(1200);
-    setFormLeadTime(5);
-    setFormCustomizable(true);
-    setFormSizes(["Standard"]);
+    setFormDescription("");
+    setFormLeadTime(3);
+    setFormCustomizable(false);
+    setFormSizes([{ name: "Standard", price: 1200 }]);
     setFormOptions(["Colour", "Name engraving"]);
-    setFormImage(PRESET_IMAGES[Math.floor(Math.random() * PRESET_IMAGES.length)] || PRESET_IMAGES[0] || "");
+    setFormImages([]);
     setIsAddingNew(true);
     setIsEditing(true);
   };
@@ -115,19 +140,36 @@ export default function Catalogue() {
     setSelectedProduct(null);
     setIsEditing(false);
     setIsAddingNew(false);
-    setSizeDraft("");
     setOptionDraft("");
+    setIsUploadingImage(false);
   };
 
-  // Add chip helper
-  const handleAddSizeChip = () => {
-    const trimmed = sizeDraft.trim();
-    if (trimmed && !formSizes.includes(trimmed)) {
-      setFormSizes([...formSizes, trimmed]);
-      setSizeDraft("");
+  // Size row management
+  const handleAddSizeRow = () => {
+    setFormSizes([...formSizes, { name: "", price: 500 }]);
+  };
+
+  const handleUpdateSizeRow = (index: number, field: "name" | "price", val: string | number) => {
+    const updated = [...formSizes];
+    const current = updated[index];
+    if (!current) return;
+    if (field === "name") {
+      updated[index] = { ...current, name: String(val) };
+    } else {
+      updated[index] = { ...current, price: Math.max(1, Math.round(Number(val) || 0)) };
     }
+    setFormSizes(updated);
   };
 
+  const handleRemoveSizeRow = (index: number) => {
+    if (formSizes.length <= 1) {
+      toast.error("Products must have at least 1 size");
+      return;
+    }
+    setFormSizes(formSizes.filter((_, i) => i !== index));
+  };
+
+  // Custom options chip management
   const handleAddOptionChip = () => {
     const trimmed = optionDraft.trim();
     if (trimmed && !formOptions.includes(trimmed)) {
@@ -136,61 +178,144 @@ export default function Catalogue() {
     }
   };
 
+  // Image upload handling
+  const handleImageFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    if (formImages.length >= 5) {
+      toast.error("Maximum 5 photos allowed per product");
+      return;
+    }
+
+    const file = files[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please upload an image file");
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("Image file size must be under 10MB");
+      return;
+    }
+
+    setIsUploadingImage(true);
+    const toastId = toast.loading("Uploading photo to Cloudinary...");
+
+    try {
+      const secureUrl = await uploadToCloudinary(file);
+      setFormImages((prev) => [...prev, secureUrl].slice(0, 5));
+      toast.success("Photo uploaded successfully", { id: toastId });
+    } catch (err) {
+      console.error("Cloudinary upload failed:", err);
+      toast.error("Photo upload failed. Please try again.", { id: toastId });
+    } finally {
+      setIsUploadingImage(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const handleRemoveImage = (index: number) => {
+    setFormImages(formImages.filter((_, i) => i !== index));
+  };
+
+  const handleSetMainImage = (index: number) => {
+    if (index === 0) return;
+    const item = formImages[index];
+    if (!item) return;
+    const rest = formImages.filter((_, i) => i !== index);
+    setFormImages([item, ...rest]);
+    toast.success("Set as main photo");
+  };
+
+  const handleUseFallbackPreset = (presetUrl: string) => {
+    if (formImages.includes(presetUrl)) return;
+    if (formImages.length >= 5) {
+      toast.error("Maximum 5 photos allowed per product");
+      return;
+    }
+    setFormImages([...formImages, presetUrl]);
+  };
+
   // Save Add/Edit
-  const handleSaveProduct = (e: React.FormEvent) => {
+  const handleSaveProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formName.trim()) {
       toast.error("Product name is required");
       return;
     }
 
+    // Validate sizes
+    if (formSizes.length === 0) {
+      toast.error("At least 1 size is required");
+      return;
+    }
+
+    const invalidSize = formSizes.find((s) => !s.name.trim() || s.price <= 0);
+    if (invalidSize) {
+      toast.error("Every size must have a name and a whole rupee price greater than 0");
+      return;
+    }
+
+    const payload = {
+      name: formName.trim(),
+      description: formDescription.trim() || null,
+      sizes: formSizes.map((s) => ({ name: s.name.trim(), price: Math.round(s.price) })),
+      leadTimeDays: Math.max(0, Math.round(Number(formLeadTime) || 3)),
+      customizable: formCustomizable,
+      customOptions: formCustomizable ? formOptions : [],
+      images: formImages.length > 0 ? formImages : [FALLBACK_PRESET_IMAGES[0] || ""],
+      isActive: true,
+    };
+
     if (isAddingNew) {
-      const newProd: Product = {
-        id: `prod-${Date.now()}`,
-        name: formName.trim(),
-        price: Number(formPrice) || 0,
-        leadTimeDays: Number(formLeadTime) || 3,
-        isCustomizable: formCustomizable,
-        sizes: formSizes.length > 0 ? formSizes : ["Standard"],
-        options: formCustomizable ? formOptions : [],
-        image: formImage || PRESET_IMAGES[0] || "",
-      };
-      setProducts([newProd, ...products]);
-      toast.success("Product added to catalogue", {
-        description: "The AI assistant will now quote prices for this item.",
-      });
-      handleCloseSlideOver();
+      try {
+        await createMutation.mutateAsync(payload);
+        toast.success("Product created", {
+          description: "The AI assistant will now quote prices for this item.",
+        });
+        handleCloseSlideOver();
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : "Failed to create product";
+        toast.error(message);
+      }
     } else if (selectedProduct) {
-      const updated: Product = {
-        ...selectedProduct,
-        name: formName.trim(),
-        price: Number(formPrice) || 0,
-        leadTimeDays: Number(formLeadTime) || 3,
-        isCustomizable: formCustomizable,
-        sizes: formSizes,
-        options: formCustomizable ? formOptions : [],
-        image: formImage || selectedProduct.image,
-      };
-      setProducts(products.map((p) => (p.id === selectedProduct.id ? updated : p)));
-      setSelectedProduct(updated);
-      setIsEditing(false);
-      toast.success("Product updated successfully", {
-        description: "Changes are active in the AI assistant knowledge.",
-      });
+      try {
+        const res = await updateMutation.mutateAsync({
+          id: selectedProduct.id,
+          data: payload,
+        });
+        setSelectedProduct(res.product);
+        setIsEditing(false);
+        toast.success("Product updated", {
+          description: "Changes are active in the AI assistant knowledge.",
+        });
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : "Failed to update product";
+        toast.error(message);
+      }
     }
   };
 
   // Delete product
-  const confirmDeleteProduct = () => {
+  const confirmDeleteProduct = async () => {
     if (!productToDelete) return;
-    setProducts(products.filter((p) => p.id !== productToDelete.id));
-    if (selectedProduct?.id === productToDelete.id) {
-      handleCloseSlideOver();
+    try {
+      await deleteMutation.mutateAsync(productToDelete.id);
+      if (selectedProduct?.id === productToDelete.id) {
+        handleCloseSlideOver();
+      }
+      toast.success("Product removed from catalogue", {
+        description: "The assistant has stopped quoting this product.",
+      });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to delete product";
+      toast.error(message);
+    } finally {
+      setProductToDelete(null);
     }
-    toast.success("Product removed from catalogue", {
-      description: "The assistant has stopped quoting this product.",
-    });
-    setProductToDelete(null);
   };
 
   return (
@@ -198,14 +323,11 @@ export default function Catalogue() {
       {/* ─── Page Header ──────────────────────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2.5">
-            <h1 className="text-24 md:text-28 font-bold font-outfit text-text tracking-tight">
-              Catalogue
-            </h1>
-            <SampleDataBadge title="Catalogue items currently using static demo data" />
-          </div>
+          <h1 className="text-24 md:text-28 font-bold font-outfit text-text tracking-tight">
+            Catalogue
+          </h1>
           <p className="text-13 text-text-muted mt-1 max-w-xl">
-            Your products. The assistant quotes prices and lead times from this list.
+            Your products. The assistant quotes prices and lead times directly from this live catalogue.
           </p>
         </div>
 
@@ -265,7 +387,7 @@ export default function Catalogue() {
             <select
               value={sortBy}
               aria-label="Sort catalogue products"
-              onChange={(e) => setSortBy(e.target.value as any)}
+              onChange={(e) => setSortBy(e.target.value as "name" | "price-asc" | "price-desc" | "lead-time")}
               className="bg-surface-muted border border-border text-text text-12 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary/40 cursor-pointer"
             >
               <option value="name">Sort: Name (A-Z)</option>
@@ -277,8 +399,47 @@ export default function Catalogue() {
         </div>
       </div>
 
-      {/* ─── Product Grid ───────────────────────────────────────────────────── */}
-      {filteredProducts.length === 0 ? (
+      {/* ─── Loading Skeletons ──────────────────────────────────────────────── */}
+      {isLoading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <div
+              key={i}
+              className="rounded-xl border border-border bg-surface overflow-hidden shadow-xs animate-pulse"
+            >
+              <div className="aspect-[4/3] bg-surface-muted w-full" />
+              <div className="p-4 space-y-3">
+                <div className="flex justify-between items-center">
+                  <div className="h-5 w-3/5 bg-surface-muted rounded-md" />
+                  <div className="h-5 w-1/4 bg-surface-muted rounded-md" />
+                </div>
+                <div className="h-4 w-4/5 bg-surface-muted rounded-md" />
+                <div className="h-4 w-2/5 bg-surface-muted rounded-md" />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : isError ? (
+        <div className="rounded-xl border border-border bg-surface p-12 text-center space-y-4">
+          <div className="w-12 h-12 rounded-full bg-danger/10 text-danger flex items-center justify-center mx-auto">
+            <X className="w-6 h-6" />
+          </div>
+          <div>
+            <h3 className="text-16 font-semibold font-outfit text-text">Failed to load catalogue</h3>
+            <p className="text-13 text-text-muted mt-1 max-w-md mx-auto">
+              There was an issue fetching the products catalogue.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => refetch()}
+            className="px-4 py-2 rounded-lg bg-surface-muted border border-border text-text font-semibold text-13 hover:bg-surface cursor-pointer"
+          >
+            Try Again
+          </button>
+        </div>
+      ) : filteredProducts.length === 0 ? (
+        /* Empty state */
         <div className="rounded-xl border border-border bg-surface p-12 text-center space-y-4">
           <div className="w-12 h-12 rounded-full bg-primary-soft text-primary-text flex items-center justify-center mx-auto">
             <Package className="w-6 h-6" />
@@ -299,79 +460,99 @@ export default function Catalogue() {
           </button>
         </div>
       ) : (
+        /* ─── Product Grid ───────────────────────────────────────────────────── */
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredProducts.map((p) => (
-            <div
-              key={p.id}
-              onClick={() => handleOpenDetail(p)}
-              className="group relative flex flex-col rounded-xl border border-border bg-surface shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-pointer overflow-hidden"
-            >
-              {/* Photo */}
-              <div className="relative aspect-[4/3] w-full overflow-hidden bg-surface-muted">
-                <img
-                  src={p.image}
-                  alt={p.name}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                  loading="lazy"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-60" />
+          {filteredProducts.map((p) => {
+            const minPrice = Math.min(...(p.sizes.map((s) => s.price) || [0]));
+            const maxPrice = Math.max(...(p.sizes.map((s) => s.price) || [0]));
+            const priceLabel =
+              p.sizes.length > 1 && minPrice !== maxPrice
+                ? `₹${minPrice.toLocaleString("en-IN")} – ₹${maxPrice.toLocaleString("en-IN")}`
+                : `₹${minPrice.toLocaleString("en-IN")}`;
+            const mainPhoto = p.images && p.images.length > 0 ? p.images[0] : FALLBACK_PRESET_IMAGES[0];
 
-                {/* Lead time badge */}
-                <div className="absolute top-3 left-3 inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-11 font-medium bg-surface/90 text-text backdrop-blur-md shadow-xs border border-border/50">
-                  <Clock className="w-3 h-3 text-text-muted" />
-                  <span>{p.leadTimeDays} days</span>
-                </div>
+            return (
+              <div
+                key={p.id}
+                onClick={() => handleOpenDetail(p)}
+                className="group relative flex flex-col rounded-xl border border-border bg-surface shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-pointer overflow-hidden"
+              >
+                {/* Photo */}
+                <div className="relative aspect-[4/3] w-full overflow-hidden bg-surface-muted">
+                  <img
+                    src={mainPhoto}
+                    alt={p.name}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    loading="lazy"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-60" />
 
-                {/* Customizable badge */}
-                {p.isCustomizable && (
-                  <div className="absolute top-3 right-3 inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-11 font-semibold bg-amber-500/90 text-white backdrop-blur-md shadow-xs">
-                    <Sparkles className="w-3 h-3" />
-                    <span>Customizable</span>
-                  </div>
-                )}
-              </div>
-
-              {/* Card Body */}
-              <div className="flex-1 p-4 flex flex-col justify-between space-y-3">
-                <div>
-                  <div className="flex items-start justify-between gap-2">
-                    <h2 className="text-16 font-semibold font-outfit text-text group-hover:text-primary-text transition-colors line-clamp-1">
-                      {p.name}
-                    </h2>
-                    <span className="text-18 font-bold font-outfit text-text tabular-nums shrink-0">
-                      ₹{p.price.toLocaleString("en-IN")}
-                    </span>
+                  {/* Lead time badge */}
+                  <div className="absolute top-3 left-3 inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-11 font-medium bg-surface/90 text-text backdrop-blur-md shadow-xs border border-border/50">
+                    <Clock className="w-3 h-3 text-text-muted" />
+                    <span>{p.leadTimeDays} days</span>
                   </div>
 
-                  {/* Sizes */}
-                  {p.sizes && p.sizes.length > 0 && (
-                    <p className="text-12 text-text-muted mt-1 line-clamp-1">
-                      <span className="font-medium text-text">Sizes:</span> {p.sizes.join(" · ")}
-                    </p>
+                  {/* Customizable badge */}
+                  {p.customizable && (
+                    <div className="absolute top-3 right-3 inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-11 font-semibold bg-amber-500/90 text-white backdrop-blur-md shadow-xs">
+                      <Sparkles className="w-3 h-3" />
+                      <span>Customizable</span>
+                    </div>
+                  )}
+
+                  {/* Multiple photos count chip */}
+                  {p.images && p.images.length > 1 && (
+                    <div className="absolute bottom-3 right-3 inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-11 font-medium bg-black/60 text-white backdrop-blur-md">
+                      <ImageIcon className="w-3 h-3" />
+                      <span>{p.images.length} photos</span>
+                    </div>
                   )}
                 </div>
 
-                {/* Custom Options Chips */}
-                {p.isCustomizable && p.options && p.options.length > 0 && (
-                  <div className="pt-2 border-t border-border flex flex-wrap gap-1.5">
-                    {p.options.slice(0, 3).map((opt, i) => (
-                      <span
-                        key={i}
-                        className="inline-flex items-center px-2 py-0.5 rounded-md text-11 bg-surface-muted text-text-muted border border-border"
-                      >
-                        {opt}
+                {/* Card Body */}
+                <div className="flex-1 p-4 flex flex-col justify-between space-y-3">
+                  <div>
+                    <div className="flex items-start justify-between gap-2">
+                      <h2 className="text-16 font-semibold font-outfit text-text group-hover:text-primary-text transition-colors line-clamp-1">
+                        {p.name}
+                      </h2>
+                      <span className="text-16 font-bold font-outfit text-text tabular-nums shrink-0">
+                        {priceLabel}
                       </span>
-                    ))}
-                    {p.options.length > 3 && (
-                      <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-11 text-text-muted">
-                        +{p.options.length - 3} more
-                      </span>
+                    </div>
+
+                    {/* Sizes */}
+                    {p.sizes && p.sizes.length > 0 && (
+                      <p className="text-12 text-text-muted mt-1 line-clamp-1">
+                        <span className="font-medium text-text">Sizes:</span>{" "}
+                        {p.sizes.map((s) => s.name).join(" · ")}
+                      </p>
                     )}
                   </div>
-                )}
+
+                  {/* Custom Options Chips */}
+                  {p.customizable && p.customOptions && p.customOptions.length > 0 && (
+                    <div className="pt-2 border-t border-border flex flex-wrap gap-1.5">
+                      {p.customOptions.slice(0, 3).map((opt, i) => (
+                        <span
+                          key={i}
+                          className="inline-flex items-center px-2 py-0.5 rounded-md text-11 bg-surface-muted text-text-muted border border-border"
+                        >
+                          {opt}
+                        </span>
+                      ))}
+                      {p.customOptions.length > 3 && (
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-11 text-text-muted">
+                          +{p.customOptions.length - 3} more
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -390,8 +571,8 @@ export default function Catalogue() {
           isAddingNew
             ? "Create a catalogue item for the AI assistant"
             : isEditing
-            ? "Update pricing, lead times, and customization options"
-            : `ID: ${selectedProduct?.id}`
+            ? "Update pricing, sizes, and photos"
+            : `Slug: ${selectedProduct?.slug}`
         }
       >
         {isEditing ? (
@@ -412,87 +593,95 @@ export default function Catalogue() {
               />
             </div>
 
-            {/* Price & Lead Time */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label className="block text-13 font-semibold text-text">
-                  Price (₹) <span className="text-danger">*</span>
-                </label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-13 text-text-muted font-bold">
-                    ₹
-                  </span>
-                  <input
-                    type="number"
-                    min="1"
-                    required
-                    value={formPrice}
-                    onChange={(e) => setFormPrice(Number(e.target.value))}
-                    className="w-full pl-7 pr-3 py-2 text-13 rounded-lg bg-surface-muted border border-border text-text tabular-nums focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary"
-                  />
+            {/* Description */}
+            <div className="space-y-1.5">
+              <label className="block text-13 font-semibold text-text">
+                Description (optional)
+              </label>
+              <textarea
+                rows={2}
+                value={formDescription}
+                onChange={(e) => setFormDescription(e.target.value)}
+                placeholder="Key details, materials or instructions for the AI"
+                className="w-full px-3 py-2 text-13 rounded-lg bg-surface-muted border border-border text-text focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary"
+              />
+            </div>
+
+            {/* Sizes & Prices Table (At least 1 size, each size has its own price) */}
+            <div className="space-y-2 p-3.5 rounded-xl border border-border bg-surface-muted/40">
+              <div className="flex items-center justify-between">
+                <div>
+                  <label className="block text-13 font-semibold text-text">
+                    Sizes & Prices <span className="text-danger">*</span>
+                  </label>
+                  <p className="text-11 text-text-muted">
+                    Each size has its own whole-rupee price. The AI quotes the exact price for requested sizes.
+                  </p>
                 </div>
+                <button
+                  type="button"
+                  onClick={handleAddSizeRow}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 text-12 font-medium rounded-md bg-surface text-text border border-border hover:bg-surface-muted cursor-pointer transition-colors"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Add size</span>
+                </button>
               </div>
 
-              <div className="space-y-1.5">
-                <label className="block text-13 font-semibold text-text">
-                  Lead Time (Days) <span className="text-danger">*</span>
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  max="30"
-                  required
-                  value={formLeadTime}
-                  onChange={(e) => setFormLeadTime(Number(e.target.value))}
-                  className="w-full px-3 py-2 text-13 rounded-lg bg-surface-muted border border-border text-text tabular-nums focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary"
-                />
+              <div className="space-y-2 pt-1">
+                {formSizes.map((s, idx) => (
+                  <div key={idx} className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      required
+                      placeholder="Size name (e.g. 10cm round or Standard)"
+                      value={s.name}
+                      onChange={(e) => handleUpdateSizeRow(idx, "name", e.target.value)}
+                      className="flex-1 px-3 py-1.5 text-13 rounded-lg bg-surface border border-border text-text focus:outline-none focus:ring-2 focus:ring-primary/40"
+                    />
+                    <div className="relative w-32 shrink-0">
+                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-12 text-text-muted font-bold">
+                        ₹
+                      </span>
+                      <input
+                        type="number"
+                        min="1"
+                        required
+                        placeholder="Price"
+                        value={s.price || ""}
+                        onChange={(e) => handleUpdateSizeRow(idx, "price", e.target.value)}
+                        className="w-full pl-6 pr-2 py-1.5 text-13 rounded-lg bg-surface border border-border text-text tabular-nums focus:outline-none focus:ring-2 focus:ring-primary/40"
+                      />
+                    </div>
+                    {formSizes.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveSizeRow(idx)}
+                        className="p-1.5 text-text-muted hover:text-danger rounded-md hover:bg-surface cursor-pointer"
+                        title="Remove size"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                ))}
               </div>
             </div>
 
-            {/* Sizes (Chip input) */}
+            {/* Lead Time */}
             <div className="space-y-1.5">
               <label className="block text-13 font-semibold text-text">
-                Sizes & Dimensions
+                Lead Time (Days) <span className="text-danger">*</span>
               </label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={sizeDraft}
-                  onChange={(e) => setSizeDraft(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      handleAddSizeChip();
-                    }
-                  }}
-                  placeholder="e.g. 10cm round, 12 inch"
-                  className="flex-1 px-3 py-1.5 text-13 rounded-lg bg-surface-muted border border-border text-text focus:outline-none focus:ring-2 focus:ring-primary/40"
-                />
-                <button
-                  type="button"
-                  onClick={handleAddSizeChip}
-                  className="px-3 py-1.5 rounded-lg bg-surface-muted border border-border text-12 font-medium hover:text-text cursor-pointer"
-                >
-                  Add
-                </button>
-              </div>
-              <div className="flex flex-wrap gap-1.5 pt-1">
-                {formSizes.map((s, i) => (
-                  <span
-                    key={i}
-                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-12 bg-surface-muted text-text border border-border"
-                  >
-                    <span>{s}</span>
-                    <button
-                      type="button"
-                      onClick={() => setFormSizes(formSizes.filter((_, idx) => idx !== i))}
-                      className="text-text-muted hover:text-danger ml-0.5 cursor-pointer"
-                    >
-                      ×
-                    </button>
-                  </span>
-                ))}
-              </div>
+              <input
+                type="number"
+                min="0"
+                max="60"
+                required
+                value={formLeadTime}
+                onChange={(e) => setFormLeadTime(Number(e.target.value))}
+                className="w-full px-3 py-2 text-13 rounded-lg bg-surface-muted border border-border text-text tabular-nums focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary"
+              />
             </div>
 
             {/* Customizable Switch */}
@@ -568,32 +757,100 @@ export default function Catalogue() {
               </div>
             )}
 
-            {/* Photo Selection */}
-            <div className="space-y-2">
-              <label className="block text-13 font-semibold text-text">
-                Product Image
-              </label>
-              <div className="grid grid-cols-3 gap-2">
-                {PRESET_IMAGES.map((imgUrl, i) => (
-                  <button
-                    key={i}
-                    type="button"
-                    onClick={() => setFormImage(imgUrl)}
-                    className={`relative aspect-[4/3] rounded-lg overflow-hidden border-2 cursor-pointer transition-all ${
-                      formImage === imgUrl
-                        ? "border-primary ring-2 ring-primary/30"
-                        : "border-border hover:border-text-muted"
-                    }`}
-                  >
-                    <img src={imgUrl} alt={`Preset ${i + 1}`} className="w-full h-full object-cover" />
-                    {formImage === imgUrl && (
-                      <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
-                        <Check className="w-5 h-5 text-white drop-shadow-md" />
-                      </div>
-                    )}
-                  </button>
-                ))}
+            {/* Photo Upload to Cloudinary */}
+            <div className="space-y-3 p-3.5 rounded-xl border border-border bg-surface-muted/40">
+              <div className="flex items-center justify-between">
+                <div>
+                  <label className="block text-13 font-semibold text-text">
+                    Product Photos (Max 5)
+                  </label>
+                  <p className="text-11 text-text-muted">
+                    First photo is the main photo. Uploaded directly to Cloudinary.
+                  </p>
+                </div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageFileChange}
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  disabled={isUploadingImage || formImages.length >= 5}
+                  onClick={() => fileInputRef.current?.click()}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground font-semibold text-12 shadow-xs hover:brightness-105 disabled:opacity-50 cursor-pointer transition-all"
+                >
+                  {isUploadingImage ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Upload className="w-3.5 h-3.5" />
+                  )}
+                  <span>Upload photo</span>
+                </button>
               </div>
+
+              {/* Uploaded Photos Grid */}
+              {formImages.length > 0 ? (
+                <div className="grid grid-cols-3 gap-2.5 pt-1">
+                  {formImages.map((imgUrl, i) => (
+                    <div
+                      key={i}
+                      className="group relative aspect-[4/3] rounded-lg overflow-hidden border border-border bg-surface"
+                    >
+                      <img src={imgUrl} alt={`Product ${i + 1}`} className="w-full h-full object-cover" />
+                      {/* Main photo badge */}
+                      {i === 0 && (
+                        <div className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded text-10 font-bold bg-primary text-primary-foreground shadow-xs">
+                          Main
+                        </div>
+                      )}
+                      {/* Controls on hover */}
+                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1.5">
+                        {i !== 0 && (
+                          <button
+                            type="button"
+                            onClick={() => handleSetMainImage(i)}
+                            className="p-1 rounded bg-surface/90 text-text hover:text-primary cursor-pointer"
+                            title="Make main photo"
+                          >
+                            <Star className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveImage(i)}
+                          className="p-1 rounded bg-surface/90 text-danger hover:bg-danger hover:text-white cursor-pointer"
+                          title="Remove photo"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="p-4 border-2 border-dashed border-border rounded-lg text-center space-y-2">
+                  <div className="w-8 h-8 rounded-full bg-surface-muted text-text-muted flex items-center justify-center mx-auto">
+                    <ImageIcon className="w-4 h-4" />
+                  </div>
+                  <p className="text-12 text-text-muted">
+                    No photos uploaded yet. Or select a sample photo below:
+                  </p>
+                  <div className="flex flex-wrap justify-center gap-2 pt-1">
+                    {FALLBACK_PRESET_IMAGES.slice(0, 4).map((pImg, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => handleUseFallbackPreset(pImg)}
+                        className="w-12 h-10 rounded overflow-hidden border border-border hover:border-primary cursor-pointer"
+                      >
+                        <img src={pImg} alt="sample" className="w-full h-full object-cover" />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Action buttons */}
@@ -610,98 +867,111 @@ export default function Catalogue() {
               </button>
               <button
                 type="submit"
-                className="px-5 py-2 rounded-lg bg-primary text-primary-foreground font-semibold text-13 shadow-xs hover:brightness-105 transition-all cursor-pointer"
+                disabled={createMutation.isPending || updateMutation.isPending}
+                className="inline-flex items-center gap-1.5 px-5 py-2 rounded-lg bg-primary text-primary-foreground font-semibold text-13 shadow-xs hover:brightness-105 disabled:opacity-50 transition-all cursor-pointer"
               >
-                {isAddingNew ? "Create Product" : "Save Changes"}
+                {(createMutation.isPending || updateMutation.isPending) && (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                )}
+                <span>{isAddingNew ? "Create Product" : "Save Changes"}</span>
               </button>
             </div>
           </form>
         ) : selectedProduct ? (
           /* Detail View Mode */
           <div className="space-y-6">
-            {/* Large Photo */}
-            <div className="relative aspect-[4/3] w-full rounded-xl overflow-hidden border border-border shadow-xs">
-              <img
-                src={selectedProduct.image}
-                alt={selectedProduct.name}
-                className="w-full h-full object-cover"
-              />
+            {/* Photos Carousel / Main Photo */}
+            <div className="space-y-2">
+              <div className="relative aspect-[4/3] w-full rounded-xl overflow-hidden border border-border shadow-xs bg-surface-muted">
+                <img
+                  src={
+                    selectedProduct.images && selectedProduct.images.length > 0
+                      ? selectedProduct.images[0]
+                      : FALLBACK_PRESET_IMAGES[0]
+                  }
+                  alt={selectedProduct.name}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+              {selectedProduct.images && selectedProduct.images.length > 1 && (
+                <div className="flex gap-2 overflow-x-auto pb-1">
+                  {selectedProduct.images.map((img, i) => (
+                    <div
+                      key={i}
+                      className="relative w-16 h-12 rounded-md overflow-hidden border border-border shrink-0"
+                    >
+                      <img src={img} alt="" className="w-full h-full object-cover" />
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
-            {/* Price & Lead Time Block */}
-            <div className="flex items-center justify-between p-4 rounded-xl border border-border bg-surface-muted">
-              <div>
-                <p className="text-11 font-semibold uppercase tracking-wider text-text-muted">
-                  Price
-                </p>
-                <p className="text-24 font-bold font-outfit text-text tabular-nums">
-                  ₹{selectedProduct.price.toLocaleString("en-IN")}
-                </p>
-              </div>
+            {/* Description */}
+            {selectedProduct.description && (
+              <p className="text-13 text-text-muted leading-relaxed">
+                {selectedProduct.description}
+              </p>
+            )}
 
-              <div className="text-right">
+            {/* Sizes & Pricing Table */}
+            <div className="space-y-2 p-3.5 rounded-xl border border-border bg-surface-muted/50">
+              <h4 className="text-13 font-semibold text-text">Sizes & Pricing</h4>
+              <div className="divide-y divide-border/60">
+                {selectedProduct.sizes?.map((s, i) => (
+                  <div key={i} className="flex items-center justify-between py-2 text-13">
+                    <span className="font-medium text-text">{s.name}</span>
+                    <span className="font-bold font-outfit text-primary-text tabular-nums">
+                      ₹{s.price.toLocaleString("en-IN")}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Lead Time & Customization Block */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="p-3 rounded-xl border border-border bg-surface-muted">
                 <p className="text-11 font-semibold uppercase tracking-wider text-text-muted">
                   Lead Time
                 </p>
-                <p className="text-16 font-semibold text-text flex items-center justify-end gap-1.5 mt-1">
+                <p className="text-15 font-semibold text-text flex items-center gap-1.5 mt-1">
                   <Clock className="w-4 h-4 text-primary" />
                   <span>{selectedProduct.leadTimeDays} days</span>
                 </p>
               </div>
-            </div>
 
-            {/* Sizes */}
-            <div className="space-y-2">
-              <h4 className="text-13 font-semibold text-text">Available Sizes</h4>
-              {selectedProduct.sizes && selectedProduct.sizes.length > 0 ? (
-                <div className="flex flex-wrap gap-2">
-                  {selectedProduct.sizes.map((s, i) => (
-                    <span
-                      key={i}
-                      className="px-3 py-1 rounded-lg text-12 font-medium bg-surface-muted border border-border text-text"
-                    >
-                      {s}
-                    </span>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-12 text-text-muted">Standard size</p>
-              )}
+              <div className="p-3 rounded-xl border border-border bg-surface-muted">
+                <p className="text-11 font-semibold uppercase tracking-wider text-text-muted">
+                  Customizable
+                </p>
+                <p className="text-15 font-semibold text-text flex items-center gap-1.5 mt-1">
+                  <Sparkles className="w-4 h-4 text-amber-500" />
+                  <span>{selectedProduct.customizable ? "Yes" : "Fixed"}</span>
+                </p>
+              </div>
             </div>
 
             {/* Customization Details */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <h4 className="text-13 font-semibold text-text">Customization</h4>
-                <span
-                  className={`px-2 py-0.5 rounded-full text-11 font-semibold ${
-                    selectedProduct.isCustomizable
-                      ? "bg-primary-soft text-primary-text"
-                      : "bg-surface-muted text-text-muted"
-                  }`}
-                >
-                  {selectedProduct.isCustomizable ? "Customizable" : "Fixed product"}
-                </span>
-              </div>
-
-              {selectedProduct.isCustomizable && selectedProduct.options.length > 0 ? (
-                <div className="p-3 rounded-lg border border-border bg-surface-muted/50 space-y-2">
-                  <p className="text-12 text-text-muted">Supported customization options:</p>
+            {selectedProduct.customizable && (
+              <div className="space-y-2">
+                <h4 className="text-13 font-semibold text-text">Custom Options</h4>
+                {selectedProduct.customOptions && selectedProduct.customOptions.length > 0 ? (
                   <div className="flex flex-wrap gap-1.5">
-                    {selectedProduct.options.map((opt, i) => (
+                    {selectedProduct.customOptions.map((opt, i) => (
                       <span
                         key={i}
-                        className="px-2.5 py-1 rounded-md text-12 bg-surface text-text border border-border"
+                        className="px-2.5 py-1 rounded-md text-12 bg-primary-soft text-primary-text border border-primary/20"
                       >
                         {opt}
                       </span>
                     ))}
                   </div>
-                </div>
-              ) : (
-                <p className="text-12 text-text-muted">No custom options configured.</p>
-              )}
-            </div>
+                ) : (
+                  <p className="text-12 text-text-muted">Standard customization permitted.</p>
+                )}
+              </div>
+            )}
 
             {/* AI Assistant Note */}
             <div className="p-3.5 rounded-xl border border-primary/20 bg-primary-soft/30 text-12 text-text space-y-1">
@@ -710,9 +980,8 @@ export default function Catalogue() {
                 <span>AI Quoting Rule</span>
               </p>
               <p className="text-text-muted">
-                When a customer asks for "{selectedProduct.name}", the AI automatically quotes ₹
-                {selectedProduct.price.toLocaleString("en-IN")} and a {selectedProduct.leadTimeDays}
-                -day dispatch timeline.
+                When a customer asks without naming a size, the AI lists every size with its price.
+                When they specify a size, it quotes only that one.
               </p>
             </div>
 

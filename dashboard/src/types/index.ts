@@ -735,6 +735,128 @@ export interface SocketEventMap {
 
 export type SocketEventName = keyof SocketEventMap;
 
+// ─── Products ────────────────────────────────────────────────────────
+
+export interface ProductSize {
+  name: string;
+  price: number;
+}
+
+export interface Product {
+  id: string;
+  businessId: string;
+  slug: string;
+  name: string;
+  description: string | null;
+  sizes: ProductSize[];
+  leadTimeDays: number;
+  customizable: boolean;
+  customOptions: string[];
+  images: string[];
+  isActive: boolean;
+  sortOrder: number;
+  createdAt: ISODateString;
+  updatedAt: ISODateString;
+}
+
+export interface ProductsResponse {
+  products: Product[];
+}
+
+export interface ProductResponse {
+  product: Product;
+}
+
+export interface CreateProductRequest {
+  name: string;
+  slug?: string;
+  description?: string | null;
+  sizes: ProductSize[];
+  leadTimeDays?: number;
+  customizable?: boolean;
+  customOptions?: string[];
+  images?: string[];
+  isActive?: boolean;
+  sortOrder?: number;
+}
+
+export interface UpdateProductRequest {
+  name?: string;
+  slug?: string;
+  description?: string | null;
+  sizes?: ProductSize[];
+  leadTimeDays?: number;
+  customizable?: boolean;
+  customOptions?: string[];
+  images?: string[];
+  isActive?: boolean;
+  sortOrder?: number;
+}
+
+export interface UploadSignatureResponse {
+  configured: boolean;
+  cloudName?: string;
+  apiKey?: string | null;
+  timestamp?: number;
+  folder?: string;
+  signature?: string;
+  uploadPreset?: string | null;
+}
+
+// ─── Payments ────────────────────────────────────────────────────────────────
+
+export type PaymentKind = "advance" | "balance" | "other";
+export type PaymentStatus = "pending" | "paid" | "void";
+
+export interface Payment {
+  id: string;
+  businessId: string;
+  orderId: string;
+  kind: PaymentKind;
+  amount: number;
+  status: PaymentStatus;
+  method?: string | null;
+  reference?: string | null;
+  note?: string | null;
+  paidAt?: ISODateString | null;
+  recordedByUserId?: string | null;
+  voidedReason?: string | null;
+  createdAt: ISODateString;
+  updatedAt: ISODateString;
+}
+
+export interface PaymentSummary {
+  orderTotal: number;
+  totalPaid: number;
+  totalPending: number;
+  totalVoid?: number;
+  balanceDue: number;
+  paymentState: "fully_paid" | "partially_paid" | "unpaid";
+}
+
+export interface OrderPaymentsResponse {
+  payments: Payment[];
+  summary: PaymentSummary;
+}
+
+export interface RecordPaymentRequest {
+  kind: PaymentKind;
+  amount: number;
+  method?: string;
+  reference?: string | null;
+  note?: string | null;
+  markPaidImmediately?: boolean;
+}
+
+export interface MarkPaidRequest {
+  method?: string;
+  reference?: string | null;
+}
+
+export interface VoidPaymentRequest {
+  reason: string;
+}
+
 // ─── Orders ──────────────────────────────────────────────────────────────────
 
 export const ORDER_STATUSES = [

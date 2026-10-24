@@ -7,7 +7,7 @@ import argon2 from "argon2";
 import { config } from "../config.ts";
 import { extractVariables } from "../lib/templates.ts";
 import { db, sql } from "./index.ts";
-import { businesses, knowledgeBase, messageTemplates, users } from "./schema.ts";
+import { businesses, knowledgeBase, messageTemplates, products, users } from "./schema.ts";
 
 // backend/src/db/seed.ts -> <repo>/docs/knowledge-base.json
 const KB_PATH = fileURLToPath(new URL("../../../docs/knowledge-base.json", import.meta.url));
@@ -128,14 +128,16 @@ async function seed() {
     ])
     .onConflictDoNothing();
 
-  const kbData = JSON.parse(readFileSync(KB_PATH, "utf-8"));
+  const kbRaw = JSON.parse(readFileSync(KB_PATH, "utf-8"));
+  const { products: rawProducts, ...kbDataWithoutProducts } = kbRaw;
+
   await db
     .insert(knowledgeBase)
-    .values({ businessId, data: kbData })
+    .values({ businessId, data: kbDataWithoutProducts })
     .onConflictDoUpdate({
       target: [knowledgeBase.businessId],
       set: {
-        data: kbData,
+        data: kbDataWithoutProducts,
         updatedAt: new Date(),
       },
     });
@@ -154,6 +156,34 @@ async function seed() {
       })),
     )
     .onConflictDoNothing();
+
+  if (Array.isArray(rawProducts) && rawProducts.length > 0) {
+    const productRows = rawProducts.map((old: any, idx: number) => {
+      const sizes =
+        Array.isArray(old.sizes) && old.sizes.length > 0
+          ? old.sizes.map((sizeName: string) => ({
+              name: String(sizeName),
+              price: Math.round(Number(old.price) || 0),
+            }))
+          : [{ name: "Standard", price: Math.round(Number(old.price) || 0) }];
+
+      return {
+        businessId,
+        slug: old.id,
+        name: old.name,
+        description: old.description ?? null,
+        sizes,
+        leadTimeDays: Number(old.lead_time_days ?? 3),
+        customizable: Boolean(old.customizable),
+        customOptions: Array.isArray(old.custom_options) ? old.custom_options : [],
+        images: [],
+        isActive: true,
+        sortOrder: idx,
+      };
+    });
+
+    await db.insert(products).values(productRows).onConflictDoNothing();
+  }
 
   console.log(`Seed complete for business ${businessId}`);
 }

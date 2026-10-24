@@ -70,6 +70,26 @@ function getActionBadge(action: string): ActionBadgeConfig {
         label: "Settings changed",
         className: "bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/20",
       };
+    case "payment_marked_paid":
+      return {
+        label: "Marked payment as paid",
+        className: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20",
+      };
+    case "payment_recorded":
+      return {
+        label: "Recorded payment",
+        className: "bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/20",
+      };
+    case "payment_voided":
+      return {
+        label: "Voided payment",
+        className: "bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/20",
+      };
+    case "payment_updated":
+      return {
+        label: "Updated payment",
+        className: "bg-stone-500/10 text-stone-700 dark:text-stone-400 border-stone-500/20",
+      };
     default:
       return {
         label: humanize(action),
@@ -294,6 +314,10 @@ export default function AuditLog() {
             <option value="knowledge_base_updated">Knowledge base updated</option>
             <option value="automation_paused">Automation paused</option>
             <option value="automation_resumed">Automation resumed</option>
+            <option value="payment_marked_paid">Marked payment as paid</option>
+            <option value="payment_recorded">Recorded payment</option>
+            <option value="payment_voided">Voided payment</option>
+            <option value="payment_updated">Updated payment</option>
           </select>
           <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted" aria-hidden />
         </div>

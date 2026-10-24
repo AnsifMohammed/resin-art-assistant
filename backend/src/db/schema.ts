@@ -45,6 +45,10 @@ export const escalationReasonEnum = pgEnum("escalation_reason", [
   "intent_off_topic", "intent_payment", "window_closed"
 ]);
 
+export const paymentKindEnum = pgEnum("payment_kind", ["advance", "balance", "other"]);
+
+export const paymentStatusEnum = pgEnum("payment_status", ["pending", "paid", "void"]);
+
 export const templateCategoryEnum = pgEnum("template_category", [
   "delivery", "festive", "custom_order", "payment", "general"
 ]);
@@ -264,6 +268,48 @@ export const pushSubscriptions = pgTable("push_subscriptions", {
   uniqueIndex("push_user_endpoint_idx").on(t.userId, t.endpoint),
 ]);
 
+// Products catalog
+export const products = pgTable("products", {
+  id: id(),
+  businessId: businessId(),
+  slug: text("slug").notNull(),
+  name: text("name").notNull(),
+  description: text("description"),
+  sizes: jsonb("sizes").$type<Array<{ name: string; price: number }>>().notNull().default([]),
+  leadTimeDays: integer("lead_time_days").notNull().default(3),
+  customizable: boolean("customizable").notNull().default(false),
+  customOptions: jsonb("custom_options").$type<string[]>().notNull().default([]),
+  images: jsonb("images").$type<string[]>().notNull().default([]),
+  isActive: boolean("is_active").notNull().default(true),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, (t) => [
+  uniqueIndex("products_business_slug_idx").on(t.businessId, t.slug),
+  index("products_business_active_idx").on(t.businessId, t.isActive),
+]);
+
+// Payments table (manually tracked per order)
+export const payments = pgTable("payments", {
+  id: id(),
+  businessId: businessId(),
+  orderId: text("order_id").notNull(),
+  kind: paymentKindEnum("kind").notNull(),
+  amount: integer("amount").notNull(),
+  status: paymentStatusEnum("status").notNull().default("pending"),
+  method: text("method").default("UPI"),
+  reference: text("reference"),
+  note: text("note"),
+  paidAt: timestamp("paid_at"),
+  recordedByUserId: text("recorded_by_user_id"),
+  voidedReason: text("voided_reason"),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, (t) => [
+  index("payments_order_idx").on(t.orderId),
+  index("payments_revenue_idx").on(t.businessId, t.status, t.paidAt),
+]);
+
 // Ready-made messages admin/staff insert into replies. {variable} placeholders.
 export const messageTemplates = pgTable("message_templates", {
   id: id(),
@@ -362,7 +408,6 @@ export const orderItems = pgTable("order_items", {
   check("order_items_unit_price_check", sql`${t.unitPrice} >= (0)::numeric`),
   index("idx_order_items_order").on(t.orderId).where(sql`${t.isDeleted} = false`),
 ]);
-
 
 export type BroadcastFilters = {
   city?: string;

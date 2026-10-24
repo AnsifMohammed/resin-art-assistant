@@ -14,13 +14,15 @@ import { requireAdmin } from "../middleware/requireAdmin.ts";
  */
 export const knowledgeBaseSchema = z.looseObject({
   business_name: z.string().trim().min(1),
-  products: z.array(
-    z.looseObject({
-      id: z.string().min(1),
-      name: z.string().min(1),
-      price: z.number().positive(),
-    }),
-  ),
+  products: z
+    .array(
+      z.looseObject({
+        id: z.string().min(1),
+        name: z.string().min(1),
+        price: z.number().positive(),
+      }),
+    )
+    .optional(),
   policies: z.looseObject({}),
 });
 

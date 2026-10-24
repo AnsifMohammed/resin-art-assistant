@@ -24,6 +24,8 @@ import {
 import { toast } from "sonner";
 import { ChannelIcon } from "../components/shared/ChannelIcon.tsx";
 import { Skeleton } from "../components/shared/Skeleton.tsx";
+import { PaymentsPanel } from "../components/orders/PaymentsPanel.tsx";
+import { useOrderPayments } from "../hooks/usePayments.ts";
 import {
   useOrders,
   useCreateOrder,
@@ -59,6 +61,34 @@ interface OrderCardProps {
   onMoveTo: (status: OrderStatus) => void;
   onCopyTracking: (trackingId: string, e: React.MouseEvent) => void;
   isGrid?: boolean;
+}
+
+function OrderPaymentChip({ orderId, orderTotal }: { orderId: string; orderTotal: number }) {
+  const { data } = useOrderPayments(orderId);
+  const summary = data?.summary;
+
+  if (!summary || summary.totalPaid === 0) {
+    const bal = summary?.balanceDue ?? orderTotal;
+    return (
+      <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-stone-500/10 text-stone-600 dark:text-stone-400 border border-stone-500/20 tabular-nums">
+        Bal: ₹{bal.toLocaleString("en-IN")}
+      </span>
+    );
+  }
+
+  if (summary.paymentState === "fully_paid") {
+    return (
+      <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
+        Fully Paid
+      </span>
+    );
+  }
+
+  return (
+    <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 tabular-nums">
+      Advance Paid · Bal: ₹{summary.balanceDue.toLocaleString("en-IN")}
+    </span>
+  );
 }
 
 function OrderCard({
@@ -122,9 +152,12 @@ function OrderCard({
       <div className="space-y-2 pt-2 border-t border-border/40">
         {/* Amount & Due date / Tracking */}
         <div className="flex items-center justify-between gap-1 min-w-0">
-          <span className="text-12 sm:text-13 font-bold font-outfit text-text tabular-nums shrink-0">
-            ₹{Number(order.totalAmount).toLocaleString("en-IN")}
-          </span>
+          <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+            <span className="text-12 sm:text-13 font-bold font-outfit text-text tabular-nums shrink-0">
+              ₹{Number(order.totalAmount).toLocaleString("en-IN")}
+            </span>
+            <OrderPaymentChip orderId={order.id} orderTotal={Number(order.totalAmount)} />
+          </div>
 
           {order.trackingId ? (
             <button
@@ -943,7 +976,10 @@ export default function Orders() {
                         {o.items?.map((i) => i.productName).join(", ") || "No items"}
                       </td>
                       <td className="p-3.5 font-bold font-outfit text-text tabular-nums">
-                        ₹{Number(o.totalAmount).toLocaleString("en-IN")}
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span>₹{Number(o.totalAmount).toLocaleString("en-IN")}</span>
+                          <OrderPaymentChip orderId={o.id} orderTotal={Number(o.totalAmount)} />
+                        </div>
                       </td>
                       <td className="p-3.5">
                         <span className="px-2 py-0.5 rounded text-11 font-semibold capitalize bg-surface-muted border border-border">
@@ -1697,6 +1733,11 @@ export default function Orders() {
                   </button>
                 </>
               )}
+            </div>
+
+            {/* Payments & Invoicing Panel */}
+            <div className="pt-2 border-t border-border/40">
+              <PaymentsPanel orderId={liveActiveOrder.id} orderTotal={Number(liveActiveOrder.totalAmount)} />
             </div>
           </div>
         </div>

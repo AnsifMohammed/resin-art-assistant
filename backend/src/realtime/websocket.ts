@@ -66,12 +66,12 @@ export type RealtimeEnvelope =
   | { kind: "conversation:updated"; businessId: string; payload: ConversationUpdatedPayload }
   | { kind: "escalation:new"; businessId: string; payload: EscalationNewPayload }
   | {
-      kind: "escalation:assigned";
-      businessId: string;
-      payload: EscalationAssignedPayload;
-      /** Staff member who held the escalation before this change (told they lost it). */
-      previousAssigneeId: string | null;
-    }
+    kind: "escalation:assigned";
+    businessId: string;
+    payload: EscalationAssignedPayload;
+    /** Staff member who held the escalation before this change (told they lost it). */
+    previousAssigneeId: string | null;
+  }
   | { kind: "settings:updated"; businessId: string; payload: SettingsUpdatedPayload }
   | { kind: "customer:updated"; businessId: string; payload: CustomerUpdatedPayload }
   | { kind: "broadcast:updated"; businessId: string; payload: BroadcastUpdatedPayload }
