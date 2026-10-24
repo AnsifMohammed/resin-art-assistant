@@ -462,9 +462,44 @@ export interface UserResponse {
 
 export type ChannelStatus = Pick<Channel, "id" | "type" | "identifier" | "status" | "tokenExpiresAt">;
 
+export type Weekday = "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun";
+
+export interface BusinessHoursSettings {
+  enabled: boolean;
+  /** "HH:mm" (IST) */
+  open: string;
+  /** "HH:mm" (IST) */
+  close: string;
+  days: Weekday[];
+}
+
+export interface AwayMessageSettings {
+  enabled: boolean;
+  text: string;
+}
+
+export type WindowAlertThresholdMinutes = 60 | 120 | 240;
+
+export interface WindowAlertSettings {
+  enabled: boolean;
+  thresholdMinutes: WindowAlertThresholdMinutes;
+  target: "push" | "whatsapp";
+}
+
 export interface SettingsResponse {
   paused: boolean;
   channels: ChannelStatus[];
+  /** Optional so the page still renders against an older backend. */
+  businessHours?: BusinessHoursSettings;
+  awayMessage?: AwayMessageSettings;
+  windowAlerts?: WindowAlertSettings;
+}
+
+/** PATCH /settings (partial) → full SettingsResponse. */
+export interface SettingsPatchRequest {
+  businessHours?: BusinessHoursSettings;
+  awayMessage?: AwayMessageSettings;
+  windowAlerts?: WindowAlertSettings;
 }
 
 export interface PauseRequest {
@@ -560,51 +595,78 @@ export interface AnalyticsResponse {
   };
   autoReplies: number;
   escalations: number;
-  /** 0..1 = autoReplies / processed inbound batches. */
+  /** 0..1 = autoReplies / (autoReplies + escalations). */
   autoReplyRate: number;
-  /** 0..1 = escalations / processed inbound batches. */
+  /** 0..1 = escalations / (autoReplies + escalations). */
   escalationRate: number;
-  /** Mean seconds from customer message to first outbound reply (AI or human). null if no data. */
+  /** Mean seconds from escalation created to resolved. null if nothing was resolved in range. */
   avgResponseTimeSeconds: number | null;
-  /** Mean seconds from escalation created to first human reply. */
-  avgHumanResponseTimeSeconds?: number | null;
   byChannel?: Record<ChannelType, { inbound: number; outbound: number }>;
   byReason?: Partial<Record<EscalationReason, number>>;
-  daily?: Array<{ date: string; inbound: number; autoReplies: number; escalations: number }>;
 
-  /* Optional extended contract fields from backend /analytics */
+  /* Extended fields. Optional so the page shows empty states against an older backend. */
+  /** Every day in range, zero-filled, date = "YYYY-MM-DD" (IST). */
+  messagesDaily?: AnalyticsDailyMessages[];
   revenue?: {
     total: number;
     previous: number;
-    daily: { date: string; revenue: number; orders: number }[];
+    /** Every day in range, zero-filled, date = "YYYY-MM-DD" (IST). */
+    daily: AnalyticsDailyRevenue[];
   };
   orders?: {
     confirmed: number;
     previousConfirmed: number;
     pending: number;
   };
-  messagesDaily?: { date: string; inbound: number; outbound: number }[];
-  channels?: {
-    whatsapp: { messages: number; revenue: number; orders: number };
-    instagram: { messages: number; revenue: number; orders: number };
-  };
-  topProducts?: {
-    productId: string | null;
-    name: string;
-    imageUrl: string | null;
-    units: number;
-    revenue: number;
-  }[];
-  attention?: {
-    openEscalations: number;
-    windowsClosingSoon: number;
-    pendingOrders: number;
-    unpaidBalance: number;
-  };
-  trends?: Record<
-    "revenue" | "orders" | "messages" | "autoReplyRate" | "avgResponseTimeSeconds",
-    { current: number; previous: number; changePct: number | null }
-  >;
+  channels?: Record<ChannelType, AnalyticsChannelStats>;
+  /** All products sold in range, revenue desc. */
+  topProducts?: AnalyticsTopProduct[];
+  attention?: AnalyticsAttention;
+  trends?: Partial<Record<AnalyticsTrendKey, AnalyticsTrend>>;
+  repliesBySender?: Record<"ai" | "owner" | "staff" | "system", number>;
+  delivery?: { failed: number; read: number };
+}
+
+export interface AnalyticsDailyMessages {
+  date: string;
+  inbound: number;
+  outbound: number;
+}
+
+export interface AnalyticsDailyRevenue {
+  date: string;
+  revenue: number;
+  orders: number;
+}
+
+export interface AnalyticsChannelStats {
+  messages: number;
+  revenue: number;
+  orders: number;
+}
+
+export interface AnalyticsTopProduct {
+  productId: string | null;
+  name: string;
+  imageUrl: string | null;
+  units: number;
+  revenue: number;
+}
+
+export interface AnalyticsAttention {
+  openEscalations: number;
+  windowsClosingSoon: number;
+  pendingOrders: number;
+  unpaidBalance: number;
+}
+
+export type AnalyticsTrendKey = "revenue" | "orders" | "messages" | "autoReplyRate" | "avgResponseTimeSeconds";
+
+export interface AnalyticsTrend {
+  current: number;
+  previous: number;
+  /** null when the previous period is 0 (no meaningful % change). */
+  changePct: number | null;
 }
 
 // ─── Audit log (admin only) ────────────────────────────────────────
@@ -612,7 +674,9 @@ export interface AnalyticsResponse {
 export interface AuditLogParams extends PageParams {
   actorId?: string | undefined;
   action?: string | undefined;
-  actorType?: string | undefined;
+  actorType?: ActorType | undefined;
+  /** Matches actions starting with this prefix, e.g. "order_". */
+  actionPrefix?: string | undefined;
 }
 
 export interface AuditLogResponse {

@@ -11,8 +11,8 @@ import {
   Tooltip,
   CartesianGrid,
 } from "recharts";
+import { BarChart3, MessageSquare } from "lucide-react";
 import { SegmentedControl } from "../shared/SegmentedControl.tsx";
-import { SampleDataBadge } from "../shared/SampleDataBadge.tsx";
 
 export interface DailyRevenueItem {
   date: string;
@@ -33,19 +33,21 @@ function formatINRCompact(n: number): string {
   return `₹${n}`;
 }
 
-interface MainChartCardProps {
-  revenueData: DailyRevenueItem[];
-  messagesData: DailyMessageItem[];
-  isSampleRevenue?: boolean;
-  isSampleMessages?: boolean;
+/** Props recharts passes to a Bar `label` render function (only the ones used here). */
+interface BarLabelProps {
+  x?: number | string | undefined;
+  y?: number | string | undefined;
+  width?: number | string | undefined;
+  value?: unknown;
 }
 
-export function MainChartCard({
-  revenueData,
-  messagesData,
-  isSampleRevenue,
-  isSampleMessages,
-}: MainChartCardProps) {
+interface MainChartCardProps {
+  /** One item per day in the selected range (zero-filled). Empty when the API has no data. */
+  revenueData: DailyRevenueItem[];
+  messagesData: DailyMessageItem[];
+}
+
+export function MainChartCard({ revenueData, messagesData }: MainChartCardProps) {
   const [metric, setMetric] = useState<"revenue" | "messages">("revenue");
 
   const totalRevenue = revenueData.reduce((acc, d) => acc + d.revenue, 0);
@@ -54,7 +56,10 @@ export function MainChartCard({
   const totalInbound = messagesData.reduce((acc, d) => acc + d.inbound, 0);
   const totalOutbound = messagesData.reduce((acc, d) => acc + d.outbound, 0);
 
-  const isSample = metric === "revenue" ? isSampleRevenue : isSampleMessages;
+  // Nothing to plot: every day is zero (or the API sent no series).
+  const revenueEmpty = totalRevenue <= 0 && totalOrders <= 0;
+  const messagesEmpty = totalInbound + totalOutbound <= 0;
+  const isEmpty = metric === "revenue" ? revenueEmpty : messagesEmpty;
 
   // Period-based sizing for bars
   const barCount = revenueData.length;
@@ -68,14 +73,14 @@ export function MainChartCard({
   // X-axis label spacing so 30 days don't collide
   const xAxisInterval = barCount > 20 ? 4 : barCount > 10 ? 1 : 0;
 
-  // Highest revenue bar calculation for label
+  // Label only the highest revenue bar. Matched by value, not index: recharts skips
+  // zero-height bars, so the label index does not line up with the data index.
   const maxRevenue = Math.max(...revenueData.map((d) => d.revenue), 0);
-  const maxRevenueIndex = revenueData.findIndex((d) => d.revenue === maxRevenue);
 
-  const renderMaxBarLabel = (props: any) => {
-    const { x = 0, y = 0, width = 0, value = 0, index } = props || {};
+  const renderMaxBarLabel = (props: BarLabelProps) => {
+    const { x = 0, y = 0, width = 0, value = 0 } = props;
     const numVal = Number(value) || 0;
-    if (numVal !== maxRevenue || numVal <= 0 || index !== maxRevenueIndex) return null;
+    if (numVal !== maxRevenue || numVal <= 0) return null;
     const numX = Number(x) || 0;
     const numY = Number(y) || 0;
     const numWidth = Number(width) || 0;
@@ -113,10 +118,6 @@ export function MainChartCard({
             value={metric}
             onChange={setMetric}
           />
-          {/* Narrow card: icon-only badge (text hidden via font-size; full text in its title) */}
-          {isSample && (
-            <SampleDataBadge className="@max-[26rem]:gap-0 @max-[26rem]:px-1 @max-[26rem]:text-[0px]" />
-          )}
         </div>
 
         {/* Legend & Summary Info — one compact line, full text in title */}
@@ -145,6 +146,18 @@ export function MainChartCard({
       </div>
 
       {/* ─── Chart Body (flex-1 min-h-0, ResponsiveContainer 100%) ─────────── */}
+      {isEmpty ? (
+        <div className="w-full flex-1 min-h-0 rounded-lg border border-dashed border-border/70 bg-surface-muted/40 flex flex-col items-center justify-center gap-1.5 text-center p-4">
+          {metric === "revenue" ? (
+            <BarChart3 className="w-6 h-6 text-text-muted opacity-40" aria-hidden />
+          ) : (
+            <MessageSquare className="w-6 h-6 text-text-muted opacity-40" aria-hidden />
+          )}
+          <p className="text-12 font-medium text-text-muted">
+            {metric === "revenue" ? "No sales in this period" : "No messages in this period"}
+          </p>
+        </div>
+      ) : (
       <div className="w-full flex-1 min-h-0">
         <ResponsiveContainer width="100%" height="100%">
           {metric === "revenue" ? (
@@ -286,6 +299,7 @@ export function MainChartCard({
           )}
         </ResponsiveContainer>
       </div>
+      )}
     </div>
   );
 }

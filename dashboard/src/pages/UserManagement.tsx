@@ -41,6 +41,7 @@ function calculatePasswordStrength(pass: string): {
 
 export default function UserManagement() {
   const { user: currentUser } = useAuth();
+  const ownerLabel = currentUser?.name || currentUser?.email || "";
   const usersQuery = useUsers();
   const createUserMutation = useCreateUser();
   const updateUserMutation = useUpdateUser();
@@ -199,11 +200,11 @@ export default function UserManagement() {
 
         <div className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-surface hover:bg-surface-muted/20 transition-colors">
           <div className="flex items-center gap-3 min-w-0">
-            <Avatar name={currentUser?.name || "Asha"} size="md" />
+            <Avatar name={ownerLabel} size="md" />
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <p className="font-semibold text-text text-sm truncate">
-                  {currentUser?.name || "Asha"}
+                  {ownerLabel}
                 </p>
                 <span className="px-1.5 py-0.5 rounded text-[11px] font-semibold bg-surface-muted text-text-muted border border-border shrink-0">
                   You
@@ -212,9 +213,9 @@ export default function UserManagement() {
                   Admin
                 </span>
               </div>
-              <p className="text-sm text-text-muted truncate mt-0.5">
-                {currentUser?.email || "asha@asharesins.com"}
-              </p>
+              {currentUser?.email && (
+                <p className="text-sm text-text-muted truncate mt-0.5">{currentUser.email}</p>
+              )}
             </div>
           </div>
 

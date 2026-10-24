@@ -15,16 +15,15 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "../context/AuthContext.tsx";
-import { StatCard } from "../components/shared/StatCard.tsx";
+import { StatCard, type StatCardProps } from "../components/shared/StatCard.tsx";
 import { SegmentedControl } from "../components/shared/SegmentedControl.tsx";
-import { SampleDataBadge } from "../components/shared/SampleDataBadge.tsx";
 import { useAnalytics } from "../hooks/useAnalytics.ts";
 import { useEscalations } from "../hooks/useEscalations.ts";
 import { formatDuration } from "../lib/format.ts";
 import { escalationReasonLabel } from "../lib/escalationReasons.ts";
-import { mockAnalyticsData } from "../data/mockData.ts";
+import type { AnalyticsTrend } from "../types/index.ts";
 
-import { AttentionStrip } from "../components/analytics/AttentionStrip.tsx";
+import { AttentionStrip, type AttentionData } from "../components/analytics/AttentionStrip.tsx";
 import {
   MainChartCard,
   type DailyRevenueItem,
@@ -32,7 +31,7 @@ import {
 } from "../components/analytics/MainChartCard.tsx";
 import { ChannelsCard } from "../components/analytics/ChannelsCard.tsx";
 import { TopProductsCard } from "../components/analytics/TopProductsCard.tsx";
-import { AiHealthCard } from "../components/analytics/AiHealthCard.tsx";
+import { AiHealthCard, type EscalationReasonStat } from "../components/analytics/AiHealthCard.tsx";
 import { RecentActivityCard } from "../components/analytics/RecentActivityCard.tsx";
 import { AnalyticsSkeleton } from "../components/analytics/AnalyticsSkeleton.tsx";
 
@@ -92,72 +91,29 @@ function downloadCsv(filename: string, rows: Array<Array<string | number>>): voi
 
 
 
-// ─── Deterministic Patterns for Daily Revenue & Message Volume (30 days) ────
-const SAMPLE_DAILY_REVENUE_PATTERN: Array<{ revenue: number; orders: number }> = [
-  { revenue: 3800, orders: 2 },
-  { revenue: 4200, orders: 2 },
-  { revenue: 3100, orders: 1 },
-  { revenue: 5400, orders: 3 },
-  { revenue: 4600, orders: 2 },
-  { revenue: 6100, orders: 3 },
-  { revenue: 4900, orders: 2 },
-  { revenue: 5200, orders: 3 },
-  { revenue: 3900, orders: 2 },
-  { revenue: 6800, orders: 3 },
-  { revenue: 4400, orders: 2 },
-  { revenue: 5800, orders: 3 },
-  { revenue: 7200, orders: 4 },
-  { revenue: 5100, orders: 2 },
-  { revenue: 6300, orders: 3 },
-  { revenue: 4700, orders: 2 },
-  { revenue: 5600, orders: 3 },
-  { revenue: 6900, orders: 4 },
-  { revenue: 5300, orders: 2 },
-  { revenue: 7600, orders: 4 },
-  { revenue: 6100, orders: 3 },
-  { revenue: 5400, orders: 2 },
-  { revenue: 8200, orders: 4 },
-  { revenue: 6400, orders: 3 },
-  { revenue: 5900, orders: 3 },
-  { revenue: 7100, orders: 4 },
-  { revenue: 4800, orders: 2 },
-  { revenue: 8600, orders: 5 },
-  { revenue: 6500, orders: 3 },
-  { revenue: 9400, orders: 5 },
-];
+// ─── Real-data helpers ───────────────────────────────────────────────────────
 
-const SAMPLE_DAILY_MESSAGES_PATTERN: Array<{ inbound: number; outbound: number }> = [
-  { inbound: 85, outbound: 72 },
-  { inbound: 92, outbound: 80 },
-  { inbound: 104, outbound: 90 },
-  { inbound: 115, outbound: 102 },
-  { inbound: 98, outbound: 86 },
-  { inbound: 110, outbound: 98 },
-  { inbound: 125, outbound: 112 },
-  { inbound: 102, outbound: 88 },
-  { inbound: 135, outbound: 120 },
-  { inbound: 142, outbound: 128 },
-  { inbound: 118, outbound: 105 },
-  { inbound: 130, outbound: 115 },
-  { inbound: 148, outbound: 134 },
-  { inbound: 136, outbound: 122 },
-  { inbound: 155, outbound: 140 },
-  { inbound: 122, outbound: 108 },
-  { inbound: 140, outbound: 124 },
-  { inbound: 160, outbound: 145 },
-  { inbound: 132, outbound: 118 },
-  { inbound: 145, outbound: 128 },
-  { inbound: 158, outbound: 142 },
-  { inbound: 128, outbound: 114 },
-  { inbound: 165, outbound: 150 },
-  { inbound: 148, outbound: 135 },
-  { inbound: 142, outbound: 126 },
-  { inbound: 152, outbound: 138 },
-  { inbound: 138, outbound: 120 },
-  { inbound: 170, outbound: 155 },
-  { inbound: 156, outbound: 140 },
-  { inbound: 162, outbound: 148 },
-];
+const DASH = "—";
+
+type StatTrend = StatCardProps["trend"];
+
+/** Trend chip from trends.*.changePct. Hidden (undefined) when there is no previous value or no change. */
+function trendChip(t: AnalyticsTrend | undefined, label: string, lowerIsBetter = false): StatTrend {
+  if (!t || t.changePct === null || !Number.isFinite(t.changePct)) return undefined;
+  const abs = Math.abs(t.changePct);
+  const shown = abs >= 10 ? Math.round(abs) : Math.round(abs * 10) / 10;
+  if (shown === 0) return undefined;
+  const up = t.changePct > 0;
+  return {
+    value: `${shown}%`,
+    direction: up ? "up" : "down",
+    isPositive: lowerIsBetter ? !up : up,
+    label,
+  };
+}
+
+/** "2026-10-24" → "24 Oct" for the chart axis. */
+const axisDate = (date: string) => dayjs(date).format("D MMM");
 
 // ─── Analytics Main Cockpit Page ─────────────────────────────────────────────
 
@@ -177,7 +133,7 @@ export default function Analytics() {
   const activeChannel: "all" | "whatsapp" | "instagram" =
     rawChannel === "whatsapp" || rawChannel === "instagram" ? rawChannel : "all";
 
-  // Backend queries
+  // Backend queries (channel is part of the analytics query key)
   const analytics = useAnalytics({
     from: range.from,
     to: range.to,
@@ -189,15 +145,10 @@ export default function Analytics() {
   const isLoading = analytics.isLoading;
   const isError = analytics.isError;
 
-  // Sample data fallback for the current channel and date preset
-  const sample = mockAnalyticsData[activeChannel][range.preset];
-
-  const rangeLabel =
-    range.preset === "custom"
-      ? `${dayjs(range.from).format("D MMM")} – ${dayjs(range.to).format("D MMM YYYY")}`
-      : range.preset === "30d"
-        ? "Last 30 days"
-        : "Last 7 days";
+  // Trends compare against the previous period of the same length.
+  const trendLabel =
+    range.preset === "30d" ? "previous 30 days" : range.preset === "7d" ? "previous 7 days" : "previous period";
+  const trendShort = range.preset === "30d" ? "prev 30d" : range.preset === "7d" ? "prev 7d" : "prev period";
 
   const formattedDate = new Intl.DateTimeFormat("en-IN", {
     weekday: "long",
@@ -206,270 +157,129 @@ export default function Analytics() {
     year: "numeric",
   }).format(new Date());
 
-  // ─── Main Chart Daily Data (Mapped to End Today or Selected Range) ────────
-  const daysCount = useMemo(() => {
-    if (range.preset === "30d") return 30;
-    if (range.preset === "7d") return 7;
-    return Math.max(1, dayjs(range.to).diff(dayjs(range.from), "day") + 1);
-  }, [range.preset, range.from, range.to]);
-
-  const revenueDailyData: DailyRevenueItem[] = useMemo(() => {
-    if (data?.revenue?.daily && data.revenue.daily.length > 0) {
-      return data.revenue.daily;
-    }
-    const channelMultiplier =
-      activeChannel === "whatsapp" ? 0.78 : activeChannel === "instagram" ? 0.22 : 1.0;
-    const end = range.preset === "custom" ? dayjs(range.to) : dayjs();
-
-    const items: DailyRevenueItem[] = [];
-    for (let i = 0; i < daysCount; i++) {
-      const templateIdx =
-        daysCount <= SAMPLE_DAILY_REVENUE_PATTERN.length
-          ? SAMPLE_DAILY_REVENUE_PATTERN.length - daysCount + i
-          : i % SAMPLE_DAILY_REVENUE_PATTERN.length;
-      const base = SAMPLE_DAILY_REVENUE_PATTERN[templateIdx] ?? { revenue: 4500, orders: 2 };
-      const rev = Math.round((base.revenue * channelMultiplier) / 100) * 100;
-      const ord = Math.max(1, Math.round(base.orders * (activeChannel === "instagram" ? 0.4 : 1)));
-      items.push({
-        date: end.subtract(daysCount - 1 - i, "day").format("D MMM"),
-        revenue: rev,
-        orders: ord,
-      });
-    }
-    return items;
-  }, [data?.revenue?.daily, daysCount, range.preset, range.to, activeChannel]);
-
-  const messagesDailyData: DailyMessageItem[] = useMemo(() => {
-    if (data?.messagesDaily && data.messagesDaily.length > 0) {
-      return data.messagesDaily;
-    }
-    const channelMultiplier =
-      activeChannel === "whatsapp" ? 0.78 : activeChannel === "instagram" ? 0.22 : 1.0;
-    const end = range.preset === "custom" ? dayjs(range.to) : dayjs();
-
-    const items: DailyMessageItem[] = [];
-    for (let i = 0; i < daysCount; i++) {
-      const templateIdx =
-        daysCount <= SAMPLE_DAILY_MESSAGES_PATTERN.length
-          ? SAMPLE_DAILY_MESSAGES_PATTERN.length - daysCount + i
-          : i % SAMPLE_DAILY_MESSAGES_PATTERN.length;
-      const base = SAMPLE_DAILY_MESSAGES_PATTERN[templateIdx] ?? { inbound: 120, outbound: 100 };
-      items.push({
-        date: end.subtract(daysCount - 1 - i, "day").format("D MMM"),
-        inbound: Math.round(base.inbound * channelMultiplier),
-        outbound: Math.round(base.outbound * channelMultiplier),
-      });
-    }
-    return items;
-  }, [data?.messagesDaily, daysCount, range.preset, range.to, activeChannel]);
-
-  const derivedTotalRevenue = useMemo(
-    () => revenueDailyData.reduce((acc, d) => acc + d.revenue, 0),
-    [revenueDailyData]
+  // ─── Main chart series (zero-filled by the API for every day in range) ─────
+  const revenueDailyData: DailyRevenueItem[] = useMemo(
+    () => (data?.revenue?.daily ?? []).map((d) => ({ ...d, date: axisDate(d.date) })),
+    [data?.revenue?.daily]
   );
-  const derivedTotalOrders = useMemo(
-    () => revenueDailyData.reduce((acc, d) => acc + d.orders, 0),
-    [revenueDailyData]
-  );
-  const derivedTotalMessages = useMemo(
-    () => messagesDailyData.reduce((acc, d) => acc + d.inbound + d.outbound, 0),
-    [messagesDailyData]
+  const messagesDailyData: DailyMessageItem[] = useMemo(
+    () => (data?.messagesDaily ?? []).map((d) => ({ ...d, date: axisDate(d.date) })),
+    [data?.messagesDaily]
   );
 
-  // ─── Attention Strip Data Fallbacks ───────────────────────────────────────
-  const escalationsValue =
-    openEscalations.data?.length ?? (data?.attention?.openEscalations ?? (data ? 0 : 20));
+  // ─── Escalations: live open list (GET /escalations), else the API's count ───
+  const openList = openEscalations.data;
+  const openEscalationsCount: number | null = openList?.length ?? data?.attention?.openEscalations ?? null;
 
-  const attentionData = useMemo(() => {
-    return {
-      openEscalations: escalationsValue,
-      windowsClosingSoon: data?.attention?.windowsClosingSoon ?? 1,
-      pendingOrders: data?.attention?.pendingOrders ?? (data?.orders?.pending ?? 3),
-      unpaidBalance: data?.attention?.unpaidBalance ?? 4200,
-    };
-  }, [escalationsValue, data?.attention, data?.orders?.pending]);
+  const oldestWaitingText = useMemo(() => {
+    if (!openList || openList.length === 0) return null;
+    const oldest = Math.min(...openList.map((e) => new Date(e.createdAt).getTime()));
+    const seconds = Math.max(60, dayjs().diff(dayjs(oldest), "second"));
+    // Whole days once past a day, so the small tile never truncates ("26d", not "25d 23h").
+    return seconds >= 86_400 ? `${Math.floor(seconds / 86_400)}d` : formatDuration(seconds);
+  }, [openList]);
 
-  // ─── KPI Card Data & Trends (Strictly matching chart & channels) ────────────
-  const revenueValue = data?.revenue?.total ?? derivedTotalRevenue;
-  const revenueTrend = data?.trends?.revenue
-    ? {
-        value: `${data.trends.revenue.changePct && data.trends.revenue.changePct > 0 ? "+" : ""}${data.trends.revenue.changePct}%`,
-        isPositive: (data.trends.revenue.changePct ?? 0) >= 0,
-        label: rangeLabel,
-      }
-    : {
-        value: sample.kpis.revenue.trend,
-        isPositive: sample.kpis.revenue.isPositive,
-        label: rangeLabel,
-      };
+  // ─── Attention strip (null = not available, never faked) ──────────────────
+  const attentionData: AttentionData = {
+    openEscalations: openEscalationsCount,
+    windowsClosingSoon: data?.attention?.windowsClosingSoon ?? null,
+    pendingOrders: data?.attention?.pendingOrders ?? data?.orders?.pending ?? null,
+    unpaidBalance: data?.attention?.unpaidBalance ?? null,
+  };
 
-  const ordersValue = data?.orders?.confirmed ?? derivedTotalOrders;
-  const ordersTrend = data?.trends?.orders
-    ? {
-        value: `${data.trends.orders.changePct && data.trends.orders.changePct > 0 ? "+" : ""}${data.trends.orders.changePct}%`,
-        isPositive: (data.trends.orders.changePct ?? 0) >= 0,
-        label: rangeLabel,
-      }
-    : {
-        value: sample.kpis.orders.trend,
-        isPositive: sample.kpis.orders.isPositive,
-        label: rangeLabel,
-      };
+  // ─── KPI values: zero stays 0; missing → "—" with no trend chip ────────────
+  const revenueValue = data?.revenue ? data.revenue.total : null;
+  const ordersValue = data?.orders ? data.orders.confirmed : null;
+  const messagesValue = data?.messages ? data.messages.total : null;
 
-  // Messages: use real only if > 0, otherwise use derived daily total (which uses sample pattern)
-  const messagesValue =
-    data?.messages?.total && data.messages.total > 0
-      ? data.messages.total
-      : derivedTotalMessages;
-  const messagesTrend = data?.trends?.messages
-    ? {
-        value: `${data.trends.messages.changePct && data.trends.messages.changePct > 0 ? "+" : ""}${data.trends.messages.changePct}%`,
-        isPositive: (data.trends.messages.changePct ?? 0) >= 0,
-        label: rangeLabel,
-      }
-    : {
-        value: sample.kpis.messages.trend,
-        isPositive: sample.kpis.messages.isPositive,
-        label: rangeLabel,
-      };
+  const autoRepliesCount = data ? data.autoReplies : null;
+  const escalationsCount = data ? data.escalations : null;
+  // A rate needs at least one processed message; with none it is "—", not 0%.
+  const processed = (autoRepliesCount ?? 0) + (escalationsCount ?? 0);
+  const autoReplyRateValue = data && processed > 0 ? Math.round(data.autoReplyRate * 100) : null;
 
-  // autoReplyRate: use real only if >0 (0% from real API is indistinguishable from missing)
-  const autoReplyRateValue =
-    data?.autoReplyRate !== undefined && data.autoReplyRate > 0
-      ? Math.round(data.autoReplyRate * 100)
-      : 94;
-  const autoReplyTrend = data?.trends?.autoReplyRate
-    ? {
-        value: `${data.trends.autoReplyRate.changePct && data.trends.autoReplyRate.changePct > 0 ? "+" : ""}${data.trends.autoReplyRate.changePct}%`,
-        isPositive: (data.trends.autoReplyRate.changePct ?? 0) >= 0,
-        label: rangeLabel,
-      }
-    : {
-        value: "+4%",
-        isPositive: true,
-        label: rangeLabel,
-      };
+  // avgResponseTimeSeconds = mean time from escalation to resolution.
+  const avgResolveText =
+    data?.avgResponseTimeSeconds !== null && data?.avgResponseTimeSeconds !== undefined
+      ? formatDuration(data.avgResponseTimeSeconds)
+      : null;
 
-  const avgResponseValue = data?.avgResponseTimeSeconds
-    ? formatDuration(data.avgResponseTimeSeconds)
-    : "1h 24m";
-  const avgResponseTrend = data?.trends?.avgResponseTimeSeconds
-    ? {
-        value: `${data.trends.avgResponseTimeSeconds.changePct && data.trends.avgResponseTimeSeconds.changePct > 0 ? "+" : ""}${data.trends.avgResponseTimeSeconds.changePct}%`,
-        isPositive: (data.trends.avgResponseTimeSeconds.changePct ?? 0) <= 0,
-        label: rangeLabel,
-      }
-    : {
-        value: "↓15s",
-        isPositive: true,
-        label: rangeLabel,
-      };
+  const trends = data?.trends;
+  const revenueTrend = revenueValue === null ? undefined : trendChip(trends?.revenue, trendLabel);
+  const ordersTrend = ordersValue === null ? undefined : trendChip(trends?.orders, trendLabel);
+  const messagesTrend = messagesValue === null ? undefined : trendChip(trends?.messages, trendLabel);
+  const autoReplyTrend = autoReplyRateValue === null ? undefined : trendChip(trends?.autoReplyRate, trendLabel);
+  const avgResolveTrend =
+    avgResolveText === null ? undefined : trendChip(trends?.avgResponseTimeSeconds, trendLabel, true);
 
-  // ─── Channels Card Data (Strictly matching chart total & orders) ───────────
-  const channelsWhatsapp = useMemo(() => {
-    if (data?.channels?.whatsapp) return data.channels.whatsapp;
-    const waShare = 0.78;
-    const rev = Math.round(revenueValue * waShare);
-    const ord = Math.round(ordersValue * waShare);
-    const msg = Math.round(messagesValue * waShare);
-    return {
-      messages: msg,
-      revenue: rev,
-      orders: ord,
-    };
-  }, [data?.channels?.whatsapp, revenueValue, ordersValue, messagesValue]);
+  const aiTrendPct = autoReplyRateValue === null ? null : (trends?.autoReplyRate?.changePct ?? null);
+  const aiTrendText =
+    aiTrendPct === null || Math.round(Math.abs(aiTrendPct)) === 0
+      ? null
+      : `${aiTrendPct > 0 ? "↑" : "↓"}${Math.round(Math.abs(aiTrendPct))}% vs ${trendShort}`;
 
-  const channelsInstagram = useMemo(() => {
-    if (data?.channels?.instagram) return data.channels.instagram;
-    return {
-      messages: Math.max(0, messagesValue - channelsWhatsapp.messages),
-      revenue: Math.max(0, revenueValue - channelsWhatsapp.revenue),
-      orders: Math.max(0, ordersValue - channelsWhatsapp.orders),
-    };
-  }, [data?.channels?.instagram, revenueValue, ordersValue, messagesValue, channelsWhatsapp]);
+  // ─── Channels card ─────────────────────────────────────────────────────────
+  const channelsWhatsapp = data?.channels?.whatsapp ?? null;
+  const channelsInstagram = data?.channels?.instagram ?? null;
 
-  // ─── AI Health Card Data ───────────────────────────────────────────────────
-  const autoRepliesCount = data?.autoReplies && data.autoReplies > 0 ? data.autoReplies : 320;
-  const escalationsCount = data?.escalations && data.escalations > 0 ? data.escalations : 20;
-  const openEscalationsCount = openEscalations.data?.length ?? 20;
-
-  const oldestEscalationWaiting = useMemo(() => {
-    if (openEscalations.data && openEscalations.data.length > 0) {
-      const sorted = [...openEscalations.data].sort(
-        (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-      );
-      const oldest = sorted[0];
-      if (oldest?.createdAt) {
-        const diffSeconds = Math.max(60, dayjs().diff(dayjs(oldest.createdAt), "second"));
-        return formatDuration(diffSeconds);
-      }
-    }
-    if (!data) return "3h";
-    return null;
-  }, [openEscalations.data, data]);
-
-  const avgResolveText = useMemo(() => {
-    if (data?.avgResponseTimeSeconds && data.avgResponseTimeSeconds > 0) {
-      return formatDuration(data.avgResponseTimeSeconds);
-    }
-    if (!data) return "1h 24m";
-    return null;
-  }, [data?.avgResponseTimeSeconds, data]);
-
-  const escalationReasonsList = useMemo(() => {
+  // ─── AI health: escalation reasons (real, sorted, no padding) ──────────────
+  const escalationReasonsList: EscalationReasonStat[] = useMemo(() => {
     const entries = Object.entries(data?.byReason ?? {})
-      .map(([reason, count]) => ({ reason, count: count ?? 0 }))
+      .map(([code, count]) => ({ code, count: count ?? 0 }))
       .filter((r) => r.count > 0)
       .sort((a, b) => b.count - a.count);
-
     const total = entries.reduce((acc, cur) => acc + cur.count, 0);
-    if (entries.length > 0 && total > 0) {
-      return entries.map((e) => ({
-        reason: escalationReasonLabel(e.reason),
-        percentage: Math.round((e.count / total) * 100),
-        count: e.count,
-      }));
-    }
-    return sample.aiPerformance.escalationReasons.slice(0, 5);
-  }, [data?.byReason, sample.aiPerformance.escalationReasons]);
+    return entries.map((e) => ({
+      code: e.code,
+      reason: escalationReasonLabel(e.code),
+      count: e.count,
+      percentage: total > 0 ? Math.round((e.count / total) * 100) : 0,
+    }));
+  }, [data?.byReason]);
 
-  // ─── Top Products Data (All products sold in period) ───────────────────────
-  const topProductsList = useMemo(() => {
-    if (data?.topProducts && data.topProducts.length > 0) {
-      return data.topProducts;
-    }
-    return sample.topProducts;
-  }, [data?.topProducts, sample.topProducts]);
+  // ─── Top products (every product sold in range; real list only) ───────────
+  const topProductsList = useMemo(() => data?.topProducts ?? [], [data?.topProducts]);
 
-  // ─── Export Handler (CSV of what's on screen) ──────────────────────────────
+  // ─── Export Handler (CSV of the real values on screen; blank = not available) ──
   const handleExport = () => {
     const filename = `analytics_${dayjs(range.from).format("YYYY-MM-DD")}_to_${dayjs(range.to).format("YYYY-MM-DD")}.csv`;
+    const cell = (v: number | string | null) => (v === null ? "" : v);
     const rows: Array<Array<string | number>> = [
-      ["Analytics Report (Screen Export)", ""],
+      ["Analytics Report", ""],
       ["Date Range", `${dayjs(range.from).format("YYYY-MM-DD")} to ${dayjs(range.to).format("YYYY-MM-DD")}`],
       ["Channel Filter", activeChannel.toUpperCase()],
       [],
       ["Key Metrics", "Value"],
-      ["Revenue (₹)", revenueValue],
-      ["Orders Confirmed", ordersValue],
-      ["Messages Total", messagesValue],
-      ["AI Reply Rate", `${autoReplyRateValue}%`],
-      ["Avg Response Time", avgResponseValue],
-      ["Open Escalations", escalationsValue],
+      ["Revenue (₹)", cell(revenueValue)],
+      ["Orders Confirmed", cell(ordersValue)],
+      ["Messages Total", cell(messagesValue)],
+      ["AI Reply Rate", autoReplyRateValue === null ? "" : `${autoReplyRateValue}%`],
+      ["Avg Resolve Time", cell(avgResolveText)],
+      ["Open Escalations", cell(openEscalationsCount)],
       [],
       ["Channel Breakdown", "Messages", "Revenue (₹)", "Orders"],
-      ["WhatsApp", channelsWhatsapp.messages, channelsWhatsapp.revenue, channelsWhatsapp.orders],
-      ["Instagram", channelsInstagram.messages, channelsInstagram.revenue, channelsInstagram.orders],
+      ...(channelsWhatsapp
+        ? [["WhatsApp", channelsWhatsapp.messages, channelsWhatsapp.revenue, channelsWhatsapp.orders]]
+        : []),
+      ...(channelsInstagram
+        ? [["Instagram", channelsInstagram.messages, channelsInstagram.revenue, channelsInstagram.orders]]
+        : []),
       [],
-      ["AI Performance", "Count / Rate"],
-      ["Auto-Replies", autoRepliesCount],
-      ["Escalations", escalationsCount],
+      ["AI Performance", "Count"],
+      ["Auto-Replies", cell(autoRepliesCount)],
+      ["Escalations", cell(escalationsCount)],
       [],
-      ["Escalation Reasons", "Share %"],
-      ...escalationReasonsList.map((r) => [r.reason, `${r.percentage}%`]),
+      ["Escalation Reasons", "Count", "Share %"],
+      ...escalationReasonsList.map((r) => [r.reason, r.count, `${r.percentage}%`]),
       [],
       ["Top Products", "Units Sold", "Revenue (₹)"],
       ...topProductsList.map((p) => [p.name, p.units, p.revenue]),
+      [],
+      ["Daily Revenue", "Revenue (₹)", "Orders"],
+      ...(data?.revenue?.daily ?? []).map((d) => [d.date, d.revenue, d.orders]),
+      [],
+      ["Daily Messages", "Inbound", "Outbound"],
+      ...(data?.messagesDaily ?? []).map((d) => [d.date, d.inbound, d.outbound]),
     ];
 
     downloadCsv(filename, rows);
@@ -624,82 +434,66 @@ export default function Analytics() {
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 shrink-0">
         <StatCard
           label="Revenue"
-          value={revenueValue}
-          prefix="₹"
+          value={revenueValue ?? DASH}
+          prefix={revenueValue === null ? undefined : "₹"}
           trend={revenueTrend}
           color="amber"
           icon={<TrendingUp className="w-3.5 h-3.5" />}
-          tag={!data?.revenue ? <SampleDataBadge /> : undefined}
         />
 
         <StatCard
           label="Orders"
-          value={ordersValue}
+          value={ordersValue ?? DASH}
           trend={ordersTrend}
           color="blue"
           icon={<Package className="w-3.5 h-3.5" />}
           onClick={() => navigate("/orders")}
-          tag={!data?.orders ? <SampleDataBadge /> : undefined}
         />
 
         <StatCard
           label="Messages"
-          value={messagesValue}
+          value={messagesValue ?? DASH}
           trend={messagesTrend}
           color="teal"
           icon={<Sparkles className="w-3.5 h-3.5" />}
           onClick={() => navigate("/inbox")}
-          tag={!data?.messages ? <SampleDataBadge /> : undefined}
         />
 
         <StatCard
           label="AI Reply Rate"
-          value={autoReplyRateValue}
-          suffix="%"
-          radialProgress={autoReplyRateValue}
+          value={autoReplyRateValue ?? DASH}
+          suffix={autoReplyRateValue === null ? undefined : "%"}
           trend={autoReplyTrend}
           color="violet"
           icon={<Bot className="w-3.5 h-3.5" />}
-          tag={data?.autoReplyRate === undefined ? <SampleDataBadge /> : undefined}
         />
 
         <StatCard
-          label="Avg Response"
-          value={avgResponseValue}
-          trend={avgResponseTrend}
+          label="Avg Resolve"
+          value={avgResolveText ?? DASH}
+          trend={avgResolveTrend}
           color="emerald"
           icon={<Clock className="w-3.5 h-3.5" />}
-          tag={data?.avgResponseTimeSeconds === undefined ? <SampleDataBadge /> : undefined}
         />
 
         <StatCard
           label="Escalations"
-          value={escalationsValue}
+          value={openEscalationsCount ?? DASH}
           color="danger"
-          pulsingDot={escalationsValue > 0}
+          pulsingDot={(openEscalationsCount ?? 0) > 0}
           icon={<AlertTriangle className="w-3.5 h-3.5" />}
           onClick={() => navigate("/escalations")}
-          tag={openEscalations.data === undefined && !data?.attention ? <SampleDataBadge /> : undefined}
         />
       </div>
 
       {/* ─── Row 2: 3 Equal Cards (Chart · Channels · AI Health) ──────────── */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 [@media(min-width:1024px)_and_(min-height:760px)]:flex-[50] [@media(min-width:1024px)_and_(min-height:760px)]:min-h-0">
         <div className="min-w-0 flex flex-col min-h-[300px] md:col-span-2 lg:col-span-1 [@media(min-width:1024px)_and_(min-height:760px)]:min-h-0">
-          <MainChartCard
-            revenueData={revenueDailyData}
-            messagesData={messagesDailyData}
-            isSampleRevenue={!data?.revenue?.daily}
-            isSampleMessages={!data?.messagesDaily}
-          />
+          <MainChartCard revenueData={revenueDailyData} messagesData={messagesDailyData} />
         </div>
 
         <div className="min-w-0 flex flex-col [@media(min-width:1024px)_and_(min-height:760px)]:min-h-0">
-          <ChannelsCard
-            whatsapp={channelsWhatsapp}
-            instagram={channelsInstagram}
-            isSample={!data?.channels}
-          />
+          <ChannelsCard whatsapp={channelsWhatsapp} instagram={channelsInstagram} />
         </div>
 
         <div className="min-w-0 flex flex-col [@media(min-width:1024px)_and_(min-height:760px)]:min-h-0">
@@ -708,20 +502,11 @@ export default function Analytics() {
             autoRepliesCount={autoRepliesCount}
             escalationsCount={escalationsCount}
             topReasons={escalationReasonsList}
-            openEscalationsCount={openEscalationsCount}
-            oldestWaitingText={oldestEscalationWaiting}
+            openEscalationsCount={openList ? openList.length : null}
+            oldestWaitingText={oldestWaitingText}
             avgResolveText={avgResolveText}
-            isSample={!data?.byReason || Object.keys(data.byReason).length === 0}
-            trendVsPrev={
-              data?.trends?.autoReplyRate?.changePct != null
-                ? `${data.trends.autoReplyRate.changePct > 0 ? "↑" : "↓"}${Math.abs(data.trends.autoReplyRate.changePct)}% vs ${range.preset === "30d" ? "30d" : "7d"}`
-                : "+3% vs 7d"
-            }
-            trendPositive={
-              data?.trends?.autoReplyRate?.changePct != null
-                ? (data.trends.autoReplyRate.changePct ?? 0) >= 0
-                : true
-            }
+            trendVsPrev={aiTrendText}
+            trendPositive={(aiTrendPct ?? 0) >= 0}
           />
         </div>
       </div>
@@ -729,10 +514,7 @@ export default function Analytics() {
       {/* ─── Row 3: 2 Cards (64% Top Products, 36% Recent Activity) ─────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-[64fr_36fr] gap-4 [@media(min-width:1024px)_and_(min-height:760px)]:flex-[50] [@media(min-width:1024px)_and_(min-height:760px)]:min-h-0">
         <div className="min-w-0 flex flex-col h-[400px] [@media(min-width:1024px)_and_(min-height:760px)]:h-auto [@media(min-width:1024px)_and_(min-height:760px)]:min-h-0">
-          <TopProductsCard
-            products={topProductsList}
-            isSample={!data?.topProducts}
-          />
+          <TopProductsCard products={topProductsList} />
         </div>
 
         <div className="min-w-0 flex flex-col h-[400px] lg:h-auto lg:[contain:size] [@media(min-width:1024px)_and_(min-height:760px)]:min-h-0">

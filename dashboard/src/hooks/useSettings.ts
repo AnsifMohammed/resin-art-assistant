@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { getSettings, setPaused } from "../api/settings.ts";
+import { getSettings, setPaused, updateSettings } from "../api/settings.ts";
 import { queryKeys } from "../lib/queryKeys.ts";
-import type { SettingsResponse } from "../types/index.ts";
+import type { SettingsPatchRequest, SettingsResponse } from "../types/index.ts";
 
 /** Admin only: GET /settings. Pass enabled:false for staff (the endpoint is 403 for them). */
 export function useSettings(opts: { enabled?: boolean } = {}) {
@@ -9,6 +9,20 @@ export function useSettings(opts: { enabled?: boolean } = {}) {
     queryKey: queryKeys.settings.all,
     queryFn: ({ signal }) => getSettings(signal),
     enabled: opts.enabled ?? true,
+  });
+}
+
+/** Admin only: PATCH /settings (business hours, away message, window alerts). Writes the full response to the cache. */
+export function useUpdateSettings() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (patch: SettingsPatchRequest) => updateSettings(patch),
+    onSuccess: (settings) => {
+      qc.setQueryData<SettingsResponse>(queryKeys.settings.all, settings);
+    },
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.settings.all });
+    },
   });
 }
 

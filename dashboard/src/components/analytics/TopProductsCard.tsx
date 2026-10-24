@@ -2,22 +2,18 @@ import { useState, useRef, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { Package, ArrowUpRight } from "lucide-react";
-import { SampleDataBadge } from "../shared/SampleDataBadge.tsx";
 
 export interface TopProductItem {
-  productId?: string | null;
+  productId: string | null;
   name: string;
-  imageUrl?: string | null;
-  image?: string | null;
+  imageUrl: string | null;
   units: number;
   revenue: number;
-  leadTime?: string;
-  sharePercent?: number;
 }
 
 interface TopProductsCardProps {
+  /** Every product sold in the period (real data only; empty → empty state). */
   products: TopProductItem[];
-  isSample?: boolean;
   isLoading?: boolean;
 }
 
@@ -48,305 +44,7 @@ const ROW_GAP = 8;
 /** Minimum shell height (px, excluding gap). Shells (~48–56px) grow to fill the area exactly. */
 const MIN_SHELL = 48;
 
-// ─── 42 Curated Sample Products ─────────────────────────────────────────────
-const SAMPLE_42_PRODUCTS: TopProductItem[] = [
-  {
-    name: "Ocean Coaster Set of 4",
-    revenue: 52800,
-    units: 44,
-    leadTime: "5 days",
-    image: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=120&q=80",
-  },
-  {
-    name: "12 inch Resin Wall Clock",
-    revenue: 44800,
-    units: 16,
-    leadTime: "7 days",
-    image: "https://images.unsplash.com/photo-1563861826100-9cb868fdbe1c?auto=format&fit=crop&w=120&q=80",
-  },
-  {
-    name: "Large Resin Serving Tray",
-    revenue: 34200,
-    units: 19,
-    leadTime: "6 days",
-    image: "https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?auto=format&fit=crop&w=120&q=80",
-  },
-  {
-    name: "Resin Photo Frame 5x7",
-    revenue: 22800,
-    units: 24,
-    leadTime: "5 days",
-    image: "https://images.unsplash.com/photo-1582562124811-c09040d0a901?auto=format&fit=crop&w=120&q=80",
-  },
-  {
-    name: "Resin Keychain Set of 3",
-    revenue: 16200,
-    units: 36,
-    leadTime: "3 days",
-    image: "https://images.unsplash.com/photo-1544717305-2782549b5136?auto=format&fit=crop&w=120&q=80",
-  },
-  {
-    name: "Resin Bookmark Set of 4",
-    revenue: 13680,
-    units: 36,
-    leadTime: "3 days",
-    image: "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&w=120&q=80",
-  },
-  {
-    name: "Geode Agate Coaster Set",
-    revenue: 10800,
-    units: 9,
-    leadTime: "5 days",
-    image: "https://images.unsplash.com/photo-1579783902614-a3fb3927b675?auto=format&fit=crop&w=120&q=80",
-  },
-  {
-    name: "Custom Floral Ring Dish",
-    revenue: 8100,
-    units: 14,
-    leadTime: "4 days",
-    image: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=120&q=80",
-  },
-  {
-    name: "Epoxy Resin River Board",
-    revenue: 28500,
-    units: 6,
-    leadTime: "8 days",
-    image: "https://images.unsplash.com/photo-1590736969955-71cc94801759?auto=format&fit=crop&w=120&q=80",
-  },
-  {
-    name: "Emerald Green Geode Platter",
-    revenue: 19500,
-    units: 8,
-    leadTime: "6 days",
-    image: "https://images.unsplash.com/photo-1579783901586-78822e39974c?auto=format&fit=crop&w=120&q=80",
-  },
-  {
-    name: "Galaxy Pendant Necklace (2pc)",
-    revenue: 7200,
-    units: 18,
-    leadTime: "3 days",
-    image: "https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?auto=format&fit=crop&w=120&q=80",
-  },
-  {
-    name: "Pressed Flower Vanity Tray",
-    revenue: 14400,
-    units: 12,
-    leadTime: "5 days",
-    image: "https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&w=120&q=80",
-  },
-  {
-    name: "Turquoise Waves Coaster Duo",
-    revenue: 5400,
-    units: 15,
-    leadTime: "4 days",
-    image: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=120&q=80",
-  },
-  {
-    name: "Botanical Resin Candle Holder",
-    revenue: 9600,
-    units: 16,
-    leadTime: "4 days",
-    image: "https://images.unsplash.com/photo-1603006905003-be475563bc59?auto=format&fit=crop&w=120&q=80",
-  },
-  {
-    name: "Rose Quartz Coaster Set of 4",
-    revenue: 15200,
-    units: 11,
-    leadTime: "5 days",
-    image: "https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=120&q=80",
-  },
-  {
-    name: "16 inch Marble Resin Wall Clock",
-    revenue: 29800,
-    units: 7,
-    leadTime: "8 days",
-    image: "https://images.unsplash.com/photo-1563861826100-9cb868fdbe1c?auto=format&fit=crop&w=120&q=80",
-  },
-  {
-    name: "Golden Foil Hexagon Coasters",
-    revenue: 8400,
-    units: 14,
-    leadTime: "4 days",
-    image: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=120&q=80",
-  },
-  {
-    name: "Midnight Ocean Trinket Box",
-    revenue: 6900,
-    units: 9,
-    leadTime: "5 days",
-    image: "https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?auto=format&fit=crop&w=120&q=80",
-  },
-  {
-    name: "Sunset Gradient Cheese Board",
-    revenue: 17500,
-    units: 10,
-    leadTime: "6 days",
-    image: "https://images.unsplash.com/photo-1590736969955-71cc94801759?auto=format&fit=crop&w=120&q=80",
-  },
-  {
-    name: "Dried Hydrangea Resin Coasters",
-    revenue: 11200,
-    units: 13,
-    leadTime: "5 days",
-    image: "https://images.unsplash.com/photo-1582562124811-c09040d0a901?auto=format&fit=crop&w=120&q=80",
-  },
-  {
-    name: "Sapphire Geode Wall Art 18x18",
-    revenue: 38000,
-    units: 5,
-    leadTime: "10 days",
-    image: "https://images.unsplash.com/photo-1579783901586-78822e39974c?auto=format&fit=crop&w=120&q=80",
-  },
-  {
-    name: "Lavender Petal Ring Cones (3pc)",
-    revenue: 4200,
-    units: 14,
-    leadTime: "3 days",
-    image: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=120&q=80",
-  },
-  {
-    name: "Black Marbled Wine Butler Tray",
-    revenue: 12600,
-    units: 9,
-    leadTime: "5 days",
-    image: "https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?auto=format&fit=crop&w=120&q=80",
-  },
-  {
-    name: "Terrazzo Hexagon Coaster Set",
-    revenue: 7800,
-    units: 12,
-    leadTime: "4 days",
-    image: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=120&q=80",
-  },
-  {
-    name: "Pearl White Resin Mirror 12x16",
-    revenue: 21000,
-    units: 6,
-    leadTime: "7 days",
-    image: "https://images.unsplash.com/photo-1582562124811-c09040d0a901?auto=format&fit=crop&w=120&q=80",
-  },
-  {
-    name: "Gold Leaf Resin Bookends",
-    revenue: 13500,
-    units: 7,
-    leadTime: "6 days",
-    image: "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&w=120&q=80",
-  },
-  {
-    name: "Autumn Maple Leaf Coasters",
-    revenue: 6400,
-    units: 10,
-    leadTime: "4 days",
-    image: "https://images.unsplash.com/photo-1544717305-2782549b5136?auto=format&fit=crop&w=120&q=80",
-  },
-  {
-    name: "Deep Blue Resin Night Light",
-    revenue: 15800,
-    units: 9,
-    leadTime: "6 days",
-    image: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=120&q=80",
-  },
-  {
-    name: "Metallic Copper Ring Dish",
-    revenue: 3900,
-    units: 11,
-    leadTime: "3 days",
-    image: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=120&q=80",
-  },
-  {
-    name: "Amethyst Style Crystal Coasters",
-    revenue: 14200,
-    units: 9,
-    leadTime: "5 days",
-    image: "https://images.unsplash.com/photo-1579783902614-a3fb3927b675?auto=format&fit=crop&w=120&q=80",
-  },
-  {
-    name: "Coral Beach Scene Charcuterie",
-    revenue: 26000,
-    units: 8,
-    leadTime: "7 days",
-    image: "https://images.unsplash.com/photo-1590736969955-71cc94801759?auto=format&fit=crop&w=120&q=80",
-  },
-  {
-    name: "Wildflower Bookmark Trio",
-    revenue: 4800,
-    units: 16,
-    leadTime: "3 days",
-    image: "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&w=120&q=80",
-  },
-  {
-    name: "Minimalist White Resin Soap Dish",
-    revenue: 3200,
-    units: 12,
-    leadTime: "3 days",
-    image: "https://images.unsplash.com/photo-1603006905003-be475563bc59?auto=format&fit=crop&w=120&q=80",
-  },
-  {
-    name: "Sunburst Resin Mantle Clock",
-    revenue: 18400,
-    units: 5,
-    leadTime: "7 days",
-    image: "https://images.unsplash.com/photo-1563861826100-9cb868fdbe1c?auto=format&fit=crop&w=120&q=80",
-  },
-  {
-    name: "Smoky Quartz Resin Coaster Set",
-    revenue: 9200,
-    units: 8,
-    leadTime: "5 days",
-    image: "https://images.unsplash.com/photo-1579783902614-a3fb3927b675?auto=format&fit=crop&w=120&q=80",
-  },
-  {
-    name: "Pressed Fern Trinket Tray",
-    revenue: 7500,
-    units: 10,
-    leadTime: "4 days",
-    image: "https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&w=120&q=80",
-  },
-  {
-    name: "Starry Night Resin Keepsake Box",
-    revenue: 11800,
-    units: 7,
-    leadTime: "6 days",
-    image: "https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?auto=format&fit=crop&w=120&q=80",
-  },
-  {
-    name: "Frosted Sea Glass Coaster Set",
-    revenue: 8900,
-    units: 9,
-    leadTime: "4 days",
-    image: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=120&q=80",
-  },
-  {
-    name: "Ruby Red Agate Slices (4pc)",
-    revenue: 12400,
-    units: 8,
-    leadTime: "5 days",
-    image: "https://images.unsplash.com/photo-1579783902614-a3fb3927b675?auto=format&fit=crop&w=120&q=80",
-  },
-  {
-    name: "Botanical Ring Cone Set",
-    revenue: 5100,
-    units: 13,
-    leadTime: "3 days",
-    image: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=120&q=80",
-  },
-  {
-    name: "Champagne Gold Serving Tray",
-    revenue: 23500,
-    units: 7,
-    leadTime: "6 days",
-    image: "https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?auto=format&fit=crop&w=120&q=80",
-  },
-  {
-    name: "Woodland Moss Coaster Duo",
-    revenue: 4600,
-    units: 9,
-    leadTime: "4 days",
-    image: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=120&q=80",
-  },
-];
-
-export function TopProductsCard({ products, isSample, isLoading }: TopProductsCardProps) {
+export function TopProductsCard({ products, isLoading }: TopProductsCardProps) {
   const navigate = useNavigate();
   const [sortBy, setSortBy] = useState<"revenue" | "units">("revenue");
   const [showBottomFade, setShowBottomFade] = useState(true);
@@ -355,29 +53,18 @@ export function TopProductsCard({ products, isSample, isLoading }: TopProductsCa
   const scrollRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
 
-  // Combine provided products with sample dataset if fewer than 10 products
-  const productList = useMemo(() => {
-    if (products && products.length >= 10) return products;
-    if (products && products.length > 0) {
-      const names = new Set(products.map((p) => p.name));
-      const filler = SAMPLE_42_PRODUCTS.filter((s) => !names.has(s.name));
-      return [...products, ...filler];
-    }
-    return SAMPLE_42_PRODUCTS;
-  }, [products]);
-
   // Total metrics across all products (for share %)
   const totalCatalogRevenue = useMemo(
-    () => productList.reduce((acc, p) => acc + p.revenue, 0),
-    [productList]
+    () => products.reduce((acc, p) => acc + p.revenue, 0),
+    [products]
   );
 
   // Sorted list based on active toggle
   const sorted = useMemo(() => {
-    return [...productList].sort((a, b) =>
+    return [...products].sort((a, b) =>
       sortBy === "revenue" ? b.revenue - a.revenue : b.units - a.units
     );
-  }, [productList, sortBy]);
+  }, [products, sortBy]);
 
   // Max value of #1 product for relative bar width
   const maxMetric = useMemo(() => {
@@ -429,7 +116,7 @@ export function TopProductsCard({ products, isSample, isLoading }: TopProductsCa
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: 0 });
     setShowBottomFade(sorted.length > 6);
-  }, [sortBy, productList]);
+  }, [sortBy, products]);
 
   // Bottom fade on scroll
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
@@ -446,15 +133,12 @@ export function TopProductsCard({ products, isSample, isLoading }: TopProductsCa
     // ─── OUTER SHELL ────────────────────────────────────────────────────────
     <div className="@container p-4 rounded-xl border border-border bg-surface flex flex-col min-h-0 gap-3 flex-1 overflow-hidden h-[400px] lg:h-full">
       {/* ─── Header Row ─────────────────────────────────────────────────── */}
-      {/* Narrow card (phones): icon-only sample badge and Catalogue link so the header stays one line */}
+      {/* Narrow card (phones): icon-only Catalogue link so the header stays one line */}
       <div className="h-9 flex items-center justify-between gap-2 shrink-0 min-w-0">
         <div className="flex items-center gap-2 min-w-0">
           <h3 className="text-12 font-semibold uppercase tracking-wider text-text-muted whitespace-nowrap">
             Top Products
           </h3>
-          {(isSample || productList.length > products.length) && (
-            <SampleDataBadge className="@max-[30rem]:gap-0 @max-[30rem]:px-1 @max-[30rem]:text-[0px]" />
-          )}
         </div>
 
         <div className="flex items-center gap-2 shrink-0 whitespace-nowrap">
@@ -524,7 +208,7 @@ export function TopProductsCard({ products, isSample, isLoading }: TopProductsCa
         ) : sorted.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center p-4">
             <Package className="w-6 h-6 text-text-muted opacity-40 mb-1" />
-            <p className="text-12 font-medium text-text-muted">No products sold in this period.</p>
+            <p className="text-12 font-medium text-text-muted">No products sold in this period</p>
           </div>
         ) : (
           <div
@@ -549,7 +233,7 @@ export function TopProductsCard({ products, isSample, isLoading }: TopProductsCa
                   totalCatalogRevenue > 0
                     ? Math.round((p.revenue / totalCatalogRevenue) * 100)
                     : null;
-                const imgSrc = p.imageUrl || p.image;
+                const imgSrc = p.imageUrl;
                 const rank = vi.index + 1;
 
                 return (

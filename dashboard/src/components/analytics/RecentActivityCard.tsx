@@ -31,98 +31,6 @@ export interface RecentActivityItem {
   onClick?: () => void;
 }
 
-interface RecentActivityCardProps {
-  activities?: RecentActivityItem[];
-  isLoading?: boolean;
-}
-
-// ─── Curated Sample Activities for Fallback and Testing (200+ Entries) ──────
-const SAMPLE_220_ACTIVITIES: AuditLogEntry[] = Array.from({ length: 220 }).map((_, i) => {
-  const timeOffsetHours = i * 0.45;
-  const createdAt = new Date(Date.now() - timeOffsetHours * 3600 * 1000).toISOString();
-  const orderNum = 1052 - (i % 50);
-
-  const types: Array<{
-    action: string;
-    actorType: "ai" | "admin" | "staff" | "system";
-    actorName?: string;
-    details?: Record<string, unknown>;
-  }> = [
-    {
-      action: "order_status_changed",
-      actorType: "admin",
-      actorName: "Asha",
-      details: { orderNo: `SA-${orderNum}`, toStatus: "dispatched", customerName: "Devi" },
-    },
-    {
-      action: "auto_reply_sent",
-      actorType: "ai",
-      details: { customerName: "Kavya", intent: "order_status" },
-    },
-    {
-      action: "escalation_assigned",
-      actorType: "staff",
-      actorName: "Priya",
-      details: { reason: "custom_dimensions" },
-    },
-    {
-      action: "order_created",
-      actorType: "admin",
-      actorName: "Asha",
-      details: { orderNo: `SA-${orderNum - 1}`, customerName: "Ananya", total: 4800 },
-    },
-    {
-      action: "reply_sent",
-      actorType: "staff",
-      actorName: "Priya",
-      details: { customerName: "Meera" },
-    },
-    {
-      action: "order_status_changed",
-      actorType: "staff",
-      actorName: "Priya",
-      details: { orderNo: `SA-${orderNum - 2}`, toStatus: "ready", customerName: "Rohan" },
-    },
-    {
-      action: "conversation_resolved",
-      actorType: "admin",
-      actorName: "Asha",
-      details: { customerName: "Sanjay" },
-    },
-    {
-      action: "escalation_created",
-      actorType: "ai",
-      details: { reason: "refund_request" },
-    },
-    {
-      action: "auto_reply_sent",
-      actorType: "ai",
-      details: { customerName: "Divya", intent: "catalog_inquiry" },
-    },
-    {
-      action: "order_status_changed",
-      actorType: "admin",
-      actorName: "Asha",
-      details: { orderNo: `SA-${orderNum - 3}`, toStatus: "in_production" },
-    },
-  ];
-
-  const template = types[i % types.length]!;
-  return {
-    id: `sample-act-${i + 1}`,
-    businessId: "resin-art-demo-business-01",
-    actorId: template.actorType === "ai" ? "ai" : `user-${(i % 3) + 1}`,
-    actorType: template.actorType,
-    actorName: template.actorName ?? null,
-    action: template.action,
-    conversationId: `conv-${(i % 15) + 1}`,
-    escalationId: template.action.includes("escalation") ? `esc-${(i % 10) + 1}` : null,
-    targetUserId: null,
-    details: template.details ?? {},
-    createdAt,
-  };
-});
-
 // Helper to convert an AuditLogEntry to a rendered activity row item
 function formatAuditEntry(entry: AuditLogEntry, navigate: (path: string) => void): RecentActivityItem {
   const actor =
@@ -139,10 +47,8 @@ function formatAuditEntry(entry: AuditLogEntry, navigate: (path: string) => void
   });
   const time = formatRelative(entry.createdAt);
 
-  const orderNo =
-    (entry.details?.orderNo as string | undefined) ||
-    (entry.details?.orderId ? `SA-${String(entry.details.orderId).slice(0, 4)}` : undefined);
-  const customerName = (entry.details?.customerName as string | undefined) ?? "";
+  const orderNo = typeof entry.details?.orderNo === "string" ? entry.details.orderNo : undefined;
+  const customerName = typeof entry.details?.customerName === "string" ? entry.details.customerName : "";
 
   let icon: ReactNode = <Layers className="w-3.5 h-3.5 text-text-muted" />;
   let title = humanize(entry.action);
@@ -194,13 +100,12 @@ function formatAuditEntry(entry: AuditLogEntry, navigate: (path: string) => void
       break;
     }
 
-    case "escalation_assigned": {
+    case "escalation_assigned":
+      // actor = who assigned it; the assignee's name is not in the audit row.
       icon = <UserCheck className="w-3.5 h-3.5 text-amber-500" />;
-      const assignedTo = entry.actorName || "staff";
-      title = `Escalation assigned to ${assignedTo}`;
+      title = "Escalation assigned";
       category = "staff";
       break;
-    }
 
     case "escalation_resolved":
       icon = <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />;
@@ -243,8 +148,8 @@ function formatAuditEntry(entry: AuditLogEntry, navigate: (path: string) => void
   }
 
   const handleClick = () => {
-    if (orderNo || entry.action.startsWith("order")) {
-      navigate(`/orders?search=${encodeURIComponent(orderNo ?? "")}`);
+    if (orderNo || entry.action.startsWith("order_")) {
+      navigate(orderNo ? `/orders?search=${encodeURIComponent(orderNo)}` : "/orders");
     } else if (entry.escalationId) {
       navigate("/escalations");
     } else if (entry.conversationId) {
@@ -266,9 +171,18 @@ function formatAuditEntry(entry: AuditLogEntry, navigate: (path: string) => void
   };
 }
 
-export function RecentActivityCard({ activities, isLoading: externalLoading }: RecentActivityCardProps) {
+type ActivityFilter = "all" | "ai" | "staff" | "order";
+
+const EMPTY_TEXT: Record<ActivityFilter, string> = {
+  all: "No activity yet",
+  ai: "No AI activity yet",
+  staff: "No staff activity yet",
+  order: "No order activity yet",
+};
+
+export function RecentActivityCard() {
   const navigate = useNavigate();
-  const [filter, setFilter] = useState<"all" | "ai" | "staff" | "order">("all");
+  const [filter, setFilter] = useState<ActivityFilter>("all");
   const [showBottomFade, setShowBottomFade] = useState(true);
   const [rowHeight, setRowHeight] = useState(44);
   const [scrollMaxHeight, setScrollMaxHeight] = useState<number | undefined>(undefined);
@@ -298,50 +212,25 @@ export function RecentActivityCard({ activities, isLoading: externalLoading }: R
     return () => ro.disconnect();
   }, []);
 
-  // Query audit log infinitely (30 per page)
+  // Query audit log infinitely (30 per page). Filters are applied server-side:
+  // All = none, AI/Staff = actorType, Orders = actions starting with "order_".
   const infiniteQuery = useInfiniteAuditLog({
     actorType: filter === "ai" ? "ai" : filter === "staff" ? "staff" : undefined,
-    action: filter === "order" ? "order" : undefined,
+    actionPrefix: filter === "order" ? "order_" : undefined,
     limit: 30,
   });
 
   const queryRows = infiniteQuery.rows;
-  const isFetching = infiniteQuery.isLoading || externalLoading;
+  const isFetching = infiniteQuery.isLoading;
   const hasNextPage = infiniteQuery.hasNextPage;
   const isFetchingNextPage = infiniteQuery.isFetchingNextPage;
   const fetchNextPage = infiniteQuery.fetchNextPage;
 
-  // Combine query rows with rich 200+ sample activities if database has fewer items
-  const combinedEntries = useMemo(() => {
-    if (queryRows && queryRows.length >= 200) {
-      return queryRows;
-    }
-    // Filter sample items to match active category pill
-    const filteredSample = SAMPLE_220_ACTIVITIES.filter((entry) => {
-      if (filter === "all") return true;
-      if (filter === "ai") return entry.actorType === "ai" || entry.action.includes("auto_reply");
-      if (filter === "staff") return entry.actorType === "staff" || entry.actorType === "admin";
-      if (filter === "order") return entry.action.startsWith("order");
-      return true;
-    });
-
-    if (!queryRows || queryRows.length === 0) {
-      return filteredSample;
-    }
-
-    // Merge query rows first, then fill with sample entries to guarantee 200+ scrolling rows
-    const seenIds = new Set(queryRows.map((r) => r.id));
-    const remainder = filteredSample.filter((s) => !seenIds.has(s.id));
-    return [...queryRows, ...remainder];
-  }, [queryRows, filter]);
-
-  // Formatted items ready for rendering
-  const displayItems = useMemo(() => {
-    if (activities && activities.length >= 20) {
-      return activities;
-    }
-    return combinedEntries.map((entry) => formatAuditEntry(entry, navigate));
-  }, [activities, combinedEntries, navigate]);
+  // Formatted items ready for rendering (real audit-log rows only)
+  const displayItems = useMemo(
+    () => queryRows.map((entry) => formatAuditEntry(entry, navigate)),
+    [queryRows, navigate]
+  );
 
   // Virtualizer setup with dynamic rowHeight
   const virtualCount = displayItems.length + (hasNextPage ? 1 : 0);
@@ -459,7 +348,7 @@ export function RecentActivityCard({ activities, isLoading: externalLoading }: R
           <div className="h-full flex flex-col items-center justify-center text-center p-4">
             <History className="w-5 h-5 text-text-muted opacity-40 mb-1" />
             <p className="text-11 text-text-muted">
-              No {filter !== "all" ? filter : ""} activity recorded.
+              {infiniteQuery.isError ? "Couldn't load activity" : EMPTY_TEXT[filter]}
             </p>
           </div>
         ) : (

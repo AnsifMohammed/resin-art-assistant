@@ -26,15 +26,6 @@ import type { Product, ProductSize } from "../types/index.ts";
 import { SlideOver } from "../components/shared/SlideOver.tsx";
 import { ConfirmDialog } from "../components/shared/ConfirmDialog.tsx";
 
-const FALLBACK_PRESET_IMAGES = [
-  "https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?w=600&auto=format&fit=crop&q=80",
-  "https://images.unsplash.com/photo-1563861826100-9cb868fdbe1c?w=600&auto=format&fit=crop&q=80",
-  "https://images.unsplash.com/photo-1615529182904-14819c35db37?w=600&auto=format&fit=crop&q=80",
-  "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&auto=format&fit=crop&q=80",
-  "https://images.unsplash.com/photo-1544717305-2782549b5136?w=600&auto=format&fit=crop&q=80",
-  "https://images.unsplash.com/photo-1512820790803-83ca734da794?w=600&auto=format&fit=crop&q=80",
-];
-
 export default function Catalogue() {
   const { data, isLoading, isError, refetch } = useProducts({ active: "true" });
   const products = useMemo(() => data?.products ?? [], [data?.products]);
@@ -208,8 +199,7 @@ export default function Catalogue() {
       const secureUrl = await uploadToCloudinary(file);
       setFormImages((prev) => [...prev, secureUrl].slice(0, 5));
       toast.success("Photo uploaded successfully", { id: toastId });
-    } catch (err) {
-      console.error("Cloudinary upload failed:", err);
+    } catch {
       toast.error("Photo upload failed. Please try again.", { id: toastId });
     } finally {
       setIsUploadingImage(false);
@@ -228,15 +218,6 @@ export default function Catalogue() {
     const rest = formImages.filter((_, i) => i !== index);
     setFormImages([item, ...rest]);
     toast.success("Set as main photo");
-  };
-
-  const handleUseFallbackPreset = (presetUrl: string) => {
-    if (formImages.includes(presetUrl)) return;
-    if (formImages.length >= 5) {
-      toast.error("Maximum 5 photos allowed per product");
-      return;
-    }
-    setFormImages([...formImages, presetUrl]);
   };
 
   // Save Add/Edit
@@ -266,7 +247,7 @@ export default function Catalogue() {
       leadTimeDays: Math.max(0, Math.round(Number(formLeadTime) || 3)),
       customizable: formCustomizable,
       customOptions: formCustomizable ? formOptions : [],
-      images: formImages.length > 0 ? formImages : [FALLBACK_PRESET_IMAGES[0] || ""],
+      images: formImages,
       isActive: true,
     };
 
@@ -469,7 +450,7 @@ export default function Catalogue() {
               p.sizes.length > 1 && minPrice !== maxPrice
                 ? `₹${minPrice.toLocaleString("en-IN")} – ₹${maxPrice.toLocaleString("en-IN")}`
                 : `₹${minPrice.toLocaleString("en-IN")}`;
-            const mainPhoto = p.images && p.images.length > 0 ? p.images[0] : FALLBACK_PRESET_IMAGES[0];
+            const mainPhoto = p.images?.[0];
 
             return (
               <div
@@ -479,13 +460,21 @@ export default function Catalogue() {
               >
                 {/* Photo */}
                 <div className="relative aspect-[4/3] w-full overflow-hidden bg-surface-muted">
-                  <img
-                    src={mainPhoto}
-                    alt={p.name}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                    loading="lazy"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-60" />
+                  {mainPhoto ? (
+                    <>
+                      <img
+                        src={mainPhoto}
+                        alt={p.name}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        loading="lazy"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-60" />
+                    </>
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-text-muted/60" aria-label="No photo">
+                      <Package className="w-10 h-10" strokeWidth={1.5} />
+                    </div>
+                  )}
 
                   {/* Lead time badge */}
                   <div className="absolute top-3 left-3 inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-11 font-medium bg-surface/90 text-text backdrop-blur-md shadow-xs border border-border/50">
@@ -834,21 +823,7 @@ export default function Catalogue() {
                   <div className="w-8 h-8 rounded-full bg-surface-muted text-text-muted flex items-center justify-center mx-auto">
                     <ImageIcon className="w-4 h-4" />
                   </div>
-                  <p className="text-12 text-text-muted">
-                    No photos uploaded yet. Or select a sample photo below:
-                  </p>
-                  <div className="flex flex-wrap justify-center gap-2 pt-1">
-                    {FALLBACK_PRESET_IMAGES.slice(0, 4).map((pImg, idx) => (
-                      <button
-                        key={idx}
-                        type="button"
-                        onClick={() => handleUseFallbackPreset(pImg)}
-                        className="w-12 h-10 rounded overflow-hidden border border-border hover:border-primary cursor-pointer"
-                      >
-                        <img src={pImg} alt="sample" className="w-full h-full object-cover" />
-                      </button>
-                    ))}
-                  </div>
+                  <p className="text-12 text-text-muted">No photos uploaded yet.</p>
                 </div>
               )}
             </div>
@@ -883,15 +858,17 @@ export default function Catalogue() {
             {/* Photos Carousel / Main Photo */}
             <div className="space-y-2">
               <div className="relative aspect-[4/3] w-full rounded-xl overflow-hidden border border-border shadow-xs bg-surface-muted">
-                <img
-                  src={
-                    selectedProduct.images && selectedProduct.images.length > 0
-                      ? selectedProduct.images[0]
-                      : FALLBACK_PRESET_IMAGES[0]
-                  }
-                  alt={selectedProduct.name}
-                  className="w-full h-full object-cover"
-                />
+                {selectedProduct.images?.[0] ? (
+                  <img
+                    src={selectedProduct.images[0]}
+                    alt={selectedProduct.name}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-text-muted/60" aria-label="No photo">
+                    <Package className="w-12 h-12" strokeWidth={1.5} />
+                  </div>
+                )}
               </div>
               {selectedProduct.images && selectedProduct.images.length > 1 && (
                 <div className="flex gap-2 overflow-x-auto pb-1">

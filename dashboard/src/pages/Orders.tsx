@@ -268,6 +268,9 @@ interface ItemRow {
   unitPrice: number | string;
 }
 
+const errorMessage = (err: unknown): string | undefined =>
+  err instanceof Error ? err.message : undefined;
+
 function SkeletonOrderCard({ isGrid = false }: { isGrid?: boolean }) {
   return (
     <div
@@ -435,7 +438,6 @@ export default function Orders() {
   const [targetStatus, setTargetStatus] = useState<OrderStatus>("in_production");
   const [statusTrackingId, setStatusTrackingId] = useState("");
   const [statusCourier, setStatusCourier] = useState("");
-  const [sendNotification, setSendNotification] = useState(true);
 
   // Create Order Modal State
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -444,7 +446,7 @@ export default function Orders() {
   const [createCustomerEmail, setCreateCustomerEmail] = useState("");
   const [createChannel, setCreateChannel] = useState<"whatsapp" | "instagram">("whatsapp");
   const [createShippingAddress, setCreateShippingAddress] = useState("");
-  const [createCourier, setCreateCourier] = useState("Shiprocket (DTDC)");
+  const [createCourier, setCreateCourier] = useState("");
   const [createExpectedDate, setCreateExpectedDate] = useState("");
   const [createDeliveryCharge, setCreateDeliveryCharge] = useState<number | string>("");
   const [createDiscountAmount, setCreateDiscountAmount] = useState<number | string>("");
@@ -474,7 +476,7 @@ export default function Orders() {
     setCreateCustomerPhone("");
     setCreateCustomerEmail("");
     setCreateShippingAddress("");
-    setCreateCourier("Shiprocket (DTDC)");
+    setCreateCourier("");
     setCreateExpectedDate("");
     setCreateDeliveryCharge("");
     setCreateDiscountAmount("");
@@ -511,7 +513,7 @@ export default function Orders() {
     setUpdatingOrder(order);
     setTargetStatus(nextStatus);
     setStatusTrackingId(order.trackingId || "");
-    setStatusCourier(order.courier || "Shiprocket (DTDC)");
+    setStatusCourier(order.courier || "");
   };
 
   const confirmStatusUpdate = async () => {
@@ -523,22 +525,15 @@ export default function Orders() {
           status: targetStatus,
           trackingId: statusTrackingId.trim() || undefined,
           courier: statusCourier.trim() || undefined,
-          sendNotification,
         },
       });
 
-      if (sendNotification) {
-        toast.success("Status updated & WhatsApp notification queued!", {
-          description: `${updatingOrder.orderNo} moved to ${targetStatus.replace("_", " ")}`,
-        });
-      } else {
-        toast.success("Order status updated", {
-          description: `${updatingOrder.orderNo} moved to ${targetStatus.replace("_", " ")}`,
-        });
-      }
+      toast.success("Order status updated", {
+        description: `${updatingOrder.orderNo} moved to ${targetStatus.replace("_", " ")}`,
+      });
       setUpdatingOrder(null);
-    } catch (err: any) {
-      toast.error("Failed to update status", { description: err?.message });
+    } catch (err: unknown) {
+      toast.error("Failed to update status", { description: errorMessage(err) });
     }
   };
 
@@ -578,7 +573,7 @@ export default function Orders() {
     setEditItems((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const handleEditItemChange = (index: number, field: keyof ItemRow, value: any) => {
+  const handleEditItemChange = <K extends keyof ItemRow>(index: number, field: K, value: ItemRow[K]) => {
     setEditItems((prev) =>
       prev.map((item, i) => (i === index ? { ...item, [field]: value } : item))
     );
@@ -632,8 +627,8 @@ export default function Orders() {
       }
       setIsEditingDetails(false);
       toast.success("Order details and prices updated successfully!");
-    } catch (err: any) {
-      toast.error("Failed to save changes", { description: err?.message });
+    } catch (err: unknown) {
+      toast.error("Failed to save changes", { description: errorMessage(err) });
     }
   };
 
@@ -648,8 +643,8 @@ export default function Orders() {
       if (activeOrder?.id === deletingOrder.id) {
         setActiveOrder(null);
       }
-    } catch (err: any) {
-      toast.error("Failed to delete order", { description: err?.message });
+    } catch (err: unknown) {
+      toast.error("Failed to delete order", { description: errorMessage(err) });
     }
   };
 
@@ -666,7 +661,7 @@ export default function Orders() {
     setCreateItems((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const handleItemChange = (index: number, field: keyof ItemRow, value: any) => {
+  const handleItemChange = <K extends keyof ItemRow>(index: number, field: K, value: ItemRow[K]) => {
     setCreateItems((prev) =>
       prev.map((item, i) => (i === index ? { ...item, [field]: value } : item))
     );
@@ -724,8 +719,8 @@ export default function Orders() {
       toast.success("Order created successfully!", {
         description: `Order #${res.order.orderNo} created for ${res.order.customerName}`,
       });
-    } catch (err: any) {
-      toast.error("Failed to create order", { description: err?.message });
+    } catch (err: unknown) {
+      toast.error("Failed to create order", { description: errorMessage(err) });
     }
   };
 
@@ -1052,7 +1047,7 @@ export default function Orders() {
                     <div className="relative mt-1">
                       <select
                         value={createChannel}
-                        onChange={(e) => setCreateChannel(e.target.value as any)}
+                        onChange={(e) => setCreateChannel(e.target.value as "whatsapp" | "instagram")}
                         className="w-full pl-3 pr-8 py-1.5 appearance-none rounded-lg border border-border bg-surface text-12 text-text focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
                       >
                         <option value="whatsapp">WhatsApp</option>
@@ -1472,6 +1467,7 @@ export default function Orders() {
                         <label className="text-[10px] text-text-muted">Courier</label>
                         <input
                           type="text"
+                          placeholder="e.g. Shiprocket (DTDC)"
                           value={editCourier}
                           onChange={(e) => setEditCourier(e.target.value)}
                           className="w-full px-2 py-1 rounded border border-border bg-surface text-12 text-text focus:outline-none"
@@ -1743,7 +1739,7 @@ export default function Orders() {
         </div>
       )}
 
-      {/* ─── Status Update & WhatsApp PhonePreview Dialog ─────────────────────── */}
+      {/* ─── Status Update Dialog ─────────────────────────────────────────────── */}
       {updatingOrder && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in"
@@ -1817,13 +1813,13 @@ export default function Orders() {
               </div>
             )}
 
-            {/* WhatsApp Notification Preview */}
+            {/* Status message preview (the backend does not send this automatically) */}
             <div className="p-4 rounded-xl border border-emerald-500/30 bg-emerald-500/5 space-y-2">
               <div className="flex items-center justify-between text-11 font-semibold text-emerald-600 dark:text-emerald-400">
                 <span className="flex items-center gap-1">
-                  <Phone className="w-3.5 h-3.5" /> WhatsApp Notification Preview
+                  <Phone className="w-3.5 h-3.5" /> Status message preview
                 </span>
-                <span>Template: {targetStatus.toUpperCase()}</span>
+                <span className="font-medium text-text-muted">Not sent automatically</span>
               </div>
 
               <div className="p-3 rounded-lg bg-surface border border-border shadow-xs text-12 text-text leading-relaxed">
@@ -1839,7 +1835,8 @@ export default function Orders() {
                 </p>
                 {targetStatus === "dispatched" && (
                   <p className="mt-1 text-teal font-medium">
-                    Tracking ID: <strong>{statusTrackingId || "SHP98421039IN"}</strong> (via {statusCourier || "Shiprocket"})
+                    Tracking ID: <strong>{statusTrackingId.trim() || "—"}</strong>
+                    {statusCourier.trim() && <> (via {statusCourier.trim()})</>}
                   </p>
                 )}
                 <p className="mt-1 text-11 text-text-muted">
@@ -1847,16 +1844,6 @@ export default function Orders() {
                 </p>
               </div>
             </div>
-
-            <label className="flex items-center gap-2 text-13 font-medium text-text cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={sendNotification}
-                onChange={(e) => setSendNotification(e.target.checked)}
-                className="w-4 h-4 rounded text-primary focus:ring-primary cursor-pointer"
-              />
-              <span>Send automated WhatsApp notification to customer</span>
-            </label>
 
             <div className="flex items-center justify-end gap-2 pt-3 border-t border-border">
               <button

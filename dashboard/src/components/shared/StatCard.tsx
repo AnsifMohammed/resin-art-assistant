@@ -4,21 +4,26 @@ import { themeColors } from "../../theme/index.ts";
 export interface StatCardProps {
   label: string;
   value: number | string;
-  prefix?: string;
-  suffix?: string;
+  prefix?: string | undefined;
+  suffix?: string | undefined;
+  /** Omit (undefined) to hide the chip, e.g. when there is no previous-period value. */
   trend?: {
+    /** e.g. "12%" (sign/arrow characters are stripped; the arrow comes from `direction`). */
     value: string;
+    /** Good (emerald) or bad (rose) for the business. */
     isPositive: boolean;
+    /** Arrow direction of the change. Defaults to up when positive, down otherwise. */
+    direction?: "up" | "down";
+    /** Shown in the tooltip as "vs {label}". */
     label?: string;
-  };
+  } | undefined;
   color?: "amber" | "emerald" | "blue" | "violet" | "danger" | "teal";
   pulsingDot?: boolean;
   onClick?: () => void;
   className?: string;
   icon?: ReactNode;
-  /** Small tag shown next to the label (e.g. <SampleDataBadge />).
-   *  In StatCard this is rendered as a tiny indicator icon, not a wide pill,
-   *  so the label never gets truncated. */
+  /** Marks the card as sample data: rendered as a tiny flask icon next to the label.
+   *  Kept for compatibility; Analytics shows real data only and never passes it. */
   tag?: ReactNode;
   /** @deprecated  Radial ring removed — pass nothing; kept for compat. */
   radialProgress?: number;
@@ -114,20 +119,9 @@ export function StatCard({
       ? displayValue.toLocaleString("en-IN")
       : displayValue;
 
-  // Hide the trend chip when there's no previous-period value or value is zero
-  const isZeroValue =
-    value === 0 ||
-    value === "0" ||
-    value === "0%" ||
-    displayValue === 0 ||
-    displayValue === "0";
-  const hasValidTrend = Boolean(
-    trend &&
-      trend.value &&
-      trend.value !== "0%" &&
-      trend.value !== "+0%" &&
-      !isZeroValue
-  );
+  // The caller omits `trend` when there is no previous-period value.
+  const hasValidTrend = Boolean(trend?.value);
+  const trendUp = trend ? (trend.direction ?? (trend.isPositive ? "up" : "down")) === "up" : true;
 
   return (
     <div
@@ -195,14 +189,14 @@ export function StatCard({
         {/* Trend chip lives in the top row so the value gets the full card width */}
         {hasValidTrend && trend && (
           <span
-            title={trend.label ? `vs ${trend.label}` : "vs previous 7 days"}
+            title={trend.label ? `vs ${trend.label}` : "vs previous period"}
             className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold shrink-0 cursor-default whitespace-nowrap ${
               trend.isPositive
                 ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
                 : "bg-rose-500/10 text-rose-600 dark:text-rose-400"
             }`}
           >
-            {trend.isPositive ? "↑" : "↓"}
+            {trendUp ? "↑" : "↓"}
             <span>{trend.value.replace(/^[↑↓+\-\s]+/, "")}</span>
           </span>
         )}

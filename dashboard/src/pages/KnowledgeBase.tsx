@@ -13,15 +13,14 @@ import {
   CheckCircle2,
   AlertCircle,
   Pencil,
-  Bot,
-  Send,
   ExternalLink,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useKnowledgeBase, usePutKnowledgeBase } from "../hooks/useKnowledgeBase.ts";
-import { SlideOver } from "../components/shared/SlideOver.tsx";
+import { useAuth } from "../hooks/useAuth.ts";
+import { useUsers } from "../hooks/useUsers.ts";
 import { ConfirmDialog } from "../components/shared/ConfirmDialog.tsx";
-import { SampleDataBadge } from "../components/shared/SampleDataBadge.tsx";
+import { formatDateTime, formatRelative } from "../lib/format.ts";
 import type {
   KbDeliveryZone,
   KbProduct,
@@ -58,9 +57,9 @@ function normalizeKb(raw: unknown): KnowledgeBaseData {
       note: str(co.note) || "All products can be customised. Bulk orders of 10+ pieces get 10% off.",
       lead_time_extra_days: numOr(co.lead_time_extra_days, 2),
       items_not_in_catalogue: str(co.items_not_in_catalogue) || "escalate_to_owner",
-      bulk_discount_qty: numOr((co as any).bulk_discount_qty, 10),
-      bulk_discount_percent: numOr((co as any).bulk_discount_percent, 10),
-    } as any,
+      bulk_discount_qty: numOr(co.bulk_discount_qty, 10),
+      bulk_discount_percent: numOr(co.bulk_discount_percent, 10),
+    },
     delivery: {
       ...del,
       courier: str(del.courier) || "Shiprocket (DTDC / Delhivery)",
@@ -123,41 +122,26 @@ const SECTIONS = [
 
 type SectionId = (typeof SECTIONS)[number]["id"];
 
-const TEST_SUGGESTIONS = [
-  {
-    q: "How much is the wall clock?",
-    answer:
-      "Hi! 💕 The 12 inch Resin Wall Clock is ₹2,800. We can customise the colour palette (geode style, marble, or florals) and add numerals. Production takes about 7 days.",
-    route: "reply",
-    reason: "Quoted from Catalogue item '12 inch Resin Wall Clock'",
-  },
-  {
-    q: "Do you deliver to Chennai?",
-    answer:
-      "Yes, we ship across Tamil Nadu via Shiprocket! 🚚 Standard delivery takes 3–5 working days and courier charge is ₹60.",
-    route: "reply",
-    reason: "Matched delivery zone 'Rest of Tamil Nadu'",
-  },
-  {
-    q: "Can I get a name on coasters?",
-    answer:
-      "Absolutely! We do custom gold or silver name engraving on our Ocean Coaster Set of 4 (₹1,200). Custom work adds 2 days to production.",
-    route: "reply",
-    reason: "Matched custom orders policy + Catalogue",
-  },
-  {
-    q: "I received a broken piece, I want a refund",
-    answer:
-      "I'm connecting you right away with our studio owner Asha to take care of this and arrange a replacement or refund.",
-    route: "escalate",
-    reason: "Triggered sensitive topic: 'refund' & 'broken'",
-  },
-];
-
 export default function KnowledgeBase() {
   const navigate = useNavigate();
   const kb = useKnowledgeBase();
   const put = usePutKnowledgeBase();
+  const { user: currentUser } = useAuth();
+  const staff = useUsers({ enabled: currentUser?.role === "admin" });
+
+  // "Last updated by <name> · <when>": the editor is usually the admin (GET /users lists staff only).
+  const updatedAt = kb.data?.updatedAt ?? null;
+  const updatedById = kb.data?.updatedByUserId ?? null;
+  const updatedByName = !updatedById
+    ? null
+    : currentUser && updatedById === currentUser.id
+      ? currentUser.name
+      : (staff.data?.find((u) => u.id === updatedById)?.name ?? null);
+  const lastUpdatedLabel = updatedAt
+    ? updatedByName
+      ? `Last updated by ${updatedByName} · ${formatDateTime(updatedAt)}`
+      : `Last updated ${formatRelative(updatedAt)}`
+    : null;
 
   const serverData = kb.data?.data;
   const base = useMemo(() => (serverData ? normalizeKb(serverData) : null), [serverData]);
@@ -184,7 +168,6 @@ export default function KnowledgeBase() {
 
   const [activeSection, setActiveSection] = useState<SectionId>("custom-orders");
   const [confirmDiscard, setConfirmDiscard] = useState(false);
-  const [testModalOpen, setTestModalOpen] = useState(false);
 
   // Policy edit view toggles (returns, cancellation, care, warranty)
   const [editingPolicies, setEditingPolicies] = useState<Record<string, boolean>>({
@@ -201,14 +184,6 @@ export default function KnowledgeBase() {
 
   // Escalate always draft chip
   const [escalateDraft, setEscalateDraft] = useState("");
-
-  // Test Assistant State
-  const [testQuery, setTestQuery] = useState("");
-  const [testResult, setTestResult] = useState<{
-    answer: string;
-    route: "reply" | "escalate";
-    reason: string;
-  } | null>(null);
 
   const update = useCallback((fn: (d: KnowledgeBaseData) => KnowledgeBaseData) => {
     setDraft((cur) => {
@@ -338,60 +313,6 @@ export default function KnowledgeBase() {
     }));
   };
 
-  // Run test
-  const runTest = (queryText: string) => {
-    setTestQuery(queryText);
-    const qLower = queryText.toLowerCase();
-
-    // Check escalation first
-    const isSensitive = d.escalate_always.some((topic) => qLower.includes(topic.toLowerCase()));
-    if (
-      isSensitive ||
-      qLower.includes("refund") ||
-      qLower.includes("return") ||
-      qLower.includes("broken") ||
-      qLower.includes("damaged") ||
-      qLower.includes("complaint")
-    ) {
-      setTestResult({
-        route: "escalate",
-        reason: "Matched sensitive rule: handover to Asha immediately.",
-        answer:
-          "I'm notifying our studio owner Asha right away so she can resolve this for you personally.",
-      });
-      return;
-    }
-
-    // Check delivery
-    if (qLower.includes("deliver") || qLower.includes("ship") || qLower.includes("shipping")) {
-      setTestResult({
-        route: "reply",
-        reason: `Answered using configured delivery policies (${d.delivery.courier}).`,
-        answer: `We deliver all across India via ${d.delivery.courier}! For Tamil Nadu it's 3–5 working days (₹60), and within Coimbatore city standard delivery is 1–2 days free.`,
-      });
-      return;
-    }
-
-    // Check clock/product
-    if (qLower.includes("clock")) {
-      setTestResult({
-        route: "reply",
-        reason: "Answered using Catalogue item: 12 inch Resin Wall Clock (₹2,800).",
-        answer:
-          "Our 12 inch Resin Wall Clock is ₹2,800. Production takes 7 days, and you can pick custom shades and numerals! Would you like to see examples?",
-      });
-      return;
-    }
-
-    // Default auto reply
-    setTestResult({
-      route: "reply",
-      reason: "Routine enquiry routed to AI with current tone guidelines.",
-      answer:
-        "Hi! 💕 Thank you for reaching out to Saba Art. We handcraft all resin pieces to order in Coimbatore. How can I help you customize your piece today?",
-    });
-  };
-
   return (
     <div className="space-y-6 pb-28 w-full">
       {/* ─── Page Header ──────────────────────────────────────────────────────── */}
@@ -409,21 +330,11 @@ export default function KnowledgeBase() {
 
         {/* Right side controls */}
         <div className="flex flex-wrap items-center gap-3">
-          <span className="text-12 text-text-muted">
-            Last updated by Asha · 2 Oct, 4:15 pm
-          </span>
-
-          <button
-            type="button"
-            onClick={() => {
-              setTestModalOpen(true);
-              if (!testResult && TEST_SUGGESTIONS[0]) runTest(TEST_SUGGESTIONS[0].q);
-            }}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-border bg-surface text-text font-semibold text-13 shadow-xs hover:bg-surface-muted cursor-pointer transition-colors"
-          >
-            <Bot className="w-4 h-4 text-primary" />
-            <span>Test the assistant</span>
-          </button>
+          {lastUpdatedLabel && (
+            <span className="text-12 text-text-muted" title={updatedAt ? formatDateTime(updatedAt) : undefined}>
+              {lastUpdatedLabel}
+            </span>
+          )}
 
           <button
             type="button"
@@ -855,7 +766,7 @@ export default function KnowledgeBase() {
                     </div>
 
                     <div className="pt-2 border-t border-border flex items-center justify-between text-11 text-text-muted">
-                      <span>Last edited by Asha (Admin)</span>
+                      <span>{updatedAt ? `Saved ${formatRelative(updatedAt)}` : ""}</span>
                       <span className="text-primary-text font-medium">Auto-quoted</span>
                     </div>
                   </div>
@@ -1149,109 +1060,6 @@ export default function KnowledgeBase() {
           </div>
         </div>
       )}
-
-      {/* ─── Test Assistant SlideOver ────────────────────────────────────────── */}
-      <SlideOver
-        open={testModalOpen}
-        onClose={() => setTestModalOpen(false)}
-        title="Test the assistant"
-        subtitle="Simulate questions before saving"
-        badge={<SampleDataBadge title="Assistant simulation uses canned sample answers" />}
-      >
-        <div className="space-y-6">
-          {/* Input */}
-          <div className="space-y-2">
-            <label className="block text-13 font-semibold text-text">
-              Ask a question like a customer would
-            </label>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={testQuery}
-                onChange={(e) => setTestQuery(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    if (testQuery.trim()) runTest(testQuery.trim());
-                  }
-                }}
-                placeholder="e.g. Can I get a clock in teal?"
-                className="flex-1 px-3 py-2 text-13 rounded-lg bg-surface-muted border border-border text-text focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary"
-              />
-              <button
-                type="button"
-                onClick={() => {
-                  if (testQuery.trim()) runTest(testQuery.trim());
-                }}
-                className="px-3.5 py-2 rounded-lg bg-primary text-primary-foreground font-semibold text-13 shadow-xs hover:brightness-105 cursor-pointer"
-              >
-                <Send className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-
-          {/* Suggestion chips */}
-          <div className="space-y-1.5">
-            <p className="text-11 font-semibold uppercase tracking-wider text-text-muted">
-              Quick Suggestions
-            </p>
-            <div className="flex flex-wrap gap-1.5">
-              {TEST_SUGGESTIONS.map((item, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  onClick={() => runTest(item.q)}
-                  className="px-2.5 py-1 rounded-lg text-12 bg-surface-muted border border-border text-text hover:border-primary hover:text-primary-text transition-colors text-left cursor-pointer"
-                >
-                  "{item.q}"
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Simulation Output */}
-          {testResult && (
-            <div className="space-y-4 pt-4 border-t border-border">
-              {/* Routing status pill */}
-              <div className="flex items-center justify-between">
-                <span className="text-11 font-semibold uppercase tracking-wider text-text-muted">
-                  Simulation Outcome
-                </span>
-                {testResult.route === "reply" ? (
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-11 font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                    <span>Would reply automatically</span>
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-11 font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400">
-                    <AlertCircle className="w-3.5 h-3.5" />
-                    <span>Would hand over to you — Sensitive / Unknown</span>
-                  </span>
-                )}
-              </div>
-
-              {/* AI Bubble Preview */}
-              <div className="p-4 rounded-xl border border-primary/20 bg-primary-soft/20 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-11 font-bold uppercase tracking-wider text-primary-text">
-                    Preview AI Response
-                  </span>
-                  <span className="px-1.5 py-0.5 rounded text-10 font-bold bg-surface border border-border text-text-muted">
-                    Preview
-                  </span>
-                </div>
-                <p className="text-13 text-text leading-relaxed font-sans">{testResult.answer}</p>
-              </div>
-
-              {/* Reason */}
-              <div className="p-3 rounded-lg border border-border bg-surface-muted text-12 text-text-muted space-y-0.5">
-                <p className="font-semibold text-text">Resolution Logic:</p>
-                <p>{testResult.reason}</p>
-              </div>
-            </div>
-          )}
-        </div>
-      </SlideOver>
 
       {/* ─── Confirm Discard Dialog ─────────────────────────────────────────── */}
       <ConfirmDialog

@@ -32,6 +32,7 @@ import {
   type ConversationFilters,
 } from "../hooks/useConversations.ts";
 import { useCustomer, useCustomerOrders, useUpdateCustomer } from "../hooks/useCustomers.ts";
+import { useDebounced } from "../hooks/useDebounced.ts";
 import { cn } from "../lib/cn.ts";
 import { formatRupees } from "../lib/customers.ts";
 import { customerLabel, formatDateTime, formatRelative, formatShortDate, humanize } from "../lib/format.ts";
@@ -55,15 +56,6 @@ const FILTERS: Array<{ key: FilterState; label: string; danger?: boolean }> = [
 ];
 
 const SEARCH_DEBOUNCE_MS = 300;
-
-function useDebounced<T>(value: T, delayMs: number): T {
-  const [debounced, setDebounced] = useState(value);
-  useEffect(() => {
-    const id = setTimeout(() => setDebounced(value), delayMs);
-    return () => clearTimeout(id);
-  }, [value, delayMs]);
-  return debounced;
-}
 
 function pickChannel(value: string | null): ChannelType | undefined {
   return value && (CHANNEL_TYPES as readonly string[]).includes(value) ? (value as ChannelType) : undefined;

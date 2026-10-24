@@ -2,7 +2,7 @@ import { keepPreviousData, useInfiniteQuery, useQuery } from "@tanstack/react-qu
 import { useMemo } from "react";
 import { getAuditLog } from "../api/audit-log.ts";
 import { queryKeys } from "../lib/queryKeys.ts";
-import type { AuditLogEntry, AuditLogParams } from "../types/index.ts";
+import type { ActorType, AuditLogEntry, AuditLogParams } from "../types/index.ts";
 
 /** Admin only: GET /audit-log (paginated). */
 export function useAuditLog(params: AuditLogParams = {}) {
@@ -14,25 +14,26 @@ export function useAuditLog(params: AuditLogParams = {}) {
 }
 
 export interface InfiniteAuditLogParams {
-  actorType?: string | undefined;
-  action?: string | undefined;
+  actorType?: ActorType | undefined;
+  /** Matches actions starting with this prefix, e.g. "order_". */
+  actionPrefix?: string | undefined;
   limit?: number | undefined;
 }
 
 /** Admin only: GET /audit-log as an infinite list. */
 export function useInfiniteAuditLog(params: InfiniteAuditLogParams = {}) {
   const limit = params.limit ?? 30;
-  const actorType = params.actorType && params.actorType !== "all" ? params.actorType : undefined;
-  const action = params.action;
+  const actorType = params.actorType;
+  const actionPrefix = params.actionPrefix;
 
   const queryParams: AuditLogParams = {
     limit,
     actorType,
-    action,
+    actionPrefix,
   };
 
   const query = useInfiniteQuery({
-    queryKey: [...queryKeys.auditLog.all, "infinite", { actorType, action, limit }] as const,
+    queryKey: [...queryKeys.auditLog.all, "infinite", { actorType, actionPrefix, limit }] as const,
     queryFn: ({ pageParam = 1, signal }) =>
       getAuditLog(
         {

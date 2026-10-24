@@ -1,11 +1,12 @@
 import { useNavigate } from "react-router-dom";
 import { AlertTriangle, Clock, Package, CreditCard, CheckCircle2 } from "lucide-react";
 
+/** null = not available from the API (that chip is skipped, never faked). */
 export interface AttentionData {
-  openEscalations: number;
-  windowsClosingSoon: number;
-  pendingOrders: number;
-  unpaidBalance: number;
+  openEscalations: number | null;
+  windowsClosingSoon: number | null;
+  pendingOrders: number | null;
+  unpaidBalance: number | null;
 }
 
 interface AttentionStripProps {
@@ -24,39 +25,46 @@ function rupeesShort(n: number): string {
 export function AttentionStrip({ data }: AttentionStripProps) {
   const navigate = useNavigate();
 
+  const openEscalations = data.openEscalations ?? 0;
+  const windowsClosingSoon = data.windowsClosingSoon ?? 0;
+  const pendingOrders = data.pendingOrders ?? 0;
+  const unpaidBalance = data.unpaidBalance ?? 0;
+  // "All clear" only when every value is known and zero.
+  const allKnown = Object.values(data).every((v) => v !== null);
+
   const chips = [
     {
       id: "escalations",
-      count: data.openEscalations,
-      label: plural(data.openEscalations, "escalation"),
-      title: `${plural(data.openEscalations, "escalation")} waiting for a person`,
+      count: openEscalations,
+      label: plural(openEscalations, "escalation"),
+      title: `${plural(openEscalations, "escalation")} waiting for a person`,
       icon: <AlertTriangle className="w-3.5 h-3.5 text-rose-500 shrink-0" aria-hidden />,
       color: "border-rose-500/30 bg-rose-500/10 text-rose-700 dark:text-rose-300 hover:bg-rose-500/20",
       href: "/escalations",
     },
     {
       id: "windows",
-      count: data.windowsClosingSoon,
-      label: `${data.windowsClosingSoon} closing < 2h`,
-      title: `${plural(data.windowsClosingSoon, "chat")} where the 24-hour reply window closes in under 2 hours`,
+      count: windowsClosingSoon,
+      label: `${windowsClosingSoon} closing < 2h`,
+      title: `${plural(windowsClosingSoon, "chat")} where the 24-hour reply window closes in under 2 hours`,
       icon: <Clock className="w-3.5 h-3.5 text-amber-500 shrink-0" aria-hidden />,
       color: "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300 hover:bg-amber-500/20",
       href: "/inbox?state=escalated",
     },
     {
       id: "orders",
-      count: data.pendingOrders,
-      label: `${data.pendingOrders} pending`,
-      title: `${plural(data.pendingOrders, "order")} pending`,
+      count: pendingOrders,
+      label: `${pendingOrders} pending`,
+      title: `${plural(pendingOrders, "order")} pending`,
       icon: <Package className="w-3.5 h-3.5 text-blue-500 shrink-0" aria-hidden />,
       color: "border-blue-500/30 bg-blue-500/10 text-blue-700 dark:text-blue-300 hover:bg-blue-500/20",
       href: "/orders?status=pending",
     },
     {
       id: "balance",
-      count: data.unpaidBalance > 0 ? 1 : 0,
-      label: `${rupeesShort(data.unpaidBalance)} unpaid`,
-      title: `₹${data.unpaidBalance.toLocaleString("en-IN")} balance unpaid`,
+      count: unpaidBalance > 0 ? 1 : 0,
+      label: `${rupeesShort(unpaidBalance)} unpaid`,
+      title: `₹${unpaidBalance.toLocaleString("en-IN")} balance unpaid`,
       icon: <CreditCard className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" aria-hidden />,
       color: "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300 hover:bg-amber-500/20",
       href: "/orders",
@@ -64,6 +72,7 @@ export function AttentionStrip({ data }: AttentionStripProps) {
   ];
 
   const activeChips = chips.filter((c) => c.count > 0);
+  if (activeChips.length === 0 && !allKnown) return null;
 
   return (
     <div

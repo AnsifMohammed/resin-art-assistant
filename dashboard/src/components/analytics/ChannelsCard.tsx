@@ -2,7 +2,6 @@ import type { CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from "recharts";
 import { ArrowUpRight } from "lucide-react";
-import { SampleDataBadge } from "../shared/SampleDataBadge.tsx";
 import { brandChannels } from "../../theme/index.ts";
 import { useCockpitMode, useMediaQuery } from "./cockpit.tsx";
 
@@ -17,65 +16,75 @@ export interface ChannelStats {
 }
 
 interface ChannelsCardProps {
-  whatsapp: ChannelStats;
-  instagram: ChannelStats;
-  isSample?: boolean;
+  /** null when the API did not send per-channel stats. */
+  whatsapp: ChannelStats | null;
+  instagram: ChannelStats | null;
 }
 
-export function ChannelsCard({ whatsapp, instagram, isSample }: ChannelsCardProps) {
+const DASH = "—";
+const rupees = (n: number) => `₹${n.toLocaleString("en-IN")}`;
+
+/** "Orders / 100 msgs" for one channel, or "—" when there are no messages. */
+function conversion(stats: ChannelStats | null): string {
+  if (!stats || stats.messages <= 0) return DASH;
+  return ((stats.orders / stats.messages) * 100).toFixed(1);
+}
+
+/** Average order value, or "—" when there are no orders. */
+function aov(stats: ChannelStats | null): string {
+  if (!stats || stats.orders <= 0) return DASH;
+  return rupees(Math.round(stats.revenue / stats.orders));
+}
+
+export function ChannelsCard({ whatsapp, instagram }: ChannelsCardProps) {
   const navigate = useNavigate();
 
-  const totalRevenue = whatsapp.revenue + instagram.revenue;
-  const waRevShare = totalRevenue > 0 ? Math.round((whatsapp.revenue / totalRevenue) * 100) : 50;
-  const igRevShare = 100 - waRevShare;
+  const hasData = whatsapp !== null || instagram !== null;
+  const waRevenue = whatsapp?.revenue ?? 0;
+  const igRevenue = instagram?.revenue ?? 0;
+  const totalRevenue = waRevenue + igRevenue;
+  const hasRevenue = totalRevenue > 0;
+  // Share is undefined (not 50/50) when nothing was sold.
+  const waRevShare = hasRevenue ? Math.round((waRevenue / totalRevenue) * 100) : null;
+  const igRevShare = waRevShare === null ? null : 100 - waRevShare;
 
-  const waAov = whatsapp.orders > 0 ? Math.round(whatsapp.revenue / whatsapp.orders) : 0;
-  const igAov = instagram.orders > 0 ? Math.round(instagram.revenue / instagram.orders) : 0;
-
-  const pieData = [
-    {
-      name: "WhatsApp",
-      value: whatsapp.revenue,
-      color: brandChannels.whatsapp,
-    },
-    {
-      name: "Instagram",
-      value: instagram.revenue,
-      color: brandChannels.instagram,
-    },
-  ];
+  // With no revenue, a single neutral ring keeps the donut's shape (recharts draws nothing for all-zero data).
+  const pieData = hasRevenue
+    ? [
+        { name: "WhatsApp", value: waRevenue, color: brandChannels.whatsapp },
+        { name: "Instagram", value: igRevenue, color: brandChannels.instagram },
+      ]
+    : [{ name: "empty", value: 1, color: "var(--border)" }];
 
   const cockpit = useCockpitMode();
   const tallScreen = useMediaQuery(TALL_SCREEN_QUERY);
 
-  const showMessageRows = Boolean(isSample || whatsapp.messages > 0 || instagram.messages > 0);
+  const count = (stats: ChannelStats | null, key: "orders" | "messages") =>
+    stats ? stats[key].toLocaleString("en-IN") : DASH;
+
+  const showMessageRows = (whatsapp?.messages ?? 0) > 0 || (instagram?.messages ?? 0) > 0;
   const tableRows: Array<{ label: string; wa: string; ig: string }> = [
-    { label: "Orders", wa: String(whatsapp.orders), ig: String(instagram.orders) },
-    {
-      label: "Avg order value",
-      wa: `₹${waAov.toLocaleString("en-IN")}`,
-      ig: `₹${igAov.toLocaleString("en-IN")}`,
-    },
+    { label: "Orders", wa: count(whatsapp, "orders"), ig: count(instagram, "orders") },
+    { label: "Avg order value", wa: aov(whatsapp), ig: aov(instagram) },
   ];
-  // Only show Messages & conversion rows when data is meaningful
+  // Only show Messages & conversion rows when there are messages
   if (showMessageRows) {
     tableRows.push(
-      { label: "Messages", wa: String(whatsapp.messages), ig: String(instagram.messages) },
-      {
-        label: "Orders / 100 msgs",
-        wa: whatsapp.messages > 0 ? ((whatsapp.orders / whatsapp.messages) * 100).toFixed(1) : "0.0",
-        ig: instagram.messages > 0 ? ((instagram.orders / instagram.messages) * 100).toFixed(1) : "0.0",
-      }
+      { label: "Messages", wa: count(whatsapp, "messages"), ig: count(instagram, "messages") },
+      { label: "Orders / 100 msgs", wa: conversion(whatsapp), ig: conversion(instagram) }
     );
   }
   // Single-screen layout: a fixed, short table so the donut can take the free height.
   // Elsewhere the card has natural height, so every row is shown.
   const visibleRows = cockpit && !tallScreen ? tableRows.slice(0, COCKPIT_TABLE_ROWS) : tableRows;
 
-  const centerTotalText =
-    totalRevenue < 10000 && totalRevenue > 0
-      ? `₹${(totalRevenue / 1000).toFixed(1)}k`
-      : `₹${Math.round(totalRevenue / 1000)}k`;
+  const centerTotalText = !hasData
+    ? DASH
+    : !hasRevenue
+      ? "₹0"
+      : totalRevenue < 10000
+        ? `₹${(totalRevenue / 1000).toFixed(1)}k`
+        : `₹${Math.round(totalRevenue / 1000)}k`;
 
   return (
     <div
@@ -86,7 +95,6 @@ export function ChannelsCard({ whatsapp, instagram, isSample }: ChannelsCardProp
       <div className="h-9 flex items-center justify-between gap-2 shrink-0 min-w-0">
         <div className="flex items-center gap-2 shrink-0">
           <h3 className="text-12 font-semibold uppercase tracking-wider text-text-muted">Channels</h3>
-          {isSample && <SampleDataBadge />}
         </div>
         <button
           type="button"
@@ -114,7 +122,7 @@ export function ChannelsCard({ whatsapp, instagram, isSample }: ChannelsCardProp
             <PieChart>
               <Tooltip
                 content={({ active, payload }) => {
-                  if (active && payload && payload.length > 0 && payload[0]) {
+                  if (hasRevenue && active && payload && payload.length > 0 && payload[0]) {
                     const item = payload[0];
                     const color = (item.payload as { color?: string })?.color ?? brandChannels.whatsapp;
                     return (
@@ -137,7 +145,7 @@ export function ChannelsCard({ whatsapp, instagram, isSample }: ChannelsCardProp
                 cy="50%"
                 innerRadius="64%"
                 outerRadius="96%"
-                paddingAngle={3}
+                paddingAngle={hasRevenue ? 3 : 0}
                 dataKey="value"
                 stroke="none"
               >
@@ -150,11 +158,13 @@ export function ChannelsCard({ whatsapp, instagram, isSample }: ChannelsCardProp
 
           {/* Center Text inside Donut */}
           <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none select-none">
-            <span className="text-17 sm:text-18 font-bold font-outfit text-text leading-tight">
+            <span
+              className={`text-17 sm:text-18 font-bold font-outfit leading-tight ${hasRevenue ? "text-text" : "text-text-muted"}`}
+            >
               {centerTotalText}
             </span>
             <span className="text-[9px] uppercase tracking-wider text-text-muted font-bold mt-0.5">
-              REVENUE
+              {hasData && !hasRevenue ? "No revenue yet" : "REVENUE"}
             </span>
           </div>
         </div>
@@ -174,11 +184,12 @@ export function ChannelsCard({ whatsapp, instagram, isSample }: ChannelsCardProp
                 <span>WhatsApp</span>
               </span>
               <span className="font-bold font-outfit text-text text-12 sm:text-13 shrink-0">
-                ₹{whatsapp.revenue.toLocaleString("en-IN")}
+                {whatsapp ? rupees(whatsapp.revenue) : DASH}
               </span>
             </div>
             <div className="text-11 text-text-muted whitespace-nowrap truncate">
-              <span className="font-bold text-[var(--wa)]">{waRevShare}%</span> · {whatsapp.orders} orders
+              <span className="font-bold text-[var(--wa)]">{waRevShare === null ? DASH : `${waRevShare}%`}</span> ·{" "}
+              {whatsapp ? `${whatsapp.orders} ${whatsapp.orders === 1 ? "order" : "orders"}` : "no data"}
             </div>
           </button>
 
@@ -195,11 +206,12 @@ export function ChannelsCard({ whatsapp, instagram, isSample }: ChannelsCardProp
                 <span>Instagram</span>
               </span>
               <span className="font-bold font-outfit text-text text-12 sm:text-13 shrink-0">
-                ₹{instagram.revenue.toLocaleString("en-IN")}
+                {instagram ? rupees(instagram.revenue) : DASH}
               </span>
             </div>
             <div className="text-11 text-text-muted whitespace-nowrap truncate">
-              <span className="font-bold text-[var(--ig)]">{igRevShare}%</span> · {instagram.orders} orders
+              <span className="font-bold text-[var(--ig)]">{igRevShare === null ? DASH : `${igRevShare}%`}</span> ·{" "}
+              {instagram ? `${instagram.orders} ${instagram.orders === 1 ? "order" : "orders"}` : "no data"}
             </div>
           </button>
         </div>
