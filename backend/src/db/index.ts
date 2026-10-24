@@ -20,7 +20,8 @@ const ssl = DATABASE_CA_CERT_PATH
 
 // postgres-js connects lazily on the first query, so importing this module
 // does not require a live database (the server can boot without one).
-export const sql = postgres(config.DATABASE_URL, { max: 10, ...(ssl ? { ssl } : {}) });
+// Kept small: Supabase's session pooler caps the whole project at 15 clients (all developers share it).
+export const sql = postgres(config.DATABASE_URL, { max: config.DB_POOL_MAX, ...(ssl ? { ssl } : {}) });
 
 export const db = drizzle(sql, { schema });
 

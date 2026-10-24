@@ -18,9 +18,12 @@ import {
   Loader2,
   ArrowRight,
   ChevronRight,
+  ChevronDown,
+  ArrowRightLeft,
 } from "lucide-react";
 import { toast } from "sonner";
 import { ChannelIcon } from "../components/shared/ChannelIcon.tsx";
+import { Skeleton } from "../components/shared/Skeleton.tsx";
 import { PaymentsPanel } from "../components/orders/PaymentsPanel.tsx";
 import { useOrderPayments } from "../hooks/usePayments.ts";
 import {
@@ -31,34 +34,6 @@ import {
   useDeleteOrder,
 } from "../hooks/useOrders.ts";
 import type { DbOrder, DbOrderItem, OrderStatus } from "../types/index.ts";
-
-function OrderPaymentChip({ orderId, orderTotal }: { orderId: string; orderTotal: number }) {
-  const { data } = useOrderPayments(orderId);
-  const summary = data?.summary;
-
-  if (!summary || summary.totalPaid === 0) {
-    const bal = summary?.balanceDue ?? orderTotal;
-    return (
-      <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-stone-500/10 text-stone-600 dark:text-stone-400 border border-stone-500/20 tabular-nums">
-        Bal: ₹{bal.toLocaleString("en-IN")}
-      </span>
-    );
-  }
-
-  if (summary.paymentState === "fully_paid") {
-    return (
-      <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
-        Fully Paid
-      </span>
-    );
-  }
-
-  return (
-    <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 tabular-nums">
-      Advance Paid · Bal: ₹{summary.balanceDue.toLocaleString("en-IN")}
-    </span>
-  );
-}
 
 const COLUMNS: Array<{ id: OrderStatus; label: string; color: string }> = [
   { id: "pending", label: "Pending", color: "bg-stone-500" },
@@ -88,6 +63,34 @@ interface OrderCardProps {
   isGrid?: boolean;
 }
 
+function OrderPaymentChip({ orderId, orderTotal }: { orderId: string; orderTotal: number }) {
+  const { data } = useOrderPayments(orderId);
+  const summary = data?.summary;
+
+  if (!summary || summary.totalPaid === 0) {
+    const bal = summary?.balanceDue ?? orderTotal;
+    return (
+      <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-stone-500/10 text-stone-600 dark:text-stone-400 border border-stone-500/20 tabular-nums">
+        Bal: ₹{bal.toLocaleString("en-IN")}
+      </span>
+    );
+  }
+
+  if (summary.paymentState === "fully_paid") {
+    return (
+      <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
+        Fully Paid
+      </span>
+    );
+  }
+
+  return (
+    <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 tabular-nums">
+      Advance Paid · Bal: ₹{summary.balanceDue.toLocaleString("en-IN")}
+    </span>
+  );
+}
+
 function OrderCard({
   order,
   onSelect,
@@ -102,17 +105,17 @@ function OrderCard({
   return (
     <div
       onClick={onSelect}
-      className={`p-3.5 rounded-xl border border-border bg-surface hover:border-primary/50 hover:shadow-sm transition-all cursor-pointer flex flex-col justify-between group ${
+      className={`p-3 rounded-xl border border-border bg-surface hover:border-primary/50 hover:shadow-xs transition-all cursor-pointer flex flex-col justify-between group ${
         isGrid ? "gap-3 min-h-[185px]" : "gap-2.5"
       }`}
     >
       <div className="space-y-2">
         {/* Top: Order #, Date, Status */}
         <div className="flex items-center justify-between gap-1.5">
-          <span className="text-12 font-bold font-outfit text-text group-hover:text-primary transition-colors">
+          <span className="text-12 font-bold font-outfit text-text group-hover:text-primary transition-colors truncate">
             #{order.orderNo}
           </span>
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 shrink-0">
             {isGrid && colInfo && (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold capitalize bg-surface-muted text-text-muted border border-border/50">
                 <span className={`w-1.5 h-1.5 rounded-full ${colInfo.color}`} />
@@ -126,16 +129,16 @@ function OrderCard({
         </div>
 
         {/* Customer row */}
-        <div className="flex items-center gap-1.5 text-12 text-text-muted">
-          <ChannelIcon channel={order.channel} size={13} />
-          <span className="font-semibold text-text truncate">{order.customerName}</span>
+        <div className="flex items-center gap-1.5 text-12 text-text-muted min-w-0">
+          <ChannelIcon channel={order.channel} size={13} className="shrink-0" />
+          <span className="font-semibold text-text truncate min-w-0">{order.customerName}</span>
         </div>
 
         {/* Items list */}
-        <div className="space-y-1">
+        <div className="space-y-1 min-w-0">
           {order.items && order.items.length > 0 ? (
             order.items.map((item: DbOrderItem, idx: number) => (
-              <p key={item.id || idx} className="text-11 text-text-muted line-clamp-1">
+              <p key={item.id || idx} className="text-11 text-text-muted truncate">
                 • {item.productName}
                 {item.quantity > 1 ? ` (x${item.quantity})` : ""}
               </p>
@@ -148,9 +151,9 @@ function OrderCard({
 
       <div className="space-y-2 pt-2 border-t border-border/40">
         {/* Amount & Due date / Tracking */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="text-13 font-bold font-outfit text-text tabular-nums">
+        <div className="flex items-center justify-between gap-1 min-w-0">
+          <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+            <span className="text-12 sm:text-13 font-bold font-outfit text-text tabular-nums shrink-0">
               ₹{Number(order.totalAmount).toLocaleString("en-IN")}
             </span>
             <OrderPaymentChip orderId={order.id} orderTotal={Number(order.totalAmount)} />
@@ -159,49 +162,70 @@ function OrderCard({
           {order.trackingId ? (
             <button
               onClick={(e) => onCopyTracking(order.trackingId!, e)}
-              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-surface-muted text-10 font-mono text-text hover:bg-border transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-surface-muted text-10 font-mono text-text hover:bg-border transition-colors cursor-pointer shrink-0"
               title="Click to copy tracking ID"
             >
-              <Truck className="w-3 h-3 text-teal" />
-              <Copy className="w-2.5 h-2.5" />
+              <Truck className="w-3 h-3 text-teal shrink-0" />
+              <Copy className="w-2.5 h-2.5 shrink-0" />
             </button>
           ) : (
-            <span className="text-[10px] text-text-muted flex items-center gap-0.5">
-              <Clock className="w-2.5 h-2.5" /> {formatDueDate(order.expectedDeliveryDate)}
+            <span className="text-[10px] text-text-muted flex items-center gap-0.5 shrink-0">
+              <Clock className="w-2.5 h-2.5 shrink-0" /> {formatDueDate(order.expectedDeliveryDate)}
             </span>
           )}
         </div>
 
-        {/* Action Buttons: 1-Click Advance + Move To Dropdown */}
-        <div className="flex items-center gap-1.5 pt-0.5">
+        {/* Action Buttons: 1-Click Advance + Move To Stage Dropdown */}
+        <div className="flex items-center gap-1.5 pt-0.5 min-w-0">
           {next && onAdvance ? (
             <button
+              type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 onAdvance(next.next);
               }}
-              className="flex-1 inline-flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg bg-primary text-primary-foreground text-11 font-semibold hover:brightness-105 active:scale-[0.98] transition-all shadow-sm cursor-pointer"
+              className="flex-1 min-w-0 inline-flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg bg-primary text-primary-foreground text-11 font-semibold hover:brightness-105 active:scale-[0.98] transition-all shadow-2xs cursor-pointer whitespace-nowrap"
+              title={`Advance to ${next.label}`}
             >
-              <span>{next.label}</span>
-              <ChevronRight className="w-3.5 h-3.5" />
+              <span className="truncate">{next.label}</span>
+              <ChevronRight className="w-3.5 h-3.5 shrink-0" />
             </button>
           ) : null}
 
-          <select
-            onClick={(e) => e.stopPropagation()}
-            value={order.status}
-            onChange={(e) => onMoveTo(e.target.value as OrderStatus)}
-            className={`${
-              next && onAdvance ? "w-24 shrink-0" : "w-full"
-            } text-10 font-semibold px-2 py-1.5 rounded-lg bg-surface-muted border border-border text-text focus:outline-none cursor-pointer truncate hover:bg-border/60 transition-colors`}
-            title="Move to another status"
-          >
-            {COLUMNS.map((c) => (
-              <option key={c.id} value={c.id}>
-                {next && onAdvance ? c.label : `Move to: ${c.label}`}
+          <div className={`relative ${next && onAdvance ? "shrink-0" : "w-full"}`}>
+            <button
+              type="button"
+              className={`${
+                next && onAdvance
+                  ? "w-7 h-7 flex items-center justify-center rounded-lg bg-surface-muted hover:bg-border border border-border text-text-muted hover:text-text"
+                  : "w-full inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-surface-muted hover:bg-border border border-border text-text text-11 font-medium"
+              } transition-colors cursor-pointer`}
+              title="Move to another stage"
+            >
+              <ArrowRightLeft className="w-3.5 h-3.5 shrink-0" />
+              {!next && <span>Move Stage</span>}
+            </button>
+            <select
+              onClick={(e) => e.stopPropagation()}
+              value=""
+              onChange={(e) => {
+                if (e.target.value) {
+                  onMoveTo(e.target.value as OrderStatus);
+                }
+              }}
+              className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+              title="Move to another stage"
+            >
+              <option value="" disabled>
+                Move to stage...
               </option>
-            ))}
-          </select>
+              {COLUMNS.map((c) => (
+                <option key={c.id} value={c.id} disabled={c.id === order.status}>
+                  {c.id === order.status ? `✓ ${c.label} (Current)` : `→ ${c.label}`}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
     </div>
@@ -244,6 +268,146 @@ interface ItemRow {
   unitPrice: number | string;
 }
 
+const errorMessage = (err: unknown): string | undefined =>
+  err instanceof Error ? err.message : undefined;
+
+function SkeletonOrderCard({ isGrid = false }: { isGrid?: boolean }) {
+  return (
+    <div
+      className={`p-3 rounded-xl border border-border bg-surface flex flex-col justify-between ${
+        isGrid ? "gap-3 min-h-[185px]" : "gap-2.5"
+      }`}
+    >
+      <div className="space-y-2">
+        <div className="flex items-center justify-between gap-1.5">
+          <Skeleton className="w-14 h-3.5" />
+          <Skeleton className="w-14 h-3" />
+        </div>
+        <div className="flex items-center gap-1.5">
+          <Skeleton className="w-3.5 h-3.5 rounded-full shrink-0" />
+          <Skeleton className="w-20 h-3.5" />
+        </div>
+        <div className="space-y-1">
+          <Skeleton className="w-3/4 h-3" />
+          <Skeleton className="w-1/2 h-3" />
+        </div>
+      </div>
+      <div className="pt-2 border-t border-border/40 space-y-2">
+        <div className="flex items-center justify-between">
+          <Skeleton className="w-14 h-4" />
+          <Skeleton className="w-12 h-3 rounded" />
+        </div>
+        <div className="flex items-center gap-1.5">
+          <Skeleton className="flex-1 h-7 rounded-lg" />
+          <Skeleton className="w-7 h-7 rounded-lg shrink-0" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function OrdersSkeleton({
+  viewMode,
+  selectedStatus,
+}: {
+  viewMode: "board" | "table";
+  selectedStatus: string;
+}) {
+  if (viewMode === "table") {
+    return (
+      <div className="rounded-xl border border-border bg-surface overflow-hidden">
+        <table className="w-full text-left text-13">
+          <thead className="bg-surface-muted border-b border-border text-11 uppercase font-semibold text-text-muted">
+            <tr>
+              <th className="p-3.5">Order</th>
+              <th className="p-3.5">Customer</th>
+              <th className="p-3.5">Products</th>
+              <th className="p-3.5">Total</th>
+              <th className="p-3.5">Status</th>
+              <th className="p-3.5">Placed</th>
+              <th className="p-3.5">Tracking / Due</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border/60">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <tr key={i} className="p-3.5">
+                <td className="p-3.5">
+                  <Skeleton className="w-14 h-4" />
+                </td>
+                <td className="p-3.5">
+                  <div className="flex items-center gap-2">
+                    <Skeleton className="w-6 h-6 rounded-full shrink-0" />
+                    <Skeleton className="w-24 h-3.5" />
+                  </div>
+                </td>
+                <td className="p-3.5">
+                  <Skeleton className="w-32 h-3.5" />
+                </td>
+                <td className="p-3.5">
+                  <Skeleton className="w-16 h-4" />
+                </td>
+                <td className="p-3.5">
+                  <Skeleton className="w-20 h-5 rounded-full" />
+                </td>
+                <td className="p-3.5">
+                  <Skeleton className="w-16 h-3.5" />
+                </td>
+                <td className="p-3.5">
+                  <Skeleton className="w-20 h-4 rounded" />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  }
+
+  if (selectedStatus !== "all") {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between p-3.5 rounded-xl border border-border bg-surface/80">
+          <div className="flex items-center gap-2.5">
+            <Skeleton className="w-3 h-3 rounded-full" />
+            <Skeleton className="w-36 h-5" />
+            <Skeleton className="w-16 h-5 rounded-full" />
+          </div>
+          <Skeleton className="w-28 h-4 hidden sm:block" />
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <SkeletonOrderCard key={i} isGrid />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-full flex items-start gap-3 xl:gap-3.5 2xl:gap-4 overflow-x-auto custom-scrollbar pb-2 pt-1 w-full">
+      {COLUMNS.map((col) => (
+        <div
+          key={col.id}
+          className="flex-1 min-w-[220px] xl:min-w-0 h-full flex flex-col rounded-xl border border-border bg-surface/60 shadow-2xs overflow-hidden"
+        >
+          <div className="shrink-0 flex items-center justify-between p-2.5 sm:p-3 border-b border-border/40 bg-surface/95 rounded-t-xl">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className={`w-2 h-2 rounded-full ${col.color} shrink-0`} />
+              <span className="text-12 sm:text-13 font-bold font-outfit text-text truncate">{col.label}</span>
+            </div>
+            <Skeleton className="w-5 h-4 rounded shrink-0" />
+          </div>
+          <div className="flex-1 min-h-0 p-2.5 space-y-2.5 overflow-hidden">
+            <SkeletonOrderCard />
+            <SkeletonOrderCard />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function Orders() {
   const navigate = useNavigate();
 
@@ -274,7 +438,6 @@ export default function Orders() {
   const [targetStatus, setTargetStatus] = useState<OrderStatus>("in_production");
   const [statusTrackingId, setStatusTrackingId] = useState("");
   const [statusCourier, setStatusCourier] = useState("");
-  const [sendNotification, setSendNotification] = useState(true);
 
   // Create Order Modal State
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -283,7 +446,7 @@ export default function Orders() {
   const [createCustomerEmail, setCreateCustomerEmail] = useState("");
   const [createChannel, setCreateChannel] = useState<"whatsapp" | "instagram">("whatsapp");
   const [createShippingAddress, setCreateShippingAddress] = useState("");
-  const [createCourier, setCreateCourier] = useState("Shiprocket (DTDC)");
+  const [createCourier, setCreateCourier] = useState("");
   const [createExpectedDate, setCreateExpectedDate] = useState("");
   const [createDeliveryCharge, setCreateDeliveryCharge] = useState<number | string>("");
   const [createDiscountAmount, setCreateDiscountAmount] = useState<number | string>("");
@@ -313,7 +476,7 @@ export default function Orders() {
     setCreateCustomerPhone("");
     setCreateCustomerEmail("");
     setCreateShippingAddress("");
-    setCreateCourier("Shiprocket (DTDC)");
+    setCreateCourier("");
     setCreateExpectedDate("");
     setCreateDeliveryCharge("");
     setCreateDiscountAmount("");
@@ -350,7 +513,7 @@ export default function Orders() {
     setUpdatingOrder(order);
     setTargetStatus(nextStatus);
     setStatusTrackingId(order.trackingId || "");
-    setStatusCourier(order.courier || "Shiprocket (DTDC)");
+    setStatusCourier(order.courier || "");
   };
 
   const confirmStatusUpdate = async () => {
@@ -362,22 +525,15 @@ export default function Orders() {
           status: targetStatus,
           trackingId: statusTrackingId.trim() || undefined,
           courier: statusCourier.trim() || undefined,
-          sendNotification,
         },
       });
 
-      if (sendNotification) {
-        toast.success("Status updated & WhatsApp notification queued!", {
-          description: `${updatingOrder.orderNo} moved to ${targetStatus.replace("_", " ")}`,
-        });
-      } else {
-        toast.success("Order status updated", {
-          description: `${updatingOrder.orderNo} moved to ${targetStatus.replace("_", " ")}`,
-        });
-      }
+      toast.success("Order status updated", {
+        description: `${updatingOrder.orderNo} moved to ${targetStatus.replace("_", " ")}`,
+      });
       setUpdatingOrder(null);
-    } catch (err: any) {
-      toast.error("Failed to update status", { description: err?.message });
+    } catch (err: unknown) {
+      toast.error("Failed to update status", { description: errorMessage(err) });
     }
   };
 
@@ -417,7 +573,7 @@ export default function Orders() {
     setEditItems((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const handleEditItemChange = (index: number, field: keyof ItemRow, value: any) => {
+  const handleEditItemChange = <K extends keyof ItemRow>(index: number, field: K, value: ItemRow[K]) => {
     setEditItems((prev) =>
       prev.map((item, i) => (i === index ? { ...item, [field]: value } : item))
     );
@@ -471,8 +627,8 @@ export default function Orders() {
       }
       setIsEditingDetails(false);
       toast.success("Order details and prices updated successfully!");
-    } catch (err: any) {
-      toast.error("Failed to save changes", { description: err?.message });
+    } catch (err: unknown) {
+      toast.error("Failed to save changes", { description: errorMessage(err) });
     }
   };
 
@@ -487,8 +643,8 @@ export default function Orders() {
       if (activeOrder?.id === deletingOrder.id) {
         setActiveOrder(null);
       }
-    } catch (err: any) {
-      toast.error("Failed to delete order", { description: err?.message });
+    } catch (err: unknown) {
+      toast.error("Failed to delete order", { description: errorMessage(err) });
     }
   };
 
@@ -505,7 +661,7 @@ export default function Orders() {
     setCreateItems((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const handleItemChange = (index: number, field: keyof ItemRow, value: any) => {
+  const handleItemChange = <K extends keyof ItemRow>(index: number, field: K, value: ItemRow[K]) => {
     setCreateItems((prev) =>
       prev.map((item, i) => (i === index ? { ...item, [field]: value } : item))
     );
@@ -563,15 +719,15 @@ export default function Orders() {
       toast.success("Order created successfully!", {
         description: `Order #${res.order.orderNo} created for ${res.order.customerName}`,
       });
-    } catch (err: any) {
-      toast.error("Failed to create order", { description: err?.message });
+    } catch (err: unknown) {
+      toast.error("Failed to create order", { description: errorMessage(err) });
     }
   };
 
   return (
-    <div className="space-y-6 pb-12 w-full">
+    <div className="h-full flex flex-col p-4 sm:p-6 lg:p-8 gap-4 overflow-hidden w-full">
       {/* ─── Page Header ──────────────────────────────────────────────────────── */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 shrink-0">
         <div>
           <h1 className="text-24 md:text-28 font-bold font-outfit text-text tracking-tight flex items-center gap-2">
             <span>Orders & Production</span>
@@ -623,7 +779,7 @@ export default function Orders() {
       </div>
 
       {/* ─── Search & Status Tabs ─────────────────────────────────────────────── */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 p-3 rounded-xl border border-border bg-surface">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 p-3 rounded-xl border border-border bg-surface shrink-0">
         <div className="flex items-center gap-1.5 overflow-x-auto custom-scrollbar pb-1 text-12 font-medium">
           <button
             onClick={() => setSelectedStatus("all")}
@@ -665,187 +821,186 @@ export default function Orders() {
         </div>
       </div>
 
-      {/* Loading State */}
-      {isLoading ? (
-        <div className="p-12 flex flex-col items-center justify-center gap-3 text-text-muted">
-          <Loader2 className="w-6 h-6 animate-spin text-primary" />
-          <p className="text-13">Loading Orders...</p>
-        </div>
-      ) : viewMode === "board" ? (
-        selectedStatus !== "all" ? (
-          /* ─── Focus Grid View for Selected Stage ────────────────────────── */
-          <div className="space-y-4">
-            {/* Stage Summary Banner */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 p-3.5 rounded-xl border border-border bg-surface/80">
-              <div className="flex items-center gap-2.5">
-                <span className={`w-3 h-3 rounded-full ${COLUMNS.find((c) => c.id === selectedStatus)?.color ?? "bg-primary"}`} />
-                <h2 className="text-15 font-bold font-outfit text-text">
-                  {COLUMNS.find((c) => c.id === selectedStatus)?.label ?? "Filtered"} Orders
-                </h2>
-                <span className="px-2 py-0.5 rounded-full text-11 font-bold bg-primary/10 text-primary">
-                  {orders.length} {orders.length === 1 ? "order" : "orders"}
-                </span>
-                <span className="text-12 text-text-muted hidden md:inline">
-                  · Full-width grid view
-                </span>
-              </div>
+      {/* Main View Area */}
+      <div className="flex-1 min-h-0 w-full overflow-hidden">
+        {isLoading ? (
+          <OrdersSkeleton viewMode={viewMode} selectedStatus={selectedStatus} />
+        ) : viewMode === "board" ? (
+          selectedStatus !== "all" ? (
+            /* ─── Focus Grid View for Selected Stage ────────────────────────── */
+            <div className="h-full overflow-y-auto custom-scrollbar space-y-4 pr-1">
+              {/* Stage Summary Banner */}
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 p-3.5 rounded-xl border border-border bg-surface/80 shrink-0">
+                <div className="flex items-center gap-2.5">
+                  <span className={`w-3 h-3 rounded-full ${COLUMNS.find((c) => c.id === selectedStatus)?.color ?? "bg-primary"}`} />
+                  <h2 className="text-15 font-bold font-outfit text-text">
+                    {COLUMNS.find((c) => c.id === selectedStatus)?.label ?? "Filtered"} Orders
+                  </h2>
+                  <span className="px-2 py-0.5 rounded-full text-11 font-bold bg-primary/10 text-primary">
+                    {orders.length} {orders.length === 1 ? "order" : "orders"}
+                  </span>
+                  <span className="text-12 text-text-muted hidden md:inline">
+                    · Full-width grid view
+                  </span>
+                </div>
 
-              <button
-                onClick={() => setSelectedStatus("all")}
-                className="inline-flex items-center gap-1.5 text-12 font-semibold text-primary hover:underline cursor-pointer"
-              >
-                <span>View all pipeline stages</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
-
-            {/* Responsive Card Grid */}
-            {orders.length === 0 ? (
-              <div className="p-12 rounded-xl border border-dashed border-border bg-surface text-center space-y-3">
-                <p className="text-13 text-text-muted">
-                  No orders currently in {COLUMNS.find((c) => c.id === selectedStatus)?.label.toLowerCase() ?? "this stage"}.
-                </p>
                 <button
                   onClick={() => setSelectedStatus("all")}
-                  className="px-3.5 py-1.5 rounded-lg bg-surface-muted border border-border text-12 font-medium text-text hover:bg-border transition-colors cursor-pointer"
+                  className="inline-flex items-center gap-1.5 text-12 font-semibold text-primary hover:underline cursor-pointer"
                 >
-                  Back to full board
+                  <span>View all pipeline stages</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
                 </button>
               </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 items-stretch">
-                {orders.map((o) => (
-                  <OrderCard
-                    key={o.id}
-                    order={o}
-                    isGrid
-                    onSelect={() => setActiveOrder(o)}
-                    onAdvance={(nextStatus) => handleOpenStatusDialog(o, nextStatus)}
-                    onMoveTo={(status) => handleOpenStatusDialog(o, status)}
-                    onCopyTracking={copyTracking}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-        ) : (
-          /* ─── Full Pipeline Kanban View (All Stages) ────────────────────── */
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 items-start overflow-x-auto custom-scrollbar pb-4">
-            {COLUMNS.map((col) => {
-              const columnOrders = orders.filter((o) => o.status === col.id);
-              return (
-                <div
-                  key={col.id}
-                  className="flex flex-col rounded-xl border border-border bg-surface/60 min-w-[230px] max-h-[calc(100vh-230px)]"
-                >
-                  {/* Sticky Column Header with Quick Focus Click */}
-                  <div
-                    onClick={() => setSelectedStatus(col.id)}
-                    className="sticky top-0 z-10 flex items-center justify-between p-3 border-b border-border/40 bg-surface/95 backdrop-blur-sm rounded-t-xl cursor-pointer hover:bg-surface-muted/60 transition-colors"
-                    title={`Click to focus on ${col.label} orders`}
-                  >
-                    <div className="flex items-center gap-1.5">
-                      <span className={`w-2 h-2 rounded-full ${col.color}`} />
-                      <span className="text-13 font-bold font-outfit text-text">{col.label}</span>
-                    </div>
-                    <span className="px-1.5 py-0.5 rounded text-11 font-bold bg-surface-muted text-text-muted hover:bg-primary/10 hover:text-primary transition-colors">
-                      {columnOrders.length}
-                    </span>
-                  </div>
 
-                  {/* Independent Scrollable Body */}
-                  <div className="flex-1 overflow-y-auto p-2.5 space-y-2.5 custom-scrollbar min-h-[140px]">
-                    {columnOrders.length === 0 ? (
-                      <div className="p-4 rounded-lg border border-dashed border-border/60 text-center text-11 text-text-muted">
-                        No orders
-                      </div>
-                    ) : (
-                      columnOrders.map((o) => (
-                        <OrderCard
-                          key={o.id}
-                          order={o}
-                          onSelect={() => setActiveOrder(o)}
-                          onAdvance={(nextStatus) => handleOpenStatusDialog(o, nextStatus)}
-                          onMoveTo={(status) => handleOpenStatusDialog(o, status)}
-                          onCopyTracking={copyTracking}
-                        />
-                      ))
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )
-      ) : (
-        /* ─── Table View ────────────────────────────────────────────────────────── */
-        <div className="rounded-xl border border-border bg-surface overflow-hidden">
-          <table className="w-full text-left text-13">
-            <thead className="bg-surface-muted border-b border-border text-11 uppercase font-semibold text-text-muted">
-              <tr>
-                <th className="p-3.5">Order</th>
-                <th className="p-3.5">Customer</th>
-                <th className="p-3.5">Products</th>
-                <th className="p-3.5">Total</th>
-                <th className="p-3.5">Status</th>
-                <th className="p-3.5">Placed</th>
-                <th className="p-3.5">Tracking / Due</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border/40">
+              {/* Responsive Card Grid */}
               {orders.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="p-8 text-center text-text-muted text-13">
-                    No orders found matching the filter.
-                  </td>
-                </tr>
-              ) : (
-                orders.map((o) => (
-                  <tr
-                    key={o.id}
-                    onClick={() => setActiveOrder(o)}
-                    className="hover:bg-surface-muted transition-colors cursor-pointer"
+                <div className="p-12 rounded-xl border border-dashed border-border bg-surface text-center space-y-3">
+                  <p className="text-13 text-text-muted">
+                    No orders currently in {COLUMNS.find((c) => c.id === selectedStatus)?.label.toLowerCase() ?? "this stage"}.
+                  </p>
+                  <button
+                    onClick={() => setSelectedStatus("all")}
+                    className="px-3.5 py-1.5 rounded-lg bg-surface-muted border border-border text-12 font-medium text-text hover:bg-border transition-colors cursor-pointer"
                   >
-                    <td className="p-3.5 font-bold font-outfit text-text">#{o.orderNo}</td>
-                    <td className="p-3.5">
-                      <div className="flex items-center gap-1.5">
-                        <ChannelIcon channel={o.channel} size={13} />
-                        <span className="font-medium text-text">{o.customerName}</span>
+                    Back to full board
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 items-stretch pb-4">
+                  {orders.map((o) => (
+                    <OrderCard
+                      key={o.id}
+                      order={o}
+                      isGrid
+                      onSelect={() => setActiveOrder(o)}
+                      onAdvance={(nextStatus) => handleOpenStatusDialog(o, nextStatus)}
+                      onMoveTo={(status) => handleOpenStatusDialog(o, status)}
+                      onCopyTracking={copyTracking}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : (
+            /* ─── Full Pipeline Kanban View (All Stages) ────────────────────── */
+            <div className="h-full flex items-start gap-3 xl:gap-3.5 2xl:gap-4 overflow-x-auto custom-scrollbar pb-2 pt-1 w-full">
+              {COLUMNS.map((col) => {
+                const columnOrders = orders.filter((o) => o.status === col.id);
+                return (
+                  <div
+                    key={col.id}
+                    className="flex-1 min-w-[220px] xl:min-w-0 h-full flex flex-col rounded-xl border border-border bg-surface/60 shadow-2xs transition-all overflow-hidden"
+                  >
+                    {/* Sticky Column Header with Quick Focus Click */}
+                    <div
+                      onClick={() => setSelectedStatus(col.id)}
+                      className="shrink-0 flex items-center justify-between p-2.5 sm:p-3 border-b border-border/40 bg-surface/95 backdrop-blur-sm rounded-t-xl cursor-pointer hover:bg-surface-muted/60 transition-colors"
+                      title={`Click to focus on ${col.label} orders`}
+                    >
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span className={`w-2 h-2 rounded-full ${col.color} shrink-0`} />
+                        <span className="text-12 sm:text-13 font-bold font-outfit text-text truncate">{col.label}</span>
                       </div>
-                    </td>
-                    <td className="p-3.5 text-text-muted max-w-xs truncate">
-                      {o.items?.map((i) => i.productName).join(", ") || "No items"}
-                    </td>
-                    <td className="p-3.5 font-bold font-outfit text-text tabular-nums">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span>₹{Number(o.totalAmount).toLocaleString("en-IN")}</span>
-                        <OrderPaymentChip orderId={o.id} orderTotal={Number(o.totalAmount)} />
-                      </div>
-                    </td>
-                    <td className="p-3.5">
-                      <span className="px-2 py-0.5 rounded text-11 font-semibold capitalize bg-surface-muted border border-border">
-                        {o.status.replace("_", " ")}
+                      <span className="px-1.5 py-0.5 rounded text-11 font-bold bg-surface-muted text-text-muted hover:bg-primary/10 hover:text-primary transition-colors shrink-0">
+                        {columnOrders.length}
                       </span>
-                    </td>
-                    <td className="p-3.5 text-text-muted">{formatOrderDate(o.createdAt)}</td>
-                    <td className="p-3.5">
-                      {o.trackingId ? (
-                        <span className="font-mono text-11 text-teal flex items-center gap-1">
-                          <Truck className="w-3.5 h-3.5" /> {o.trackingId}
-                        </span>
+                    </div>
+
+                    {/* Independent Scrollable Body */}
+                    <div className="flex-1 min-h-0 overflow-y-auto p-2.5 space-y-2.5 custom-scrollbar">
+                      {columnOrders.length === 0 ? (
+                        <div className="p-4 rounded-lg border border-dashed border-border/60 text-center text-11 text-text-muted">
+                          No orders
+                        </div>
                       ) : (
-                        <span className="text-12 text-text-muted">
-                          {formatDueDate(o.expectedDeliveryDate)}
-                        </span>
+                        columnOrders.map((o) => (
+                          <OrderCard
+                            key={o.id}
+                            order={o}
+                            onSelect={() => setActiveOrder(o)}
+                            onAdvance={(nextStatus) => handleOpenStatusDialog(o, nextStatus)}
+                            onMoveTo={(status) => handleOpenStatusDialog(o, status)}
+                            onCopyTracking={copyTracking}
+                          />
+                        ))
                       )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )
+        ) : (
+          /* ─── Table View ────────────────────────────────────────────────────────── */
+          <div className="h-full overflow-auto rounded-xl border border-border bg-surface custom-scrollbar">
+            <table className="w-full text-left text-13">
+              <thead className="sticky top-0 z-10 bg-surface-muted border-b border-border text-11 uppercase font-semibold text-text-muted">
+                <tr>
+                  <th className="p-3.5">Order</th>
+                  <th className="p-3.5">Customer</th>
+                  <th className="p-3.5">Products</th>
+                  <th className="p-3.5">Total</th>
+                  <th className="p-3.5">Status</th>
+                  <th className="p-3.5">Placed</th>
+                  <th className="p-3.5">Tracking / Due</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/40">
+                {orders.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="p-8 text-center text-text-muted text-13">
+                      No orders found matching the filter.
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      )}
+                ) : (
+                  orders.map((o) => (
+                    <tr
+                      key={o.id}
+                      onClick={() => setActiveOrder(o)}
+                      className="hover:bg-surface-muted transition-colors cursor-pointer"
+                    >
+                      <td className="p-3.5 font-bold font-outfit text-text">#{o.orderNo}</td>
+                      <td className="p-3.5">
+                        <div className="flex items-center gap-1.5">
+                          <ChannelIcon channel={o.channel} size={13} />
+                          <span className="font-medium text-text">{o.customerName}</span>
+                        </div>
+                      </td>
+                      <td className="p-3.5 text-text-muted max-w-xs truncate">
+                        {o.items?.map((i) => i.productName).join(", ") || "No items"}
+                      </td>
+                      <td className="p-3.5 font-bold font-outfit text-text tabular-nums">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span>₹{Number(o.totalAmount).toLocaleString("en-IN")}</span>
+                          <OrderPaymentChip orderId={o.id} orderTotal={Number(o.totalAmount)} />
+                        </div>
+                      </td>
+                      <td className="p-3.5">
+                        <span className="px-2 py-0.5 rounded text-11 font-semibold capitalize bg-surface-muted border border-border">
+                          {o.status.replace("_", " ")}
+                        </span>
+                      </td>
+                      <td className="p-3.5 text-text-muted">{formatOrderDate(o.createdAt)}</td>
+                      <td className="p-3.5">
+                        {o.trackingId ? (
+                          <span className="font-mono text-11 text-teal flex items-center gap-1">
+                            <Truck className="w-3.5 h-3.5" /> {o.trackingId}
+                          </span>
+                        ) : (
+                          <span className="text-12 text-text-muted">
+                            {formatDueDate(o.expectedDeliveryDate)}
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
 
       {/* ─── Create Order SlideOver ───────────────────────────────────────────── */}
       {isCreateOpen && (
@@ -889,14 +1044,17 @@ export default function Orders() {
                   </div>
                   <div>
                     <label className="text-11 font-medium text-text">Channel</label>
-                    <select
-                      value={createChannel}
-                      onChange={(e) => setCreateChannel(e.target.value as any)}
-                      className="mt-1 w-full px-3 py-1.5 rounded-lg border border-border bg-surface text-12 text-text focus:outline-none focus:ring-1 focus:ring-primary"
-                    >
-                      <option value="whatsapp">WhatsApp</option>
-                      <option value="instagram">Instagram</option>
-                    </select>
+                    <div className="relative mt-1">
+                      <select
+                        value={createChannel}
+                        onChange={(e) => setCreateChannel(e.target.value as "whatsapp" | "instagram")}
+                        className="w-full pl-3 pr-8 py-1.5 appearance-none rounded-lg border border-border bg-surface text-12 text-text focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
+                      >
+                        <option value="whatsapp">WhatsApp</option>
+                        <option value="instagram">Instagram</option>
+                      </select>
+                      <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted" aria-hidden />
+                    </div>
                   </div>
                   <div>
                     <label className="text-11 font-medium text-text">Phone / Handle</label>
@@ -1309,6 +1467,7 @@ export default function Orders() {
                         <label className="text-[10px] text-text-muted">Courier</label>
                         <input
                           type="text"
+                          placeholder="e.g. Shiprocket (DTDC)"
                           value={editCourier}
                           onChange={(e) => setEditCourier(e.target.value)}
                           className="w-full px-2 py-1 rounded border border-border bg-surface text-12 text-text focus:outline-none"
@@ -1580,7 +1739,7 @@ export default function Orders() {
         </div>
       )}
 
-      {/* ─── Status Update & WhatsApp PhonePreview Dialog ─────────────────────── */}
+      {/* ─── Status Update Dialog ─────────────────────────────────────────────── */}
       {updatingOrder && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in"
@@ -1611,18 +1770,21 @@ export default function Orders() {
             {/* Target Status Dropdown */}
             <div>
               <label className="text-11 font-medium text-text">Change status to:</label>
-              <select
-                value={targetStatus}
-                onChange={(e) => setTargetStatus(e.target.value as OrderStatus)}
-                className="mt-1 w-full px-3 py-1.5 rounded-lg border border-border bg-surface text-12 text-text focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
-              >
-                {COLUMNS.map((col) => (
-                  <option key={col.id} value={col.id}>
-                    {col.label}
-                  </option>
-                ))}
-                <option value="cancelled">Cancelled</option>
-              </select>
+              <div className="relative mt-1">
+                <select
+                  value={targetStatus}
+                  onChange={(e) => setTargetStatus(e.target.value as OrderStatus)}
+                  className="w-full pl-3 pr-8 py-1.5 appearance-none rounded-lg border border-border bg-surface text-12 text-text focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
+                >
+                  {COLUMNS.map((col) => (
+                    <option key={col.id} value={col.id}>
+                      {col.label}
+                    </option>
+                  ))}
+                  <option value="cancelled">Cancelled</option>
+                </select>
+                <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted" aria-hidden />
+              </div>
             </div>
 
             {/* If Dispatching, Tracking ID Input */}
@@ -1651,13 +1813,13 @@ export default function Orders() {
               </div>
             )}
 
-            {/* WhatsApp Notification Preview */}
+            {/* Status message preview (the backend does not send this automatically) */}
             <div className="p-4 rounded-xl border border-emerald-500/30 bg-emerald-500/5 space-y-2">
               <div className="flex items-center justify-between text-11 font-semibold text-emerald-600 dark:text-emerald-400">
                 <span className="flex items-center gap-1">
-                  <Phone className="w-3.5 h-3.5" /> WhatsApp Notification Preview
+                  <Phone className="w-3.5 h-3.5" /> Status message preview
                 </span>
-                <span>Template: {targetStatus.toUpperCase()}</span>
+                <span className="font-medium text-text-muted">Not sent automatically</span>
               </div>
 
               <div className="p-3 rounded-lg bg-surface border border-border shadow-xs text-12 text-text leading-relaxed">
@@ -1673,7 +1835,8 @@ export default function Orders() {
                 </p>
                 {targetStatus === "dispatched" && (
                   <p className="mt-1 text-teal font-medium">
-                    Tracking ID: <strong>{statusTrackingId || "SHP98421039IN"}</strong> (via {statusCourier || "Shiprocket"})
+                    Tracking ID: <strong>{statusTrackingId.trim() || "—"}</strong>
+                    {statusCourier.trim() && <> (via {statusCourier.trim()})</>}
                   </p>
                 )}
                 <p className="mt-1 text-11 text-text-muted">
@@ -1681,16 +1844,6 @@ export default function Orders() {
                 </p>
               </div>
             </div>
-
-            <label className="flex items-center gap-2 text-13 font-medium text-text cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={sendNotification}
-                onChange={(e) => setSendNotification(e.target.checked)}
-                className="w-4 h-4 rounded text-primary focus:ring-primary cursor-pointer"
-              />
-              <span>Send automated WhatsApp notification to customer</span>
-            </label>
 
             <div className="flex items-center justify-end gap-2 pt-3 border-t border-border">
               <button

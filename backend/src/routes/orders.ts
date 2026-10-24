@@ -25,7 +25,7 @@ const orderItemInputSchema = z.object({
   productDescription: z.string().optional().nullable(),
   quantity: z.coerce.number().int().positive().default(1),
   unitPrice: z.coerce.number().nonnegative(),
-  customizations: z.record(z.any()).optional().default({}),
+  customizations: z.record(z.string(), z.unknown()).optional().default({}),
 });
 
 const createOrderSchema = z.object({
@@ -75,7 +75,7 @@ export const orderRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
   // GET /orders - List orders with status counts & search
   app.get(
     "/orders",
-    { preHandler: [authenticate] },
+    { preHandler: [authenticate, requireAdmin] },
     async (request) => {
       const businessId = request.user.businessId;
       const query = request.query as {
@@ -148,7 +148,7 @@ export const orderRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
         )
         .groupBy(orders.status);
 
-      const statusCounts: Record<string, number> = {
+      const statusCounts: Record<OrderStatus | "all", number> = {
         all: 0,
         pending: 0,
         confirmed: 0,
@@ -159,10 +159,12 @@ export const orderRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
         cancelled: 0,
       };
 
+      let totalAll = 0;
       for (const row of allBusinessOrders) {
         statusCounts[row.status] = row.count;
-        statusCounts.all += row.count;
+        totalAll += row.count;
       }
+      statusCounts.all = totalAll;
 
       const results = orderList.map((o) => ({
         ...o,
@@ -180,7 +182,7 @@ export const orderRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
   // GET /orders/:id - Get single order with items
   app.get(
     "/orders/:id",
-    { preHandler: [authenticate] },
+    { preHandler: [authenticate, requireAdmin] },
     async (request) => {
       const { id } = request.params as { id: string };
       const businessId = request.user.businessId;
@@ -273,7 +275,7 @@ export const orderRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
         }
 
         const match = candidateOrderNo.match(/^(.*?)(\d+)$/);
-        if (match) {
+        if (match && match[1] !== undefined && match[2] !== undefined) {
           const prefix = match[1];
           const num = parseInt(match[2], 10) + 1;
           candidateOrderNo = `${prefix}${num}`;
@@ -306,10 +308,10 @@ export const orderRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
       const discountAmount = data.discountAmount ?? 0;
       const totalAmount = Math.max(0, subtotal + deliveryCharge - discountAmount);
 
-      let createdOrder;
-      let createdItems;
+      let createdOrder: typeof orders.$inferSelect | undefined;
+      let createdItems: (typeof orderItems.$inferSelect)[] = [];
       try {
-        [createdOrder] = await db
+        const [insertedOrder] = await db
           .insert(orders)
           .values({
             businessId,
@@ -333,11 +335,16 @@ export const orderRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
           })
           .returning();
 
+        if (!insertedOrder) {
+          throw new AppError(500, "Failed to create order", "INTERNAL_ERROR");
+        }
+        createdOrder = insertedOrder;
+
         createdItems = await db
           .insert(orderItems)
           .values(
             data.items.map((it) => ({
-              orderId: createdOrder.id,
+              orderId: insertedOrder.id,
               productId: it.productId?.trim() || null,
               productName: it.productName.trim(),
               productDescription: it.productDescription?.trim() || null,
@@ -348,10 +355,15 @@ export const orderRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
           )
           .returning();
       } catch (err: any) {
+        if (err instanceof AppError) throw err;
         if (err?.code === "23505") {
           throw new AppError(400, `An order with number "${orderNo}" already exists`, "ORDER_EXISTS");
         }
         throw new AppError(500, err?.message || "Failed to create order", "INTERNAL_ERROR");
+      }
+
+      if (!createdOrder) {
+        throw new AppError(500, "Failed to create order", "INTERNAL_ERROR");
       }
 
       // Audit log

@@ -72,6 +72,8 @@ export const envSchema = z
   .object({
     // Server
     PORT: z.coerce.number().int().min(1).max(65535),
+    DB_POOL_MAX: z.coerce.number().int().min(1).max(50).default(4),
+    QUEUE_POOL_MAX: z.coerce.number().int().min(1).max(20).default(2),
     NODE_ENV: z.enum(["development", "production", "test"]),
     DEMO_MODE: z
       .enum(["true", "false"], { error: 'must be "true" or "false"' })

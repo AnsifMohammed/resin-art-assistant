@@ -50,6 +50,26 @@ const mockEscalation = {
   resolvedAt: null,
 };
 
+const mockOrder = {
+  id: "ord-1",
+  businessId: "biz-1",
+  customerId: "cust-1",
+  orderNo: "ORD-001",
+  status: "confirmed",
+  totalAmount: "1500.00",
+  createdAt: new Date("2026-10-01T12:00:00.000Z"),
+  expectedDeliveryDate: null,
+  isDeleted: false,
+};
+
+const mockOrderItem = {
+  id: "item-1",
+  orderId: "ord-1",
+  productName: "Ocean Coaster Set",
+  quantity: 2,
+  isDeleted: false,
+};
+
 let staffHasAccess = true;
 
 // Captured for assertions: WHERE conditions passed to select chains, and inserted rows.
@@ -119,6 +139,10 @@ vi.mock("../src/db/index.ts", () => {
             data = mockDecisions;
           } else if (name === "users") {
             data = [{ id: "staff-1", name: "Priya", email: "priya@asharesins.com", role: "staff", active: true }];
+          } else if (name === "orders") {
+            data = [mockOrder];
+          } else if (name === "order_items") {
+            data = [mockOrderItem];
           }
 
           const handler: ProxyHandler<any> = {
@@ -193,6 +217,7 @@ beforeAll(async () => {
 beforeEach(() => {
   captured.wheres = [];
   captured.inserts = [];
+  staffHasAccess = true;
   Object.values(rt).forEach((fn) => fn.mockClear());
 });
 
@@ -482,6 +507,50 @@ describe("Conversation routes", () => {
     it("staff cannot pause or resume (403)", async () => {
       expect((await post("pause", staffToken)).statusCode).toBe(403);
       expect((await post("resume", staffToken)).statusCode).toBe(403);
+    });
+  });
+
+  describe("GET /conversations/:id/orders", () => {
+    it("allows admin to view conversation customer orders", async () => {
+      const res = await app.inject({
+        method: "GET",
+        url: "/conversations/conv-1/orders",
+        headers: { authorization: `Bearer ${adminToken}` },
+      });
+      expect(res.statusCode).toBe(200);
+      const body = res.json();
+      expect(body.orders).toHaveLength(1);
+      expect(body.orders[0]).toEqual({
+        id: "ord-1",
+        orderNo: "ORD-001",
+        status: "confirmed",
+        totalAmount: 1500,
+        createdAt: "2026-10-01T12:00:00.000Z",
+        expectedDeliveryDate: null,
+        items: [{ productName: "Ocean Coaster Set", quantity: 2 }],
+      });
+    });
+
+    it("allows staff assigned to the conversation to view orders", async () => {
+      staffHasAccess = true;
+      const res = await app.inject({
+        method: "GET",
+        url: "/conversations/conv-1/orders",
+        headers: { authorization: `Bearer ${staffToken}` },
+      });
+      expect(res.statusCode).toBe(200);
+      expect(res.json().orders).toHaveLength(1);
+    });
+
+    it("forbids staff not assigned to the conversation (403)", async () => {
+      staffHasAccess = false;
+      const res = await app.inject({
+        method: "GET",
+        url: "/conversations/conv-1/orders",
+        headers: { authorization: `Bearer ${staffToken}` },
+      });
+      expect(res.statusCode).toBe(403);
+      expect(res.json().error).toBe("Not assigned to you");
     });
   });
 });

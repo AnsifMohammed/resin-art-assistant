@@ -18,6 +18,7 @@ import {
   Trash2,
   Users,
   XCircle,
+  ChevronDown,
 } from "lucide-react";
 import { toast } from "sonner";
 import { isApiError } from "../api/client.ts";
@@ -561,9 +562,9 @@ export default function BroadcastPage() {
   const primaryAction: BroadcastAction = mode === "schedule" ? "schedule" : "send_now";
 
   return (
-    <div ref={topRef} className="space-y-8 pb-12 w-full">
+    <div className="h-full w-full flex flex-col gap-6 p-4 sm:p-6 lg:p-8 overflow-y-auto md:overflow-hidden">
       {/* ─── Page Header ──────────────────────────────────────────────────────── */}
-      <div>
+      <div className="shrink-0">
         <h1 className="text-24 md:text-28 font-bold font-outfit text-text tracking-tight flex items-center gap-2">
           <span>Broadcast Campaigns</span>
           <span className="px-2 py-0.5 rounded-full text-11 font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
@@ -575,6 +576,9 @@ export default function BroadcastPage() {
         </p>
       </div>
 
+      {/* ─── Scroll region: composer + history (the only part that scrolls on md+) ─── */}
+      <div className="md:flex-1 md:min-h-0 md:overflow-y-auto custom-scrollbar md:pr-1 md:pb-1">
+      <div ref={topRef} className="space-y-8">
       {editingId && (
         <div className="p-3 rounded-xl border border-primary/30 bg-primary/10 flex items-center justify-between gap-3 text-13 text-text">
           <span className="flex items-center gap-2">
@@ -653,18 +657,21 @@ export default function BroadcastPage() {
               </div>
               <div>
                 <span className="text-11 text-text-muted block mb-0.5">Language</span>
-                <select
-                  value={language}
-                  onChange={(e) => setLanguage(e.target.value)}
-                  className="w-full p-2 rounded-lg border border-border bg-surface-muted text-text focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
-                >
-                  <option value="">Any language</option>
-                  {CUSTOMER_LANGUAGES.map((l) => (
-                    <option key={l} value={l}>
-                      {languageLabel(l)}
-                    </option>
-                  ))}
-                </select>
+                <div className="relative">
+                  <select
+                    value={language}
+                    onChange={(e) => setLanguage(e.target.value)}
+                    className="w-full pl-3 pr-8 py-2 appearance-none rounded-lg border border-border bg-surface-muted text-12 text-text focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
+                  >
+                    <option value="">Any language</option>
+                    {CUSTOMER_LANGUAGES.map((l) => (
+                      <option key={l} value={l}>
+                        {languageLabel(l)}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted" aria-hidden />
+                </div>
                 <FieldError message={fieldErrors.language} />
               </div>
             </div>
@@ -797,26 +804,29 @@ export default function BroadcastPage() {
                 >
                   Approved WhatsApp Template
                 </label>
-                <select
-                  id="broadcast-template"
-                  value={templateId}
-                  onChange={(e) => {
-                    setTemplateId(e.target.value);
-                    setFieldErrors((prev) => ({ ...prev, templateId: "" }));
-                  }}
-                  className="w-full p-2.5 rounded-xl border border-border bg-surface-muted text-13 font-medium text-text focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
-                >
-                  {!activeTemplate && (
-                    <option value={templateId} disabled>
-                      {templateId ? "Template not available" : "Choose a template"}
-                    </option>
-                  )}
-                  {approvedTemplates.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.name} ({humanize(t.category)})
-                    </option>
-                  ))}
-                </select>
+                <div className="relative">
+                  <select
+                    id="broadcast-template"
+                    value={templateId}
+                    onChange={(e) => {
+                      setTemplateId(e.target.value);
+                      setFieldErrors((prev) => ({ ...prev, templateId: "" }));
+                    }}
+                    className="w-full pl-3 pr-9 py-2.5 appearance-none rounded-xl border border-border bg-surface-muted text-13 font-medium text-text focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
+                  >
+                    {!activeTemplate && (
+                      <option value={templateId} disabled>
+                        {templateId ? "Template not available" : "Choose a template"}
+                      </option>
+                    )}
+                    {approvedTemplates.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name} ({humanize(t.category)})
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" aria-hidden />
+                </div>
                 <FieldError message={fieldErrors.templateId} />
               </div>
 
@@ -1114,6 +1124,9 @@ export default function BroadcastPage() {
             onPage={setHistoryPage}
           />
         )}
+      </div>
+
+      </div>
       </div>
 
       {/* ─── Confirmation Modal ───────────────────────────────────────────────── */}

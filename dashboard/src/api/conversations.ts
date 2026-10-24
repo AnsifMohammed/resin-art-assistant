@@ -6,6 +6,7 @@ import type {
   ReplyRequest,
   ReplyResponse,
   ResolveResponse,
+  ConversationOrdersResponse,
 } from "../types/index.ts";
 import { api } from "./client.ts";
 
@@ -18,6 +19,10 @@ export const listConversations = (params: ConversationListParams = {}, signal?: 
 /** GET /conversations/:id (admin: any; staff: only with an open escalation assigned to them or unassigned) */
 export const getConversation = (id: string, signal?: AbortSignal) =>
   api.get<ConversationDetailResponse>(`/conversations/${enc(id)}`, undefined, signal);
+
+/** GET /conversations/:id/orders (admin + assigned staff) */
+export const getConversationOrders = (id: string, signal?: AbortSignal) =>
+  api.get<ConversationOrdersResponse>(`/conversations/${enc(id)}/orders`, undefined, signal);
 
 /** POST /conversations/:id/reply — body is { text } or { templateId, variables? } */
 export const replyToConversation = (id: string, body: ReplyRequest) =>

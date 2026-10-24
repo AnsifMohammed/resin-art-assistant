@@ -1,3 +1,4 @@
+import { AlertCircle } from "lucide-react";
 import { Badge } from "../ui/Badge.tsx";
 import { cn } from "../../lib/cn.ts";
 import { escalationReasonColor, escalationReasonLabel } from "../../lib/escalationReasons.ts";
@@ -7,7 +8,8 @@ export function EscalationBadge({ reason, className }: { reason: EscalationReaso
   const label = escalationReasonLabel(reason);
   return (
     <Badge className={cn(escalationReasonColor(reason), className)} title={`Escalation reason: ${label}`}>
-      {label}
+      <AlertCircle className="h-2.5 w-2.5 shrink-0" aria-hidden />
+      <span>{label}</span>
     </Badge>
   );
 }

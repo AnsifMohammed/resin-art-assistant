@@ -2,7 +2,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   createProduct,
   deleteProduct,
-  getProduct,
   getProducts,
   type ProductsQuery,
   updateProduct,
@@ -15,15 +14,6 @@ export function useProducts(query?: ProductsQuery) {
   return useQuery({
     queryKey: queryKeys.products.list(query?.active),
     queryFn: ({ signal }) => getProducts(query, signal),
-  });
-}
-
-/** GET /products/:id */
-export function useProduct(id: string | null | undefined) {
-  return useQuery({
-    queryKey: queryKeys.products.detail(id || ""),
-    queryFn: ({ signal }) => getProduct(id!, signal),
-    enabled: Boolean(id),
   });
 }
 

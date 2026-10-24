@@ -162,6 +162,24 @@ Same access rule. Sets `state = "ai_active"`, sets `resolvedAt/resolvedByUserId`
 200 { conversation: { id, state: "ai_active" }, escalation: Escalation | null }
 ```
 
+### GET /conversations/:id/orders (admin + staff)
+Admin: any conversation of the business; staff: only if assigned to an open escalation or unassigned
+(`staffCanAccessConversation`), else `403 FORBIDDEN` ("Not assigned to you").
+Returns non-deleted orders for that conversation's customer (`orders.customerId = conversation.customerId`), newest first. Read-only.
+```ts
+200 {
+  orders: Array<{
+    id: string,
+    orderNo: string,
+    status: OrderStatus,
+    totalAmount: number,
+    createdAt: string,
+    expectedDeliveryDate: string | null,
+    items: Array<{ productName: string, quantity: number }>
+  }>
+}
+```
+
 ## Message templates
 
 Ready-made messages inserted into replies. `{variableName}` placeholders (`\w+`); `variables` is always computed from
@@ -427,8 +445,44 @@ connections are closed with code `4403` (on every API process).
 ## Settings (admin only)
 
 ### GET /settings
-`200 { paused: boolean, channels: Array<{ id, type, identifier, status, tokenExpiresAt }> }`
-(`paused` is stored as `businesses.settings.automation_paused`.)
+```ts
+200 {
+  paused: boolean,                       // businesses.settings.automation_paused
+  channels: Array<{ id, type, identifier, status, tokenExpiresAt }>,
+  businessHours: {
+    enabled: boolean,                    // default false
+    open: "HH:mm",                       // 24h, default "09:00"
+    close: "HH:mm",                      // 24h, default "21:00"; always after open
+    days: Array<"mon"|"tue"|"wed"|"thu"|"fri"|"sat"|"sun">  // default all 7; returned in week order
+  },
+  awayMessage: {
+    enabled: boolean,                    // default false
+    text: string                         // 1–500 chars, default "Hi! We're closed right now 🌙 We'll reply as soon as we're back."
+  },
+  windowAlerts: {
+    enabled: boolean,                    // default false
+    thresholdMinutes: 60 | 120 | 240,    // default 120
+    target: "push" | "whatsapp"          // default "push"
+  }
+}
+```
+Missing (or unreadable) stored sections are returned with the defaults above, field by field.
+Storage: `businesses.settings` jsonb keys `business_hours`, `away_message`, `window_alerts` (values camelCase as above),
+next to `automation_paused`.
+
+> **Stored only.** Business hours, the away message and window alerts are saved and returned, but nothing acts on them
+> yet: no away message is sent outside business hours and no 24h-window alerts are sent.
+
+### PATCH /settings
+Body (strict — unknown keys → 400): `{ businessHours?, awayMessage?, windowAlerts? }`, at least one section.
+Each section may be partial; it is merged onto the current (or default) value and the **merged** result is validated:
+`open`/`close` must be `HH:mm` 24h (`00:00`–`23:59`) with `close > open`; `days` non-empty, unique, from the 7 day codes;
+`text` trimmed, 1–500 chars; `thresholdMinutes` ∈ {60, 120, 240}; `target` ∈ {"push", "whatsapp"}.
+Errors: `400 { error: "Validation failed", code: "VALIDATION_ERROR", details: [{ path: "businessHours.close", message }] }`.
+Only the changed sections are written (atomic jsonb `||` merge), so `automation_paused` and any other keys are kept.
+Audit `settings_updated` with `details: { changed: ["businessHours", ...], <section>: <new value> }`.
+Emits `settings:updated` `{ paused }` to admins (payload unchanged; refetch `GET /settings` on it).
+`200` → the full `GET /settings` shape.
 
 ### POST /settings/pause
 Body `{ paused: boolean }`. Audit `automation_paused` / `automation_resumed`. Emits `settings:updated` to admins.
@@ -449,27 +503,77 @@ Sets `updatedByUserId`, invalidates the Redis KB cache, audit `knowledge_base_up
 ## Analytics (admin only)
 
 ### GET /analytics
-Query: `from?`, `to?` (ISO; default last 7 days).
+Query: `from?`, `to?` (ISO-8601; default `to = now`, `from = now − 7 days`; `from > to` → 400),
+`channel?`: `"whatsapp" | "instagram"` (anything else → 400).
+
+Channel filter (when set): messages by their conversation's channel type, escalations by their conversation's channel
+type, orders by `orders.channel`. It applies to every field **except** `channels`, which is always computed for both
+channels. `byChannel` follows the filter (the other channel reads 0). `attention` and `orders.pending` are filtered too.
+
+Previous period = the same length immediately before `from`: `[from − (to − from), from)`.
+Days are IST calendar days (`Asia/Kolkata`), `"YYYY-MM-DD"`, one entry for **every** day from `from` to `to`
+(inclusive, zero-filled). Money is in whole rupees (rounded numbers).
 ```ts
 200 {
-  from, to,
+  from: string, to: string,
   messages: { total, inbound, outbound },
-  autoReplies: number,
-  escalations: number,
-  autoReplyRate: number,            // 0..1
-  escalationRate: number,           // 0..1
-  avgResponseTimeSeconds: number | null,
-  avgHumanResponseTimeSeconds?: number | null,
-  byChannel?: { instagram: { inbound, outbound }, whatsapp: { inbound, outbound } },
-  byReason?: { [reason]: number },
-  daily?: Array<{ date: "YYYY-MM-DD", inbound, autoReplies, escalations }>
+  autoReplies: number,                 // messages with senderType "ai"
+  escalations: number,                 // escalations created in range
+  autoReplyRate: number,               // 0..1 = autoReplies / (autoReplies + escalations); 0 when both are 0
+  escalationRate: number,              // 0..1 = escalations / (autoReplies + escalations); 0 when both are 0
+  avgResponseTimeSeconds: number | null, // average escalation RESOLUTION time (createdAt → resolvedAt) of escalations
+                                         // created in range and resolved; null when none resolved
+  byChannel: { whatsapp: { inbound, outbound }, instagram: { inbound, outbound } },
+  byReason: { [reason]: number },
+
+  messagesDaily: Array<{ date: "YYYY-MM-DD", inbound: number, outbound: number }>,
+  revenue: {
+    total: number,                     // sum(orders.totalAmount): createdAt in range, not deleted, status <> cancelled
+    previous: number,                  // same, previous period
+    daily: Array<{ date: "YYYY-MM-DD", revenue: number, orders: number }>  // orders = count of those orders
+  },
+  orders: {
+    total: number,                     // count of non-deleted, non-cancelled orders created in range (same rule as revenue.daily)
+    previousTotal: number,             // same, previous period
+    confirmed: number,                 // orders in range with status confirmed|in_production|ready|dispatched|delivered
+    previousConfirmed: number,         // same, previous period
+    pending: number                    // CURRENT non-deleted orders with status pending (not range-bound)
+  },
+  channels: {                          // in range, both channels regardless of ?channel
+    whatsapp:  { messages: number, revenue: number, orders: number },
+    instagram: { messages: number, revenue: number, orders: number }
+  },                                   // messages = inbound + outbound; revenue/orders as in `revenue`
+  topProducts: Array<{                 // ALL items sold in range (no limit), sorted by revenue desc
+    productId: string | null,          // grouped by productId, or by productName when productId is null
+    name: string,                      // current product name, else the order item's productName
+    imageUrl: string | null,           // products.images[0] when productId matches a product
+    units: number,                     // sum(quantity)
+    revenue: number                    // sum(quantity × unitPrice)
+  }>,                                  // (non-deleted items of non-deleted, non-cancelled orders in range)
+  attention: {                         // CURRENT values, not range-bound
+    openEscalations: number,           // unresolved escalations
+    oldestOpenEscalationAt: string | null, // ISO timestamp of the oldest unresolved escalation (or null)
+    windowsClosingSoon: number,        // conversations in escalated|owner_handling with windowClosesAt in [now, now + 2h]
+    pendingOrders: number,             // = orders.pending
+    unpaidBalance: number              // Σ over non-deleted, non-cancelled orders of max(0, totalAmount − Σ paid payments)
+  },
+  trends: Record<"revenue" | "orders" | "messages" | "autoReplyRate" | "avgResponseTimeSeconds",
+                 { current: number, previous: number, changePct: number | null }>,
+    // revenue = revenue.total/previous; orders = orders.total/previousTotal;
+    // messages = messages.total vs previous period; autoReplyRate = rate (0..1) vs previous period rate;
+    // avgResponseTimeSeconds: null → 0 in current/previous, changePct null if either is null.
+    // changePct = round((current − previous) / previous × 100); null when previous is 0 (or null).
+  repliesBySender: { ai: number, owner: number, staff: number, system: number },  // outbound messages in range
+  delivery: { failed: number, read: number }   // outbound messages in range with deliveryStatus failed / read
 }
 ```
 
 ## Audit log (admin only)
 
 ### GET /audit-log
-Query: `page?`, `limit?`, `actorId?`, `action?`. Newest first.
+Query: `page?`, `limit?`, `actorId?`, `action?` (exact), `actorType?` (`"admin"|"staff"|"ai"|"system"`),
+`actionPrefix?` (1–100 chars, e.g. `order_` or `payment_` → `action LIKE 'order\_%'`; `%`, `_` and `\` are escaped).
+All filters combine with AND. Newest first.
 `200 { entries: AuditLogEntry[], pagination: { page, limit, total } }` — include `actorName` (joined from users) if cheap.
 
 ## Push
@@ -529,7 +633,7 @@ queries every 5 s (polling fallback), and it refetches once after a reconnect.
 | `escalation:new` | admins + all staff | `{ escalationId, conversationId, reason, customerName }` | every escalation creation path (AI decision, `window_closed`, `parse_error` after failures / dead letter) |
 | `escalation:assigned` | admins | `{ escalationId, conversationId, assignedToUserId: string\|null }` | `POST /escalations/:id/assign` (assign, reassign, unassign) |
 | `escalation:assigned:<userId>` | that staff member only | same as `escalation:assigned` | when they become the assignee, and when they stop being it (reassign/unassign) |
-| `settings:updated` | admins | `{ paused: boolean }` | `POST /settings/pause` |
+| `settings:updated` | admins | `{ paused: boolean }` | `POST /settings/pause`, `PATCH /settings` |
 | `customer:updated` | admins | `{ customerId }` | `PATCH /customers/:id` (when something changed), STOP/START keyword opt-out/in |
 | `broadcast:updated` | admins | `{ broadcastId, status: BroadcastStatus, stats: BroadcastStats }` | every status change (create, schedule, send, dispatch, cancel, finish, fail) and sending/receipt progress (progress throttled to ≤ 1 per 2 s per broadcast, with a trailing emit) |
 | `subscription:revoked` | the affected staff member | `{ event: "message:new:<id>", conversationId }` | their access ended (resolved, reassigned to someone else); the subscription is dropped |
