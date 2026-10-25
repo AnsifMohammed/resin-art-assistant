@@ -156,3 +156,27 @@ describe("splitInstagramText", () => {
     }
   });
 });
+
+describe("fetchInstagramDisplayName", () => {
+  it("returns 'Name (@username)' from the profile API", async () => {
+    fetchMock.mockResolvedValue(json({ name: "Vj Allan", username: "vj_allan05", id: "2201" }));
+    await expect(ig.fetchInstagramDisplayName("2201")).resolves.toBe("Vj Allan (@vj_allan05)");
+    const [url, init] = call();
+    expect(url).toContain("/2201?fields=name,username");
+    expect((init.headers as Record<string, string>).Authorization).toBe("Bearer env-ig-token");
+  });
+
+  it("falls back to @username or name", async () => {
+    fetchMock.mockResolvedValueOnce(json({ username: "only_handle" }));
+    await expect(ig.fetchInstagramDisplayName("1")).resolves.toBe("@only_handle");
+    fetchMock.mockResolvedValueOnce(json({ name: "Only Name" }));
+    await expect(ig.fetchInstagramDisplayName("2")).resolves.toBe("Only Name");
+  });
+
+  it("returns null instead of throwing on Meta errors or network failures", async () => {
+    fetchMock.mockResolvedValueOnce(metaError(100, undefined, 400));
+    await expect(ig.fetchInstagramDisplayName("3")).resolves.toBeNull();
+    fetchMock.mockRejectedValueOnce(new TypeError("fetch failed"));
+    await expect(ig.fetchInstagramDisplayName("4")).resolves.toBeNull();
+  });
+});

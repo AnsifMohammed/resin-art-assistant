@@ -125,6 +125,41 @@ export async function resolveInstagramToken(businessId: string = config.BUSINESS
   throw new AppError(503, "Instagram is not connected for this business", "INSTAGRAM_NOT_CONFIGURED");
 }
 
+/** Profile lookups run inside webhook handling, so they get a short timeout. */
+const PROFILE_TIMEOUT_MS = 3000;
+
+/**
+ * Display name for an Instagram customer from the User Profile API
+ * (GET /{IGSID}?fields=name,username): "Name (@username)", "@username" or "Name".
+ * Best effort: returns null on any failure so webhook handling never breaks.
+ */
+export async function fetchInstagramDisplayName(
+  igsid: string,
+  businessId: string = config.BUSINESS_ID,
+): Promise<string | null> {
+  try {
+    const token = await resolveInstagramToken(businessId);
+    const url = `${INSTAGRAM_GRAPH_HOST}/${INSTAGRAM_GRAPH_VERSION}/${encodeURIComponent(igsid)}?fields=name,username`;
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(PROFILE_TIMEOUT_MS),
+    });
+    if (!res.ok) {
+      logger.warn({ status: res.status }, "Instagram profile lookup failed");
+      return null;
+    }
+    const body = (await res.json()) as { name?: unknown; username?: unknown };
+    const name = typeof body.name === "string" ? body.name.trim() : "";
+    const username = typeof body.username === "string" ? body.username.trim() : "";
+    if (name && username) return `${name} (@${username})`;
+    if (username) return `@${username}`;
+    return name || null;
+  } catch (err) {
+    logger.warn({ errName: err instanceof Error ? err.name : "unknown" }, "Instagram profile lookup failed");
+    return null;
+  }
+}
+
 /**
  * Split text into chunks of at most `maxBytes` UTF-8 bytes, preferring to cut at
  * a line break or space. Malayalam is 3 bytes per character, so ~330 characters
