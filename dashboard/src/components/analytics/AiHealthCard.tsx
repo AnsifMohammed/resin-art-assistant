@@ -3,11 +3,22 @@ import { useNavigate } from "react-router-dom";
 import { ArrowUpRight, TrendingUp, TrendingDown } from "lucide-react";
 import { useCockpitMode, useElementHeight } from "./cockpit.tsx";
 
-/** One reason block (text line + 6px gap + bar), the gap between blocks, and the
- *  "Why chats were escalated" heading (h-4) + its 6px gap. */
+/** One reason block (text line + 6px gap + bar), the gap between blocks, the
+ *  "Why chats were escalated" heading (h-4) + its 6px gap, and the list shell's
+ *  vertical padding + border. */
 const REASON_ROW_PX = 34;
 const REASON_GAP_PX = 8;
 const REASON_HEADING_PX = 16 + 6;
+const REASON_SHELL_PX = 16 + 2;
+
+/** Single-screen layout: how many reason rows fit in the measured reasons area (heading + list box).
+ *  Shared with AnalyticsSkeleton so the loading state follows the real list. */
+export function fittingReasonRows(areaH: number): number {
+  return Math.max(
+    0,
+    Math.floor((areaH - REASON_HEADING_PX - REASON_SHELL_PX + REASON_GAP_PX) / (REASON_ROW_PX + REASON_GAP_PX))
+  );
+}
 
 export interface EscalationReasonStat {
   /** Raw escalation_reason value (used for the escalations link). */
@@ -64,17 +75,7 @@ export function AiHealthCard({
   // The measured area is the whole section (heading + list), so hiding the heading
   // when nothing fits cannot feed back into the measurement.
   const reasonsAreaH = useElementHeight(reasonsAreaRef, cockpit);
-  const activeReasons = cockpit
-    ? allReasons.slice(
-        0,
-        Math.max(
-          0,
-          Math.floor(
-            (reasonsAreaH - REASON_HEADING_PX + REASON_GAP_PX) / (REASON_ROW_PX + REASON_GAP_PX)
-          )
-        )
-      )
-    : allReasons;
+  const activeReasons = cockpit ? allReasons.slice(0, fittingReasonRows(reasonsAreaH)) : allReasons;
 
   // Three mini stat tiles — always shown so the card keeps its shape; "—" when there is no value.
   const tiles: Array<{ label: string; value: string }> = [
@@ -189,7 +190,12 @@ export function AiHealthCard({
           </div>
         )}
 
-        <div className="flex flex-col gap-2">
+        {activeReasons.length > 0 && (
+        <div
+          className={`rounded-lg border border-border/60 bg-surface-muted/50 px-3 py-2 flex flex-col gap-2 ${
+            cockpit ? "flex-1 min-h-0 justify-evenly" : ""
+          }`}
+        >
           {activeReasons.map((r, i) => {
             const barPct = Math.min(100, Math.round((r.percentage / maxReasonPct) * 100));
             return (
@@ -224,6 +230,7 @@ export function AiHealthCard({
             );
           })}
         </div>
+        )}
       </div>
     </div>
   );

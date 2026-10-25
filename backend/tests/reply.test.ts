@@ -160,6 +160,15 @@ describe("POST /conversations/:id/reply", () => {
     expect(rt.emitConversationUpdated).toHaveBeenCalledWith("biz-1", { conversationId: "conv-1", state: "owner_handling", tag: null });
   });
 
+  it("stores Meta's message id on the sent row so the Instagram echo is de-duplicated", async () => {
+    sendMessage.mockResolvedValue({ metaMessageId: "ig.mid.reply" });
+    const res = await postReply(adminToken);
+
+    expect(res.statusCode).toBe(201);
+    expect(state.updates).toContainEqual({ table: "messages", vals: { deliveryStatus: "sent", metaMessageId: "ig.mid.reply" } });
+    expect(res.json().message).toMatchObject({ deliveryStatus: "sent", metaMessageId: "ig.mid.reply" });
+  });
+
   it("uses whatsapp when the conversation's channel is whatsapp", async () => {
     state.channel = { id: "chan-1", type: "whatsapp" };
     await postReply(adminToken);

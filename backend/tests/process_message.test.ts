@@ -268,6 +268,16 @@ describe("processMessageJob: outcomes", () => {
     expect(rt.emitEscalationNew).not.toHaveBeenCalled();
   });
 
+  it("stores Meta's message id on the AI reply so its echo never flips the conversation to owner_handling", async () => {
+    processAiDecision.mockResolvedValue(autoReply);
+    sendMessage.mockResolvedValue({ metaMessageId: "ig.mid.ai" });
+
+    await processMessageJob(params);
+
+    expect(state.updates).toContainEqual({ table: "messages", vals: { deliveryStatus: "sent", metaMessageId: "ig.mid.ai" } });
+    expect(rt.emitMessageNew.mock.calls[0]![0]).toMatchObject({ deliveryStatus: "sent", metaMessageId: "ig.mid.ai" });
+  });
+
   it("sends on the conversation's own channel type (not hardcoded whatsapp)", async () => {
     state.channel = { id: "chan-1", type: "instagram" };
     processAiDecision.mockResolvedValue(autoReply);
