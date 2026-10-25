@@ -62,7 +62,9 @@ export type AiIntent =
   | "refund"
   | "unknown"
   | "off_topic"
-  | "greeting";
+  | "greeting"
+  | "product_info"
+  | "business_info";
 
 export type LanguageDetected = "english" | "malayalam" | "manglish";
 
