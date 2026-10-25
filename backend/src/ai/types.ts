@@ -10,6 +10,7 @@ export const intentEnum = z.enum([
   "refund",
   "unknown",
   "off_topic",
+  "greeting",
 ]);
 
 export const tagEnum = z.enum([

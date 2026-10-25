@@ -13,7 +13,8 @@ export const GEMINI_TIMEOUT_MS = 20_000;
 export const GEMINI_MAX_RETRIES = 2;
 /** Output cap for one decision (the JSON is small; thinking is disabled below). */
 export const GEMINI_MAX_OUTPUT_TOKENS = 1000;
-export const GEMINI_TEMPERATURE = 0.2;
+// Some variety so replies don't repeat word for word; facts stay pinned by the prompt rules.
+export const GEMINI_TEMPERATURE = 0.6;
 
 /**
  * A key that doesn't look like a real Gemini key (dummy/placeholder values).
