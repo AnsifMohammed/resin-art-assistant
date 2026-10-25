@@ -53,13 +53,13 @@ describe("AI pipeline", () => {
     expect(pipeline.isPlaceholderKey("AQ." + "x".repeat(50))).toBe(false);
   });
 
-  it("requests JSON structured output derived from the Zod schema, low temperature, no thinking", async () => {
+  it("requests JSON structured output derived from the Zod schema, configured temperature, no thinking", async () => {
     generateContent.mockResolvedValue(textResponse("not json"));
     await pipeline.processAiDecision({ businessId: "b", incomingText: "hi" });
     const cfg = generateContent.mock.lastCall![0].config;
     expect(cfg).toMatchObject({
       responseMimeType: "application/json",
-      temperature: 0.2,
+      temperature: pipeline.GEMINI_TEMPERATURE,
       maxOutputTokens: 1000,
       thinkingConfig: { thinkingBudget: 0 },
     });
