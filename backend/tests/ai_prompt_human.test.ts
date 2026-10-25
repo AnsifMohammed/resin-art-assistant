@@ -55,3 +55,11 @@ describe("new auto-reply intents", () => {
     expect(res.escalate_reason).toBe("missing_facts");
   });
 });
+
+describe("thinkingConfigFor", () => {
+  it("turns thinking off per model generation", async () => {
+    const { thinkingConfigFor } = await import("../src/ai/pipeline.ts");
+    expect(thinkingConfigFor("gemini-2.5-flash")).toEqual({ thinkingBudget: 0 });
+    expect(thinkingConfigFor("gemini-3.5-flash-lite")).toEqual({ thinkingLevel: "MINIMAL" });
+  });
+});

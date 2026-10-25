@@ -1,4 +1,4 @@
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, ThinkingLevel, type ThinkingConfig } from "@google/genai";
 import { config } from "../config.ts";
 import { logger } from "../lib/logger.ts";
 import {
@@ -40,6 +40,14 @@ export const aiDecisionJsonSchema: Record<string, unknown> = (() => {
   const { $schema: _ignored, ...schema } = z.toJSONSchema(aiDecisionSchema) as Record<string, unknown>;
   return schema;
 })();
+
+/**
+ * Gemini 2.x turns thinking off with `thinkingBudget: 0`; Gemini 3+ rejects that
+ * (400 INVALID_ARGUMENT) and takes `thinkingLevel: "minimal"` instead.
+ */
+export function thinkingConfigFor(model: string): ThinkingConfig {
+  return /^gemini-[12](\.|-)/.test(model) ? { thinkingBudget: 0 } : { thinkingLevel: ThinkingLevel.MINIMAL };
+}
 
 /** The keyword mock is ONLY used in DEMO_MODE without a real API key. */
 export const useMockDecisions = config.DEMO_MODE && isPlaceholderKey(config.GEMINI_API_KEY);
@@ -234,9 +242,9 @@ export async function processAiDecision(params: {
         responseJsonSchema: aiDecisionJsonSchema,
         temperature: GEMINI_TEMPERATURE,
         maxOutputTokens: GEMINI_MAX_OUTPUT_TOKENS,
-        // gemini-2.5-flash thinks by default and thinking tokens count against
-        // maxOutputTokens; disable it so the budget goes to the JSON answer.
-        thinkingConfig: { thinkingBudget: 0 },
+        // Thinking tokens count against maxOutputTokens; keep thinking off/minimal
+        // so the budget goes to the JSON answer.
+        thinkingConfig: thinkingConfigFor(config.GEMINI_MODEL),
       },
     });
 
