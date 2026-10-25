@@ -1346,12 +1346,12 @@ export default function Orders() {
                     <h4 className="font-semibold text-text">{liveActiveOrder.customerName}</h4>
                   ) : (
                     <div>
-                      <label className="text-[10px] text-text-muted">Customer Name</label>
+                      <label className="block text-12 font-medium text-text-muted mb-1">Customer Name</label>
                       <input
                         type="text"
                         value={editCustomerName}
                         onChange={(e) => setEditCustomerName(e.target.value)}
-                        className="w-full px-2 py-1 rounded border border-border bg-surface text-12 text-text font-semibold focus:outline-none"
+                        className="w-full h-10 px-3 rounded-lg border border-border bg-surface text-14 text-text font-semibold focus:outline-none focus:border-primary"
                       />
                     </div>
                   )}
@@ -1365,7 +1365,7 @@ export default function Orders() {
                         placeholder="Phone / Handle"
                         value={editCustomerPhone}
                         onChange={(e) => setEditCustomerPhone(e.target.value)}
-                        className="px-2 py-0.5 rounded border border-border bg-surface text-11 text-text focus:outline-none"
+                        className="h-9 px-3 rounded-lg border border-border bg-surface text-13 text-text focus:outline-none focus:border-primary"
                       />
                     )}
                   </div>
@@ -1452,53 +1452,53 @@ export default function Orders() {
                   </>
                 ) : (
                   /* Editable Shipping Inputs */
-                  <div className="space-y-2 pt-1">
+                  <div className="space-y-3 pt-1">
                     <div>
-                      <label className="text-[10px] text-text-muted">Shipping Address</label>
+                      <label className="block text-12 font-medium text-text-muted mb-1">Shipping Address</label>
                       <textarea
                         rows={2}
                         value={editShippingAddress}
                         onChange={(e) => setEditShippingAddress(e.target.value)}
-                        className="w-full px-2 py-1 rounded border border-border bg-surface text-12 text-text focus:outline-none"
+                        className="w-full px-3 py-2 rounded-lg border border-border bg-surface text-14 text-text focus:outline-none focus:border-primary"
                       />
                     </div>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <label className="text-[10px] text-text-muted">Courier</label>
+                        <label className="block text-12 font-medium text-text-muted mb-1">Courier</label>
                         <input
                           type="text"
                           placeholder="e.g. Shiprocket (DTDC)"
                           value={editCourier}
                           onChange={(e) => setEditCourier(e.target.value)}
-                          className="w-full px-2 py-1 rounded border border-border bg-surface text-12 text-text focus:outline-none"
+                          className="w-full h-10 px-3 rounded-lg border border-border bg-surface text-14 text-text focus:outline-none focus:border-primary"
                         />
                       </div>
                       <div>
-                        <label className="text-[10px] text-text-muted">Tracking ID</label>
+                        <label className="block text-12 font-medium text-text-muted mb-1">Tracking ID</label>
                         <input
                           type="text"
                           value={editTrackingId}
                           onChange={(e) => setEditTrackingId(e.target.value)}
-                          className="w-full px-2 py-1 rounded border border-border bg-surface text-12 text-text focus:outline-none"
+                          className="w-full h-10 px-3 rounded-lg border border-border bg-surface text-14 text-text focus:outline-none focus:border-primary"
                         />
                       </div>
                     </div>
                     <div>
-                      <label className="text-[10px] text-text-muted">Expected Delivery Date</label>
+                      <label className="block text-12 font-medium text-text-muted mb-1">Expected Delivery Date</label>
                       <input
                         type="date"
                         value={editExpectedDate}
                         onChange={(e) => setEditExpectedDate(e.target.value)}
-                        className="w-full px-2 py-1 rounded border border-border bg-surface text-12 text-text focus:outline-none"
+                        className="w-full h-10 px-3 rounded-lg border border-border bg-surface text-14 text-text focus:outline-none focus:border-primary"
                       />
                     </div>
                     <div>
-                      <label className="text-[10px] text-text-muted">Customer Notes</label>
+                      <label className="block text-12 font-medium text-text-muted mb-1">Customer Notes</label>
                       <input
                         type="text"
                         value={editCustomerNotes}
                         onChange={(e) => setEditCustomerNotes(e.target.value)}
-                        className="w-full px-2 py-1 rounded border border-border bg-surface text-12 text-text focus:outline-none"
+                        className="w-full h-10 px-3 rounded-lg border border-border bg-surface text-14 text-text focus:outline-none focus:border-primary"
                       />
                     </div>
                   </div>
@@ -1583,30 +1583,30 @@ export default function Orders() {
                           </button>
                         )}
                         <div>
-                          <label className="text-[10px] text-text-muted">Product Name</label>
+                          <label className="block text-12 font-medium text-text-muted mb-1">Product Name</label>
                           <input
                             type="text"
                             required
                             placeholder="Product Name"
                             value={item.productName}
                             onChange={(e) => handleEditItemChange(idx, "productName", e.target.value)}
-                            className="w-full px-2 py-1 rounded border border-border bg-surface text-12 text-text font-medium focus:outline-none"
+                            className="w-full h-10 px-3 rounded-lg border border-border bg-surface text-14 text-text font-medium focus:outline-none focus:border-primary"
                           />
                         </div>
-                        <div className="grid grid-cols-3 gap-2">
+                        <div className="grid grid-cols-3 gap-3">
                           <div>
-                            <label className="text-[10px] text-text-muted">Quantity</label>
+                            <label className="block text-12 font-medium text-text-muted mb-1">Quantity</label>
                             <input
                               type="number"
                               min="1"
                               placeholder="1"
                               value={item.quantity}
                               onChange={(e) => handleEditItemChange(idx, "quantity", e.target.value)}
-                              className="w-full px-2 py-1 rounded border border-border bg-surface text-12 text-text focus:outline-none"
+                              className="w-full h-10 px-3 rounded-lg border border-border bg-surface text-14 text-text focus:outline-none focus:border-primary"
                             />
                           </div>
                           <div>
-                            <label className="text-[10px] text-text-muted">Unit Price (₹)</label>
+                            <label className="block text-12 font-medium text-text-muted mb-1">Unit Price (₹)</label>
                             <input
                               type="number"
                               min="0"
@@ -1614,12 +1614,12 @@ export default function Orders() {
                               placeholder="0.00"
                               value={item.unitPrice}
                               onChange={(e) => handleEditItemChange(idx, "unitPrice", e.target.value)}
-                              className="w-full px-2 py-1 rounded border border-border bg-surface text-12 text-text focus:outline-none"
+                              className="w-full h-10 px-3 rounded-lg border border-border bg-surface text-14 text-text focus:outline-none focus:border-primary"
                             />
                           </div>
                           <div className="flex flex-col justify-end">
-                            <label className="text-[10px] text-text-muted">Line Total</label>
-                            <span className="text-12 font-bold font-outfit text-text py-1">
+                            <label className="block text-12 font-medium text-text-muted mb-1">Line Total</label>
+                            <span className="h-10 flex items-center text-14 font-bold font-outfit text-text">
                               ₹{((parseInt(String(item.quantity), 10) || 0) * (parseFloat(String(item.unitPrice)) || 0)).toLocaleString("en-IN")}
                             </span>
                           </div>
@@ -1630,7 +1630,7 @@ export default function Orders() {
                             placeholder="Customizations (optional)"
                             value={item.productDescription}
                             onChange={(e) => handleEditItemChange(idx, "productDescription", e.target.value)}
-                            className="w-full px-2 py-0.5 rounded border border-border bg-surface text-11 text-text-muted focus:outline-none"
+                            className="w-full h-9 px-3 rounded-lg border border-border bg-surface text-13 text-text-muted focus:outline-none focus:border-primary"
                           />
                         </div>
                       </div>
@@ -1651,7 +1651,7 @@ export default function Orders() {
                         placeholder="0"
                         value={editDeliveryCharge}
                         onChange={(e) => setEditDeliveryCharge(e.target.value)}
-                        className="w-24 px-2 py-0.5 rounded border border-border bg-surface text-right text-12 text-text"
+                        className="w-28 h-9 px-3 rounded-lg border border-border bg-surface text-right text-14 text-text focus:outline-none focus:border-primary"
                       />
                     </div>
                     <div className="flex items-center justify-between">
@@ -1662,7 +1662,7 @@ export default function Orders() {
                         placeholder="0"
                         value={editDiscountAmount}
                         onChange={(e) => setEditDiscountAmount(e.target.value)}
-                        className="w-24 px-2 py-0.5 rounded border border-border bg-surface text-right text-12 text-text"
+                        className="w-28 h-9 px-3 rounded-lg border border-border bg-surface text-right text-14 text-text focus:outline-none focus:border-primary"
                       />
                     </div>
                     <div className="flex justify-between text-14 font-bold text-text pt-2 border-t border-border">

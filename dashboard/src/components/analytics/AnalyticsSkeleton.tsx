@@ -1,5 +1,7 @@
 import { useRef } from "react";
 import { useCockpitMode, useElementHeight } from "./cockpit.tsx";
+import { channelTableFit } from "./ChannelsCard.tsx";
+import { fittingReasonRows } from "./AiHealthCard.tsx";
 
 /**
  * Loading state for the Analytics page. Mirrors the real layout card by card AND inside each
@@ -113,6 +115,9 @@ function StatSkeleton() {
       <div className="flex items-center gap-1.5 shrink-0 min-w-0">
         <Bone className="w-6 h-6 shrink-0" />
         <TextLine h="h-[14px]" bar="h-2.5 w-20" className="hidden @min-[12rem]:flex flex-1" />
+        <span className="flex-1 @min-[12rem]:hidden" aria-hidden />
+        {/* Trend chip (StatCard shows it at the right of the top row) */}
+        <Bone className="h-[18px] w-11 rounded shrink-0" />
       </div>
       {/* Label line on narrow tiles */}
       <TextLine h="h-[14px]" bar="h-2.5 w-20" className="@min-[12rem]:hidden" />
@@ -166,10 +171,17 @@ function ChartSkeleton() {
 
 // ─── Channels ────────────────────────────────────────────────────────────────
 
+/** ChannelsCard rows: Orders, Avg order value, Messages, Orders / 100 msgs. */
+const CHANNEL_TABLE_ROWS = 4;
+const CHANNEL_ROW_LABEL_W = ["w-12", "w-24", "w-16", "w-28"];
+
 function ChannelsSkeleton() {
   const cockpit = useCockpitMode();
-  // The real table has 2 rows (Orders, Avg order value); Messages rows only appear with message data.
-  const rows = 2;
+  // Same table area and row fitting as ChannelsCard (its table always has 4 rows).
+  const tableAreaRef = useRef<HTMLDivElement>(null);
+  const tableAreaH = useElementHeight(tableAreaRef, cockpit);
+  const fit = cockpit ? channelTableFit(tableAreaH, CHANNEL_TABLE_ROWS) : null;
+  const rows = fit?.rows ?? CHANNEL_TABLE_ROWS;
 
   return (
     <div className="@container p-4 rounded-xl border border-border bg-surface flex flex-col gap-2 flex-1 min-h-0 overflow-hidden">
@@ -181,7 +193,7 @@ function ChannelsSkeleton() {
       {/* Donut + two channel boxes (same size rules as ChannelsCard) */}
       <div
         className={`flex flex-col items-center gap-3 @min-[20rem]:flex-row @min-[20rem]:items-stretch @min-[20rem]:gap-4 ${
-          cockpit ? "flex-1 min-h-0 max-h-[156px]" : "shrink-0"
+          cockpit ? "flex-1 min-h-[130px] max-h-[156px]" : "shrink-0"
         }`}
       >
         <div
@@ -219,7 +231,10 @@ function ChannelsSkeleton() {
       </div>
 
       {/* Comparison table shell: header row + rows (h-7 each) */}
-      <div className="shrink-0 mt-4">
+      <div
+        ref={tableAreaRef}
+        className={cockpit ? "flex-1 min-h-0 flex flex-col overflow-hidden" : "shrink-0 mt-4"}
+      >
         <div className="w-full rounded-lg border border-border/60 bg-surface-muted/50 overflow-hidden">
           <div className="h-7 flex items-center justify-end gap-6 pr-2.5 border-b border-border/50">
             <Bone className="h-2.5 w-[76px] rounded-sm" />
@@ -231,8 +246,9 @@ function ChannelsSkeleton() {
               className={`h-7 flex items-center justify-between pl-2.5 pr-2.5 ${
                 i < rows - 1 ? "border-b border-border/40" : ""
               }`}
+              style={fit ? { height: fit.rowH } : undefined}
             >
-              <Bone className={`h-2.5 rounded-sm ${i === 0 ? "w-12" : "w-24"}`} />
+              <Bone className={`h-2.5 rounded-sm ${CHANNEL_ROW_LABEL_W[i] ?? "w-20"}`} />
               <div className="flex items-center gap-[88px]">
                 <Bone className="h-2.5 w-8 rounded-sm" />
                 <Bone className="h-2.5 w-5 rounded-sm" />
@@ -247,8 +263,17 @@ function ChannelsSkeleton() {
 
 // ─── AI health ───────────────────────────────────────────────────────────────
 
+/** Reason rows drawn outside the single-screen layout (the real card lists every reason). */
+const LOADING_REASON_ROWS = 3;
+const REASON_LABEL_W = ["w-1/2", "w-2/5", "w-1/3"];
+const REASON_BAR_W = ["w-full", "w-3/5", "w-2/5"];
+
 function AiHealthSkeleton() {
   const cockpit = useCockpitMode();
+  // Same reasons area and row fitting as AiHealthCard.
+  const reasonsAreaRef = useRef<HTMLDivElement>(null);
+  const reasonsAreaH = useElementHeight(reasonsAreaRef, cockpit);
+  const reasonRows = cockpit ? fittingReasonRows(reasonsAreaH) : LOADING_REASON_ROWS;
 
   return (
     <div className="@container p-4 rounded-xl border border-border bg-surface flex flex-col gap-2 flex-1 min-h-0 overflow-hidden">
@@ -292,23 +317,29 @@ function AiHealthSkeleton() {
         </div>
       </div>
 
-      {/* "Why chats were escalated" + bordered list box */}
-      <div className={`flex flex-col gap-1.5 ${cockpit ? "flex-1 min-h-0 overflow-hidden" : "shrink-0"}`}>
-        <TextLine h="h-4" bar="h-2.5 w-36" className="shrink-0" />
-        <div className="flex-1 min-h-[34px] rounded-lg border border-border/60 px-3 py-[5px] flex flex-col gap-2.5 overflow-hidden">
-          {/* One row outside cockpit (the real empty state is a 34px box); a short list in cockpit mode. */}
-          {(cockpit ? ["w-1/2", "w-2/5"] : ["w-1/2"]).map((w, i) => (
-            <div key={i} className="shrink-0 flex flex-col gap-1.5">
-              <div className="flex items-center justify-between">
-                <Bone className={`h-2.5 rounded-sm ${w}`} />
-                <Bone className="h-2.5 w-7 rounded-sm" />
+      {/* "Why chats were escalated" + reasons box (same shell and spacing as AiHealthCard) */}
+      <div
+        ref={reasonsAreaRef}
+        className={`flex flex-col gap-1.5 ${cockpit ? "flex-1 min-h-0 overflow-hidden" : "shrink-0"}`}
+      >
+        {reasonRows > 0 && <TextLine h="h-4" bar="h-2.5 w-36" className="shrink-0" />}
+        {reasonRows > 0 && (
+          <div
+            className={`rounded-lg border border-border/60 bg-surface-muted/50 px-3 py-2 flex flex-col gap-2 ${
+              cockpit ? "flex-1 min-h-0 justify-evenly" : ""
+            }`}
+          >
+            {Array.from({ length: reasonRows }, (_, i) => (
+              <div key={i} className="h-[34px] shrink-0 flex flex-col justify-center gap-1.5">
+                <div className="flex items-center justify-between">
+                  <Bone className={`h-2.5 rounded-sm ${REASON_LABEL_W[i % REASON_LABEL_W.length]}`} />
+                  <Bone className="h-2.5 w-7 rounded-sm" />
+                </div>
+                <Bone className={`h-1.5 rounded-full ${REASON_BAR_W[i % REASON_BAR_W.length]}`} />
               </div>
-              <Bone className={`h-1.5 rounded-full ${i === 0 ? "w-full" : "w-3/5"}`} />
-            </div>
-          ))}
-        </div>
-        {/* AiHealthCard always renders its (here empty) reasons list after the box; keep its gap. */}
-        <div />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
