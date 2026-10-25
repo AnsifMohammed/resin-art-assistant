@@ -1,5 +1,5 @@
 import type { FastifyInstance, FastifyPluginAsync } from "fastify";
-import { and, eq } from "drizzle-orm";
+import { and, eq, gte, isNull } from "drizzle-orm";
 import { config } from "../config.ts";
 import { db } from "../db/index.ts";
 import { auditLog, channels, conversations, customers, messages } from "../db/schema.ts";
@@ -8,6 +8,7 @@ import { logger } from "../lib/logger.ts";
 import { enqueueProcessMessage } from "../queue/enqueue.ts";
 import { applyWhatsAppStatus } from "../services/deliveryReceipts.ts";
 import { handleOptKeyword } from "../services/optOut.ts";
+import { INSTAGRAM_MAX_TEXT_BYTES, splitInstagramText } from "../services/meta/instagram.ts";
 import { emitConversationUpdated, emitMessageNew } from "../realtime/events.ts";
 import {
   digitsOnly,
@@ -181,6 +182,75 @@ async function handleCustomerMessage(m: InboundCustomerMessage): Promise<void> {
   }
 }
 
+/** How far back an echo is matched against our own recent outbound messages. */
+const OWN_ECHO_LOOKBACK_MS = 10 * 60 * 1000;
+
+const isUniqueViolation = (err: unknown): boolean => {
+  const e = err as { code?: string; cause?: { code?: string } } | undefined;
+  return e?.code === "23505" || e?.cause?.code === "23505";
+};
+
+/**
+ * Meta echoes every message the business account sends, including the ones WE
+ * sent through the API (AI auto-replies, dashboard replies, acknowledgements).
+ * Those are normally de-duplicated by meta_message_id, but the echo can arrive
+ * before the send call returns and the id is stored. So an echo whose text
+ * equals one of our recent, still-queued outbound messages in this
+ * conversation (or one part of a reply we split into several Instagram
+ * messages) is treated as our own send:
+ * the id is attached to that row if it has none yet, and nothing else happens
+ * (no owner message, no owner_handling).
+ */
+async function claimOwnOutboundEcho(conversationId: string, text: string, metaMessageId: string | undefined): Promise<boolean> {
+  if (!text) return false;
+  const since = new Date(Date.now() - OWN_ECHO_LOOKBACK_MS);
+  const rows = await db
+    .select({
+      id: messages.id,
+      direction: messages.direction,
+      content: messages.content,
+      metaMessageId: messages.metaMessageId,
+      deliveryStatus: messages.deliveryStatus,
+      createdAt: messages.createdAt,
+    })
+    .from(messages)
+    .where(
+      and(
+        eq(messages.conversationId, conversationId),
+        eq(messages.direction, "outbound"),
+        gte(messages.createdAt, since),
+      ),
+    );
+  const isOwn = (r: (typeof rows)[number]): boolean => {
+    if (r.direction !== "outbound" || typeof r.content !== "string") return false;
+    if (!(r.createdAt instanceof Date) || r.createdAt < since) return false;
+    // Still in flight: the send has not returned (and stored its id) yet.
+    if (r.content === text && r.deliveryStatus === "queued" && !r.metaMessageId) return true;
+    // One part of a long reply that was split into several Instagram messages.
+    return (
+      Buffer.byteLength(r.content, "utf8") > INSTAGRAM_MAX_TEXT_BYTES &&
+      splitInstagramText(r.content).includes(text)
+    );
+  };
+  const own = rows
+    .filter(isOwn)
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];
+  if (!own) return false;
+
+  if (!own.metaMessageId && metaMessageId) {
+    try {
+      await db
+        .update(messages)
+        .set({ metaMessageId })
+        .where(and(eq(messages.id, own.id), isNull(messages.metaMessageId)));
+    } catch (err) {
+      if (!isUniqueViolation(err)) throw err;
+    }
+  }
+  logger.info({ metaMessageId, messageId: own.id, conversationId }, "Echo of our own outbound message ignored");
+  return true;
+}
+
 interface EchoMessage {
   channelType: ChannelType;
   recipientHandle: string | undefined;
@@ -207,6 +277,9 @@ async function handleEcho(m: EchoMessage): Promise<void> {
     logger.warn(logCtx, "Echo for unknown customer/conversation ignored");
     return;
   }
+
+  // Our own API send coming back: never an owner takeover.
+  if (await claimOwnOutboundEcho(conv.id, m.text, m.metaMessageId)) return;
 
   const [inserted] = await db
     .insert(messages)
@@ -395,7 +468,7 @@ export const webhookRoutes: FastifyPluginAsync = async (app: FastifyInstance) =>
     const authorized = isWebhookRequestAuthorized({
       rawBody: request.rawBody,
       signature,
-      secret: config.META_APP_SECRET,
+      secrets: [config.META_APP_SECRET, config.INSTAGRAM_APP_SECRET],
       demoMode: config.DEMO_MODE,
     });
     if (!authorized) {

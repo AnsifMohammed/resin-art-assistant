@@ -58,6 +58,60 @@ describe("config validation", () => {
   });
 });
 
+describe("INSTAGRAM_LIVE", () => {
+  const igLive = {
+    INSTAGRAM_ACCESS_TOKEN: "tok",
+    INSTAGRAM_ACCOUNT_ID: "17841400000000000",
+    INSTAGRAM_APP_SECRET: "ig-secret",
+    META_VERIFY_TOKEN: "verify",
+  };
+
+  it("defaults to false and is off in plain demo mode", () => {
+    const cfg = mod.parseEnv(validEnv);
+    expect(cfg.INSTAGRAM_LIVE).toBe(false);
+    expect(mod.isInstagramLive(cfg)).toBe(false);
+    expect(mod.parseEnv({ ...validEnv, INSTAGRAM_LIVE: "" }).INSTAGRAM_LIVE).toBe(false);
+  });
+
+  it("turns Instagram live while DEMO_MODE stays true", () => {
+    const cfg = mod.parseEnv({ ...validEnv, ...igLive, INSTAGRAM_LIVE: "true" });
+    expect(cfg.DEMO_MODE).toBe(true);
+    expect(cfg.INSTAGRAM_LIVE).toBe(true);
+    expect(mod.isInstagramLive(cfg)).toBe(true);
+  });
+
+  it("fails fast when INSTAGRAM_LIVE=true but Instagram credentials are missing", () => {
+    try {
+      mod.parseEnv({ ...validEnv, INSTAGRAM_LIVE: "true" });
+      expect.unreachable();
+    } catch (err) {
+      const issues = (err as InstanceType<typeof mod.ConfigError>).issues.join("\n");
+      for (const key of mod.INSTAGRAM_LIVE_VARS) {
+        expect(issues).toContain(`${key}: required when INSTAGRAM_LIVE=true`);
+      }
+    }
+    expect(() => mod.parseEnv({ ...validEnv, ...igLive, INSTAGRAM_APP_SECRET: "", INSTAGRAM_LIVE: "true" })).toThrow(
+      /INSTAGRAM_APP_SECRET: required when INSTAGRAM_LIVE=true/,
+    );
+  });
+
+  it("rejects an invalid INSTAGRAM_LIVE value", () => {
+    expect(() => mod.parseEnv({ ...validEnv, INSTAGRAM_LIVE: "yes" })).toThrow(/INSTAGRAM_LIVE/);
+  });
+
+  it("Instagram is live whenever DEMO_MODE=false, and each missing var is reported once", () => {
+    const live = Object.fromEntries(mod.LIVE_ONLY_VARS.map((k) => [k, "value"]));
+    expect(mod.isInstagramLive(mod.parseEnv({ ...validEnv, ...live, DEMO_MODE: "false" }))).toBe(true);
+    try {
+      mod.parseEnv({ ...validEnv, DEMO_MODE: "false", INSTAGRAM_LIVE: "true" });
+      expect.unreachable();
+    } catch (err) {
+      const issues = (err as InstanceType<typeof mod.ConfigError>).issues;
+      expect(issues.filter((i) => i.startsWith("INSTAGRAM_APP_SECRET:"))).toHaveLength(1);
+    }
+  });
+});
+
 describe("TRUST_PROXY", () => {
   it("defaults to false when unset or empty", () => {
     expect(mod.parseEnv(validEnv).TRUST_PROXY).toBe(false);

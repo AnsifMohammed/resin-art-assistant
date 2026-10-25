@@ -10,6 +10,12 @@ export const validEnv: Record<string, string> = {
   GEMINI_API_KEY: "AIza-test-key-for-gemini-API",
   ENCRYPTION_KEY: "a".repeat(64),
   BUSINESS_ID: "test-business",
+  // Pin live-channel settings so a developer's real backend/.env (loaded by dotenv) can't leak in.
+  INSTAGRAM_LIVE: "false",
+  INSTAGRAM_ACCESS_TOKEN: "",
+  INSTAGRAM_ACCOUNT_ID: "",
+  INSTAGRAM_APP_ID: "",
+  INSTAGRAM_APP_SECRET: "",
 };
 
 export function applyTestEnv(overrides: Record<string, string> = {}): void {

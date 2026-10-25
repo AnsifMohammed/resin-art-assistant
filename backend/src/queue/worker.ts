@@ -1,4 +1,5 @@
 import type { Job } from "pg-boss";
+import { config, isInstagramLive } from "../config.ts";
 import { logger } from "../lib/logger.ts";
 import { clearInlineTimers } from "./enqueue.ts";
 import {
@@ -17,6 +18,7 @@ export async function startWorkers(): Promise<void> {
   if (!queue) {
     // No pg-boss: scheduled broadcasts are still dispatched, in-process.
     startInlineBroadcastDispatcher();
+    startInlineTokenRefresh();
     return;
   }
 
@@ -56,6 +58,11 @@ export async function startWorkers(): Promise<void> {
     await boss.work(QUEUES.refreshTokens, async () => {
       await checkAndRefreshInstagramTokens();
     });
+    // Live Instagram: also run once at startup, so a token seeded from
+    // INSTAGRAM_ACCESS_TOKEN gets stored (encrypted) with its expiry right away.
+    if (isInstagramLive(config)) {
+      await boss.send(QUEUES.refreshTokens, {});
+    }
 
     // 4. Broadcasts: every minute, claim due scheduled broadcasts and enqueue their send job.
     await boss.schedule(QUEUES.dispatchBroadcasts, "* * * * *");
@@ -78,8 +85,24 @@ export async function startWorkers(): Promise<void> {
   }
 }
 
+let inlineTokenRefreshTimer: NodeJS.Timeout | null = null;
+
+/** Without pg-boss: refresh live Instagram tokens at startup and then daily, in-process. */
+function startInlineTokenRefresh(): void {
+  if (!isInstagramLive(config) || config.NODE_ENV === "test" || inlineTokenRefreshTimer) return;
+  const run = () =>
+    checkAndRefreshInstagramTokens().catch((err: unknown) => logger.error({ err }, "Inline Instagram token refresh failed"));
+  void run();
+  inlineTokenRefreshTimer = setInterval(run, 24 * 60 * 60 * 1000);
+  inlineTokenRefreshTimer.unref();
+}
+
 export async function stopWorkers(): Promise<void> {
   clearInlineTimers();
   stopInlineBroadcastDispatcher();
+  if (inlineTokenRefreshTimer) {
+    clearInterval(inlineTokenRefreshTimer);
+    inlineTokenRefreshTimer = null;
+  }
   await stopQueue();
 }

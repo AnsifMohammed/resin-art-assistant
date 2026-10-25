@@ -14,6 +14,7 @@ import {
   messages,
 } from "../../db/schema.ts";
 import { Sentry } from "../../instrument.ts";
+import { markMessageSent } from "../../lib/conversation.ts";
 import { logger } from "../../lib/logger.ts";
 import { emitConversationUpdated, emitEscalationNew, emitMessageNew } from "../../realtime/events.ts";
 import { notifyEscalation } from "../../services/notify.ts";
@@ -410,17 +411,19 @@ async function runPipeline(params: ProcessMessageParams): Promise<AiDecision | n
     return null;
   }
 
+  let metaMessageId: string | null = null;
   try {
     // The reply goes out on the conversation's own channel; never guess.
     if (!channel) throw new Error(`Channel ${conv.channelId} not found for conversation`);
     if (!customer?.handleOrPhone) throw new Error("Customer recipient not found for conversation");
-    await sendMessage({
+    const result = await sendMessage({
       channelType: channel.type,
       recipient: customer.handleOrPhone,
       text: decision.reply,
       businessId,
       conversationId,
     });
+    metaMessageId = result?.metaMessageId ?? null;
   } catch (err) {
     // Never retry the job here (that would duplicate the reply). Mark failed and
     // hand the conversation to a human.
@@ -446,8 +449,8 @@ async function runPipeline(params: ProcessMessageParams): Promise<AiDecision | n
   }
 
   if (committed.outboundMsg) {
-    await db.update(messages).set({ deliveryStatus: "sent" }).where(eq(messages.id, committed.outboundMsg.id));
-    emitMessageNew({ ...committed.outboundMsg, deliveryStatus: "sent" });
+    await markMessageSent(db, committed.outboundMsg.id, metaMessageId);
+    emitMessageNew({ ...committed.outboundMsg, deliveryStatus: "sent", ...(metaMessageId ? { metaMessageId } : {}) });
   }
   if (committed.decisionId) {
     await db.update(aiDecisions).set({ sent: true }).where(eq(aiDecisions.id, committed.decisionId));
