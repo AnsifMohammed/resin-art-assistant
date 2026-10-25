@@ -327,6 +327,8 @@ async function runPipeline(params: ProcessMessageParams): Promise<AiDecision | n
     businessId,
     incomingText: rawText,
     history: history.map((m) => ({ senderType: m.senderType, content: m.content })),
+    customerName: customer?.name ?? null,
+    customerHandle: customer?.handleOrPhone ?? null,
   });
 
   // Re-check the pause switch: it may have been flipped during the LLM call.

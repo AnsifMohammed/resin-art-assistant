@@ -1,7 +1,13 @@
 import { GoogleGenAI } from "@google/genai";
 import { config } from "../config.ts";
 import { logger } from "../lib/logger.ts";
-import { buildConversationMessages, buildSystemPrompt, getKnowledgeBase, type HistoryMessage } from "./prompt.ts";
+import {
+  buildConversationMessages,
+  buildSystemPrompt,
+  customerFirstName,
+  getKnowledgeBase,
+  type HistoryMessage,
+} from "./prompt.ts";
 import { applyRules } from "./rules.ts";
 import { aiDecisionSchema, type AiDecision } from "./types.ts";
 import { z } from "zod";
@@ -202,6 +208,9 @@ export async function processAiDecision(params: {
   incomingText: string;
   /** Prior messages BEFORE the current batch (the batch itself must not be included). */
   history?: HistoryMessage[];
+  /** Stored customer name and handle, used to address the customer by first name. */
+  customerName?: string | null;
+  customerHandle?: string | null;
 }): Promise<AiDecision> {
   if (!ai) {
     logger.info(
@@ -218,7 +227,9 @@ export async function processAiDecision(params: {
       model: config.GEMINI_MODEL,
       contents: buildConversationMessages(params.history ?? [], params.incomingText),
       config: {
-        systemInstruction: buildSystemPrompt(kb),
+        systemInstruction: buildSystemPrompt(kb, {
+          customerFirstName: customerFirstName(params.customerName, params.customerHandle),
+        }),
         responseMimeType: "application/json",
         responseJsonSchema: aiDecisionJsonSchema,
         temperature: GEMINI_TEMPERATURE,

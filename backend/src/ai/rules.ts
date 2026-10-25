@@ -31,6 +31,8 @@ export const AUTO_REPLY_ALLOWED_INTENTS = [
   "care",
   "custom_order",
   "greeting",
+  "product_info",
+  "business_info",
 ];
 
 export function applyRules(decision: AiDecision, rawText: string): AiDecision {
