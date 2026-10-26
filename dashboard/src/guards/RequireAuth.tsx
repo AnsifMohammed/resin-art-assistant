@@ -5,10 +5,12 @@ import { useAuth } from "../hooks/useAuth.ts";
 
 /** Redirects to /login (remembering the target) unless signed in. */
 export function RequireAuth() {
-  const { status } = useAuth();
+  const { status, user } = useAuth();
   const location = useLocation();
 
   if (status === "loading") {
+    // The stored token already says who this is, so show the real sidebar and let the page load.
+    if (user) return <Outlet />;
     const hasToken = Boolean(getToken());
     if (hasToken) {
       return <AppFrameSkeleton />;

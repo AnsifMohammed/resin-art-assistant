@@ -11,6 +11,7 @@ import {
   messages,
   messageTemplates,
 } from "../db/schema.ts";
+import { markMessageSent } from "../lib/conversation.ts";
 import { AppError } from "../lib/errors.ts";
 import { renderTemplate, TEMPLATE_MAX_LENGTH } from "../lib/templates.ts";
 import { authenticate } from "../middleware/authenticate.ts";
@@ -200,14 +201,16 @@ export const replyRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
       // 6. Send outbound reply on the conversation's own channel.
       //    Templates go out as their rendered text for now; live mode will send
       //    the approved Meta template by metaTemplateName instead.
+      let metaMessageId: string | null = null;
       try {
-        await sendMessage({
+        const result = await sendMessage({
           channelType: channel.type,
           recipient: customer.handleOrPhone,
           text,
           businessId,
           conversationId: id,
         });
+        metaMessageId = result?.metaMessageId ?? null;
       } catch (err) {
         if (queuedMsg) {
           await db.update(messages).set({ deliveryStatus: "failed" }).where(eq(messages.id, queuedMsg.id));
@@ -238,9 +241,11 @@ export const replyRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
       }
 
       if (queuedMsg) {
-        await db.update(messages).set({ deliveryStatus: "sent" }).where(eq(messages.id, queuedMsg.id));
+        await markMessageSent(db, queuedMsg.id, metaMessageId);
       }
-      const newMsg = queuedMsg ? { ...queuedMsg, deliveryStatus: "sent" as const } : queuedMsg;
+      const newMsg = queuedMsg
+        ? { ...queuedMsg, deliveryStatus: "sent" as const, ...(metaMessageId ? { metaMessageId } : {}) }
+        : queuedMsg;
 
       // 7. Record in audit trail
       await db.insert(auditLog).values({

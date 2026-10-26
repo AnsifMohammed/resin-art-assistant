@@ -22,19 +22,33 @@ export function validateSignature(
 export interface WebhookAuthOptions {
   rawBody: Buffer | undefined;
   signature: string | undefined;
-  secret: string | undefined;
+  /** A single app secret (kept for existing callers). */
+  secret?: string | undefined;
+  /**
+   * Every app secret that may sign a webhook. Meta signs Facebook-login /
+   * WhatsApp webhooks with the Meta app secret and Instagram-login webhooks
+   * with the Instagram app secret, so either may be valid.
+   */
+  secrets?: Array<string | undefined>;
   demoMode: boolean;
 }
 
 /**
  * Decide whether a POST /webhook request may be processed.
- * - Secret configured: signature must be present and valid over the raw bytes.
+ * - Any secret configured: signature must be present and valid over the raw
+ *   bytes under at least one of them.
  * - No secret: accepted only in DEMO_MODE (no validation possible); otherwise rejected.
  */
 export function isWebhookRequestAuthorized(opts: WebhookAuthOptions): boolean {
-  if (!opts.secret) return opts.demoMode;
+  const secrets = [opts.secret, ...(opts.secrets ?? [])].filter(
+    (s): s is string => typeof s === "string" && s !== "",
+  );
+  if (secrets.length === 0) return opts.demoMode;
   if (!opts.rawBody) return false;
-  return validateSignature(opts.rawBody, opts.signature, opts.secret);
+  const rawBody = opts.rawBody;
+  // Check every secret (no early exit) so timing does not reveal which one matched.
+  const results = secrets.map((secret) => validateSignature(rawBody, opts.signature, secret));
+  return results.includes(true);
 }
 
 /**

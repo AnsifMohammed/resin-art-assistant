@@ -28,7 +28,7 @@ export const AuthContext = createContext<AuthContextValue | null>(null);
 /** Service-worker runtime cache for API GETs (see vite.config.ts). */
 const API_CACHE_NAME = "api-cache";
 
-/** Decode (not verify) the JWT payload. Only used as an offline fallback when /auth/me is unreachable. */
+/** Decode (not verify) the JWT payload. Used to render the app frame before /auth/me answers, and as an offline fallback. */
 function decodeToken(token: string): AuthUser | null {
   try {
     const part = token.split(".")[1];
@@ -70,7 +70,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const location = useLocation();
-  const [user, setUser] = useState<AuthUser | null>(null);
+  // With a stored token, start from its (unverified) payload so the app frame renders at once;
+  // GET /auth/me below confirms or replaces it, and the server enforces access either way.
+  const [user, setUser] = useState<AuthUser | null>(() => {
+    const token = getToken();
+    return token ? decodeToken(token) : null;
+  });
   const [status, setStatus] = useState<AuthStatus>(() => (getToken() ? "loading" : "anonymous"));
 
   // Latest location for the 401 handler without re-registering it each navigation.

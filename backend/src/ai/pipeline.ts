@@ -1,7 +1,13 @@
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, ThinkingLevel, type ThinkingConfig } from "@google/genai";
 import { config } from "../config.ts";
 import { logger } from "../lib/logger.ts";
-import { buildConversationMessages, buildSystemPrompt, getKnowledgeBase, type HistoryMessage } from "./prompt.ts";
+import {
+  buildConversationMessages,
+  buildSystemPrompt,
+  customerFirstName,
+  getKnowledgeBase,
+  type HistoryMessage,
+} from "./prompt.ts";
 import { applyRules } from "./rules.ts";
 import { aiDecisionSchema, type AiDecision } from "./types.ts";
 import { z } from "zod";
@@ -13,7 +19,8 @@ export const GEMINI_TIMEOUT_MS = 20_000;
 export const GEMINI_MAX_RETRIES = 2;
 /** Output cap for one decision (the JSON is small; thinking is disabled below). */
 export const GEMINI_MAX_OUTPUT_TOKENS = 1000;
-export const GEMINI_TEMPERATURE = 0.2;
+// Some variety so replies don't repeat word for word; facts stay pinned by the prompt rules.
+export const GEMINI_TEMPERATURE = 0.6;
 
 /**
  * A key that doesn't look like a real Gemini key (dummy/placeholder values).
@@ -33,6 +40,14 @@ export const aiDecisionJsonSchema: Record<string, unknown> = (() => {
   const { $schema: _ignored, ...schema } = z.toJSONSchema(aiDecisionSchema) as Record<string, unknown>;
   return schema;
 })();
+
+/**
+ * Gemini 2.x turns thinking off with `thinkingBudget: 0`; Gemini 3+ rejects that
+ * (400 INVALID_ARGUMENT) and takes `thinkingLevel: "minimal"` instead.
+ */
+export function thinkingConfigFor(model: string): ThinkingConfig {
+  return /^gemini-[12](\.|-)/.test(model) ? { thinkingBudget: 0 } : { thinkingLevel: ThinkingLevel.MINIMAL };
+}
 
 /** The keyword mock is ONLY used in DEMO_MODE without a real API key. */
 export const useMockDecisions = config.DEMO_MODE && isPlaceholderKey(config.GEMINI_API_KEY);
@@ -201,6 +216,9 @@ export async function processAiDecision(params: {
   incomingText: string;
   /** Prior messages BEFORE the current batch (the batch itself must not be included). */
   history?: HistoryMessage[];
+  /** Stored customer name and handle, used to address the customer by first name. */
+  customerName?: string | null;
+  customerHandle?: string | null;
 }): Promise<AiDecision> {
   if (!ai) {
     logger.info(
@@ -217,14 +235,16 @@ export async function processAiDecision(params: {
       model: config.GEMINI_MODEL,
       contents: buildConversationMessages(params.history ?? [], params.incomingText),
       config: {
-        systemInstruction: buildSystemPrompt(kb),
+        systemInstruction: buildSystemPrompt(kb, {
+          customerFirstName: customerFirstName(params.customerName, params.customerHandle),
+        }),
         responseMimeType: "application/json",
         responseJsonSchema: aiDecisionJsonSchema,
         temperature: GEMINI_TEMPERATURE,
         maxOutputTokens: GEMINI_MAX_OUTPUT_TOKENS,
-        // gemini-2.5-flash thinks by default and thinking tokens count against
-        // maxOutputTokens; disable it so the budget goes to the JSON answer.
-        thinkingConfig: { thinkingBudget: 0 },
+        // Thinking tokens count against maxOutputTokens; keep thinking off/minimal
+        // so the budget goes to the JSON answer.
+        thinkingConfig: thinkingConfigFor(config.GEMINI_MODEL),
       },
     });
 

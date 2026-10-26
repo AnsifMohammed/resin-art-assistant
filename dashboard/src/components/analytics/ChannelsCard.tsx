@@ -1,13 +1,31 @@
-import type { CSSProperties } from "react";
+import { useRef, type CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from "recharts";
 import { ArrowUpRight } from "lucide-react";
 import { brandChannels } from "../../theme/index.ts";
-import { useCockpitMode, useMediaQuery } from "./cockpit.tsx";
+import { useCockpitMode, useElementHeight } from "./cockpit.tsx";
 
-/** Table rows in the single-screen layout: 2 normally, all of them on tall screens. */
-const COCKPIT_TABLE_ROWS = 2;
-const TALL_SCREEN_QUERY = "(min-height: 1100px)";
+/** Single-screen layout: the table shows as many rows as fit, never fewer than this. */
+const MIN_COCKPIT_ROWS = 2;
+/** Table row height (h-7) and header row + border, used to work out how many rows fit. */
+const TABLE_ROW_H = 28;
+const TABLE_CHROME_H = TABLE_ROW_H + 2;
+/** Body rows stretch to fill spare height in the single-screen layout, up to this. */
+const MAX_TABLE_ROW_H = 36;
+
+/**
+ * Single-screen layout: how many table body rows fit in the measured table area, and how tall
+ * each one is (spare height is spread over the rows so the table ends near the card bottom).
+ * Shared with AnalyticsSkeleton so the loading state follows the real table.
+ */
+export function channelTableFit(tableAreaH: number, totalRows: number): { rows: number; rowH: number } {
+  const rows = Math.min(
+    totalRows,
+    Math.max(MIN_COCKPIT_ROWS, Math.floor((tableAreaH - TABLE_CHROME_H) / TABLE_ROW_H))
+  );
+  const rowH = Math.min(MAX_TABLE_ROW_H, Math.max(TABLE_ROW_H, Math.floor((tableAreaH - TABLE_CHROME_H) / rows)));
+  return { rows, rowH };
+}
 
 export interface ChannelStats {
   messages: number;
@@ -51,32 +69,31 @@ export function ChannelsCard({ whatsapp, instagram }: ChannelsCardProps) {
   // With no revenue, a single neutral ring keeps the donut's shape (recharts draws nothing for all-zero data).
   const pieData = hasRevenue
     ? [
-        { name: "WhatsApp", value: waRevenue, color: brandChannels.whatsapp },
-        { name: "Instagram", value: igRevenue, color: brandChannels.instagram },
-      ]
+      { name: "WhatsApp", value: waRevenue, color: brandChannels.whatsapp },
+      { name: "Instagram", value: igRevenue, color: brandChannels.instagram },
+    ]
     : [{ name: "empty", value: 1, color: "var(--border)" }];
 
   const cockpit = useCockpitMode();
-  const tallScreen = useMediaQuery(TALL_SCREEN_QUERY);
+  const tableAreaRef = useRef<HTMLDivElement>(null);
+  const tableAreaH = useElementHeight(tableAreaRef, cockpit);
 
   const count = (stats: ChannelStats | null, key: "orders" | "messages") =>
     stats ? stats[key].toLocaleString("en-IN") : DASH;
 
-  const showMessageRows = (whatsapp?.messages ?? 0) > 0 || (instagram?.messages ?? 0) > 0;
+  // A channel with no messages shows a dash rather than 0.
+  const messages = (stats: ChannelStats | null) => (stats && stats.messages > 0 ? count(stats, "messages") : DASH);
   const tableRows: Array<{ label: string; wa: string; ig: string }> = [
     { label: "Orders", wa: count(whatsapp, "orders"), ig: count(instagram, "orders") },
     { label: "Avg order value", wa: aov(whatsapp), ig: aov(instagram) },
+    { label: "Messages", wa: messages(whatsapp), ig: messages(instagram) },
+    { label: "Orders / 100 msgs", wa: conversion(whatsapp), ig: conversion(instagram) },
   ];
-  // Only show Messages & conversion rows when there are messages
-  if (showMessageRows) {
-    tableRows.push(
-      { label: "Messages", wa: count(whatsapp, "messages"), ig: count(instagram, "messages") },
-      { label: "Orders / 100 msgs", wa: conversion(whatsapp), ig: conversion(instagram) }
-    );
-  }
-  // Single-screen layout: a fixed, short table so the donut can take the free height.
+  // Single-screen layout: show as many rows as the table area fits (the donut keeps its minimum).
   // Elsewhere the card has natural height, so every row is shown.
-  const visibleRows = cockpit && !tallScreen ? tableRows.slice(0, COCKPIT_TABLE_ROWS) : tableRows;
+  const fit = cockpit ? channelTableFit(tableAreaH, tableRows.length) : null;
+  const visibleRows = fit ? tableRows.slice(0, fit.rows) : tableRows;
+  const bodyRowH = fit?.rowH;
 
   const centerTotalText = !hasData
     ? DASH
@@ -110,7 +127,7 @@ export function ChannelsCard({ whatsapp, instagram }: ChannelsCardProps) {
             Single-screen layout: the block takes the free height (up to 156px); the donut and the
             two boxes share that exact height, so the boxes always match the pie. ─── */}
       <div
-        className={`flex flex-col items-center gap-3 @min-[20rem]:flex-row @min-[20rem]:items-stretch @min-[20rem]:gap-4 ${cockpit ? "flex-1 min-h-0 max-h-[156px]" : "shrink-0"
+        className={`flex flex-col items-center gap-3 @min-[20rem]:flex-row @min-[20rem]:items-stretch @min-[20rem]:gap-4 ${cockpit ? "flex-1 min-h-[130px] max-h-[156px]" : "shrink-0"
           }`}
       >
         {/* Donut — overflow-hidden prevents recharts SVG from leaking */}
@@ -218,8 +235,11 @@ export function ChannelsCard({ whatsapp, instagram }: ChannelsCardProps) {
       </div>
 
       {/* ─── Compact Comparison Table (text-12, rows h-7, hairline borders) ────
-            Single-screen layout shows the first rows only; elsewhere all rows. */}
-      <div className="shrink-0 mt-4">
+            Single-screen layout shows the rows that fit; elsewhere all rows. */}
+      <div
+        ref={tableAreaRef}
+        className={cockpit ? "flex-1 min-h-0 flex flex-col overflow-hidden" : "shrink-0 mt-1"}
+      >
         {visibleRows.length > 0 && (
           <table className="w-full text-12 border-separate border-spacing-0 rounded-lg border border-border/60 bg-surface-muted/50 overflow-hidden">
             <thead>
@@ -245,7 +265,7 @@ export function ChannelsCard({ whatsapp, instagram }: ChannelsCardProps) {
               {visibleRows.map((row, i) => {
                 const divider = i < visibleRows.length - 1 ? "border-b border-border/40" : "";
                 return (
-                  <tr key={row.label} className="h-7">
+                  <tr key={row.label} className="h-7" style={bodyRowH ? { height: bodyRowH } : undefined}>
                     <td className={`pl-2.5 text-text-muted whitespace-nowrap ${divider}`}>{row.label}</td>
                     <td className={`text-right font-outfit font-semibold text-text tabular-nums ${divider}`}>{row.wa}</td>
                     <td className={`pr-2.5 text-right font-outfit font-semibold text-text tabular-nums ${divider}`}>{row.ig}</td>

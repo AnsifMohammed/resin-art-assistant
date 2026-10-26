@@ -20,6 +20,19 @@ describe("applyRules", () => {
     expect(res.escalate_reason).toBeNull();
   });
 
+  it("lets a plain greeting auto-reply", () => {
+    const greeting: AiDecision = { ...baseDecision, intent: "greeting", facts_used: [], suggested_tag: null };
+    const res = applyRules(greeting, "Hi");
+    expect(res.escalate).toBe(false);
+  });
+
+  it("still escalates a greeting that contains a sensitive phrase", () => {
+    const greeting: AiDecision = { ...baseDecision, intent: "greeting", facts_used: [], suggested_tag: null };
+    const res = applyRules(greeting, "Hi, I paid already");
+    expect(res.escalate).toBe(true);
+    expect(res.escalate_reason).toBe("always_escalate_phrase");
+  });
+
   it("escalates when intent is in ALWAYS_ESCALATE_INTENTS (e.g. refund, complaint)", () => {
     const refundDecision: AiDecision = {
       ...baseDecision,

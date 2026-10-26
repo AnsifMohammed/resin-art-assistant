@@ -66,6 +66,17 @@ export const LIVE_ONLY_VARS = [
   "WHATSAPP_TOKEN",
   "WHATSAPP_PHONE_NUMBER_ID",
   "WHATSAPP_BUSINESS_ACCOUNT_ID",
+  "INSTAGRAM_APP_SECRET",
+] as const;
+
+// Vars required when INSTAGRAM_LIVE=true (real Instagram DMs while DEMO_MODE
+// stays on for everything else). INSTAGRAM_APP_SECRET signs Instagram-login
+// webhooks; META_VERIFY_TOKEN answers the webhook verification handshake.
+export const INSTAGRAM_LIVE_VARS = [
+  "INSTAGRAM_ACCESS_TOKEN",
+  "INSTAGRAM_ACCOUNT_ID",
+  "INSTAGRAM_APP_SECRET",
+  "META_VERIFY_TOKEN",
 ] as const;
 
 export const envSchema = z
@@ -77,6 +88,12 @@ export const envSchema = z
     NODE_ENV: z.enum(["development", "production", "test"]),
     DEMO_MODE: z
       .enum(["true", "false"], { error: 'must be "true" or "false"' })
+      .transform((v) => v === "true"),
+    // Send real Instagram DMs (graph.instagram.com) even when DEMO_MODE=true.
+    // WhatsApp keeps following DEMO_MODE. Default false.
+    INSTAGRAM_LIVE: z
+      .enum(["true", "false"], { error: 'must be "true" or "false"' })
+      .default("false")
       .transform((v) => v === "true"),
     DASHBOARD_URL: z.url().default("http://localhost:5173"),
     // Whether to trust X-Forwarded-For. Default false. See .env.example.
@@ -121,6 +138,10 @@ export const envSchema = z
     META_VERIFY_TOKEN: optional(),
     INSTAGRAM_ACCESS_TOKEN: optional(),
     INSTAGRAM_ACCOUNT_ID: optional(),
+    // Instagram API with Instagram Login: the Instagram app id/secret shown in
+    // App Dashboard > Instagram > API setup with Instagram login (NOT the Meta app's).
+    INSTAGRAM_APP_ID: optional(),
+    INSTAGRAM_APP_SECRET: optional(),
     WHATSAPP_TOKEN: optional(),
     WHATSAPP_PHONE_NUMBER_ID: optional(),
     WHATSAPP_BUSINESS_ACCOUNT_ID: optional(),
@@ -158,19 +179,41 @@ export const envSchema = z
     BROADCAST_RATE_PER_SEC: z.coerce.number().positive().max(80).default(10),
   })
   .superRefine((env, ctx) => {
-    if (env.DEMO_MODE) return;
-    for (const key of LIVE_ONLY_VARS) {
-      if (!env[key]) {
-        ctx.addIssue({
-          code: "custom",
-          path: [key],
-          message: "required when DEMO_MODE=false",
-        });
+    const flagged = new Set<string>();
+    if (!env.DEMO_MODE) {
+      for (const key of LIVE_ONLY_VARS) {
+        if (!env[key]) {
+          flagged.add(key);
+          ctx.addIssue({
+            code: "custom",
+            path: [key],
+            message: "required when DEMO_MODE=false",
+          });
+        }
+      }
+    }
+    if (env.INSTAGRAM_LIVE) {
+      for (const key of INSTAGRAM_LIVE_VARS) {
+        if (!env[key] && !flagged.has(key)) {
+          ctx.addIssue({
+            code: "custom",
+            path: [key],
+            message: "required when INSTAGRAM_LIVE=true",
+          });
+        }
       }
     }
   });
 
 export type Config = z.infer<typeof envSchema>;
+
+/**
+ * Instagram messages go to Meta when INSTAGRAM_LIVE=true, or when the whole app
+ * is live (DEMO_MODE=false). Otherwise they are only logged (demo).
+ */
+export function isInstagramLive(cfg: Pick<Config, "DEMO_MODE" | "INSTAGRAM_LIVE">): boolean {
+  return cfg.INSTAGRAM_LIVE || !cfg.DEMO_MODE;
+}
 
 export class ConfigError extends Error {
   constructor(public readonly issues: string[]) {

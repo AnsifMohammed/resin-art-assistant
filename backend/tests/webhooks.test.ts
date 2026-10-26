@@ -6,11 +6,13 @@ import { applyTestEnv } from "./env.ts";
 const dialect = new PgDialect();
 
 const SECRET = "test_app_secret";
+const IG_SECRET = "test_instagram_app_secret";
 const IG_ACCOUNT = "17841400000000000";
 
 applyTestEnv({
   META_VERIFY_TOKEN: "test_verify_token",
   META_APP_SECRET: SECRET,
+  INSTAGRAM_APP_SECRET: IG_SECRET,
   WHATSAPP_PHONE_NUMBER_ID: "1234567890",
   INSTAGRAM_ACCOUNT_ID: IG_ACCOUNT,
 });
@@ -229,6 +231,28 @@ describe("Meta Webhooks", () => {
       expect(isWebhookRequestAuthorized({ rawBody, signature: undefined, secret: undefined, demoMode: false })).toBe(false);
       expect(isWebhookRequestAuthorized({ rawBody, signature: undefined, secret: SECRET, demoMode: true })).toBe(false);
       expect(isWebhookRequestAuthorized({ rawBody, signature: sign(rawBody), secret: SECRET, demoMode: false })).toBe(true);
+    });
+  });
+
+  describe("Signature with either app secret", () => {
+    it("isWebhookRequestAuthorized accepts a signature valid under any configured secret", () => {
+      const rawBody = Buffer.from('{"object":"instagram"}');
+      const secrets = [SECRET, IG_SECRET];
+      expect(isWebhookRequestAuthorized({ rawBody, signature: sign(rawBody, SECRET), secrets, demoMode: false })).toBe(true);
+      expect(isWebhookRequestAuthorized({ rawBody, signature: sign(rawBody, IG_SECRET), secrets, demoMode: false })).toBe(true);
+      expect(isWebhookRequestAuthorized({ rawBody, signature: sign(rawBody, "other"), secrets, demoMode: false })).toBe(false);
+      expect(isWebhookRequestAuthorized({ rawBody, signature: undefined, secrets, demoMode: true })).toBe(false);
+      // Unset secrets are ignored; none at all -> only demo mode may skip validation.
+      expect(isWebhookRequestAuthorized({ rawBody, signature: undefined, secrets: [undefined, ""], demoMode: true })).toBe(true);
+      expect(isWebhookRequestAuthorized({ rawBody, signature: undefined, secrets: [undefined], demoMode: false })).toBe(false);
+      expect(isWebhookRequestAuthorized({ rawBody, signature: sign(rawBody, IG_SECRET), secrets: [undefined, IG_SECRET], demoMode: false })).toBe(true);
+    });
+
+    it("POST /webhook accepts an Instagram webhook signed with INSTAGRAM_APP_SECRET and rejects other secrets", async () => {
+      const raw = JSON.stringify({ object: "instagram", entry: [] });
+      expect((await post(raw, sign(raw, IG_SECRET))).statusCode).toBe(200);
+      expect((await post(raw, sign(raw, SECRET))).statusCode).toBe(200);
+      expect((await post(raw, sign(raw, "not-a-secret"))).statusCode).toBe(403);
     });
   });
 
@@ -462,6 +486,112 @@ describe("Meta Webhooks", () => {
       expect(h.enqueue).not.toHaveBeenCalled();
     });
   });
+  describe("POST /webhook echoes of our own sends", () => {
+    const igPayload = (event: any) => ({ object: "instagram", entry: [{ id: IG_ACCOUNT, time: 1, messaging: [event] }] });
+    const echo = (mid: string, text: string) =>
+      igPayload({ sender: { id: IG_ACCOUNT }, recipient: { id: "igsid-555" }, timestamp: 1, message: { mid, text, is_echo: true } });
+
+    beforeEach(() => {
+      h.state.rows.channels = [{ id: "chan-ig", type: "instagram" }];
+      h.state.rows.customers = [{ id: "cust-ig", handleOrPhone: "igsid-555" }];
+      h.state.rows.conversations = [{ id: "conv-ig", customerId: "cust-ig", state: "ai_active" }];
+    });
+
+    it("an echo of an AI reply already stored with its mid is a duplicate: AI keeps the conversation", async () => {
+      h.state.duplicateIds.add("ig.mid.ai");
+      const raw = JSON.stringify(echo("ig.mid.ai", "The clock is ₹2,800"));
+      const res = await post(raw, sign(raw, IG_SECRET));
+
+      expect(res.statusCode).toBe(200);
+      expect(insertsInto("messages")).toHaveLength(0);
+      expect(h.state.updates.filter((u) => u.table === "conversations")).toHaveLength(0);
+      expect(insertsInto("audit_log")).toHaveLength(0);
+    });
+
+    it("an echo arriving before the send returned claims the queued outbound row instead of an owner takeover", async () => {
+      h.state.rows.messages = [
+        {
+          id: "msg-ai",
+          conversationId: "conv-ig",
+          direction: "outbound",
+          senderType: "ai",
+          content: "The clock is ₹2,800",
+          deliveryStatus: "queued",
+          metaMessageId: null,
+          createdAt: new Date(),
+        },
+      ];
+      const raw = JSON.stringify(echo("ig.mid.race", "The clock is ₹2,800"));
+      const res = await post(raw, sign(raw, IG_SECRET));
+
+      expect(res.statusCode).toBe(200);
+      expect(insertsInto("messages")).toHaveLength(0);
+      expect(h.state.updates.filter((u) => u.table === "messages").map((u) => u.vals)).toEqual([{ metaMessageId: "ig.mid.race" }]);
+      expect(h.state.updates.filter((u) => u.table === "conversations")).toHaveLength(0);
+      expect(h.emitConversationUpdated).not.toHaveBeenCalled();
+    });
+
+    it("an echo of one part of a long reply we split is ignored", async () => {
+      const { splitInstagramText } = await import("../src/services/meta/instagram.ts");
+      const long = "Thank you for your order ".repeat(60);
+      const parts = splitInstagramText(long);
+      expect(parts.length).toBeGreaterThan(1);
+      h.state.rows.messages = [
+        {
+          id: "msg-ai",
+          conversationId: "conv-ig",
+          direction: "outbound",
+          content: long,
+          deliveryStatus: "sent",
+          metaMessageId: "ig.mid.part1",
+          createdAt: new Date(),
+        },
+      ];
+      const raw = JSON.stringify(echo("ig.mid.part2", parts[1]!));
+      await post(raw, sign(raw, IG_SECRET));
+
+      expect(insertsInto("messages")).toHaveLength(0);
+      expect(h.state.updates).toHaveLength(0);
+    });
+
+    it("a different text typed by the owner in the Instagram app still hands the conversation to the owner", async () => {
+      h.state.rows.messages = [
+        {
+          id: "msg-ai",
+          conversationId: "conv-ig",
+          direction: "outbound",
+          content: "The clock is ₹2,800",
+          deliveryStatus: "sent",
+          metaMessageId: "ig.mid.ai",
+          createdAt: new Date(),
+        },
+      ];
+      // Same text as a reply that already has its own (different) mid: a new owner message.
+      const raw = JSON.stringify(echo("ig.mid.owner", "The clock is ₹2,800"));
+      await post(raw, sign(raw, IG_SECRET));
+
+      expect(insertsInto("messages")[0]).toMatchObject({ senderType: "owner", metaMessageId: "ig.mid.owner" });
+      expect(h.state.updates.filter((u) => u.table === "conversations")[0]?.vals).toMatchObject({ state: "owner_handling" });
+    });
+
+    it("an old queued row outside the lookback window does not swallow an owner echo", async () => {
+      h.state.rows.messages = [
+        {
+          id: "msg-old",
+          conversationId: "conv-ig",
+          direction: "outbound",
+          content: "ok",
+          deliveryStatus: "queued",
+          metaMessageId: null,
+          createdAt: new Date(Date.now() - 60 * 60 * 1000),
+        },
+      ];
+      const raw = JSON.stringify(echo("ig.mid.owner2", "ok"));
+      await post(raw, sign(raw, IG_SECRET));
+      expect(insertsInto("messages")[0]).toMatchObject({ senderType: "owner" });
+    });
+  });
+
   describe("POST /webhook opt-out keywords", () => {
     const send = async (id: string, text: string) => {
       const raw = JSON.stringify(waPayload([waText(id, text)]));
