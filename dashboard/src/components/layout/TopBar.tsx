@@ -187,11 +187,10 @@ function NotificationsMenu() {
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className={`relative p-1.5 rounded-lg transition cursor-pointer ${
-          open
+        className={`relative p-1.5 rounded-lg transition cursor-pointer ${open
             ? "bg-surface-muted text-text"
             : "text-text-muted hover:text-text hover:bg-surface-muted"
-        }`}
+          }`}
         aria-label={openCount > 0 ? `Notifications: ${openCount} open escalations` : "Notifications"}
         aria-expanded={open}
       >
@@ -409,13 +408,12 @@ export function TopBar({ onOpenSearch, automation }: TopBarProps) {
             onClick={automation.requestToggle}
             disabled={aiPaused === undefined || automation.pending}
             aria-pressed={aiPaused === true}
-            className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 rounded-full text-xs font-semibold select-none transition active:scale-98 cursor-pointer disabled:cursor-default disabled:opacity-70 shrink-0 ${
-              aiPaused === undefined
+            className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 rounded-full text-xs font-semibold select-none transition active:scale-98 cursor-pointer disabled:cursor-default disabled:opacity-70 shrink-0 ${aiPaused === undefined
                 ? "bg-surface-muted text-text-muted border border-border"
                 : aiPaused
                   ? "bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/30"
                   : "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30"
-            }`}
+              }`}
             title={aiPaused === undefined ? "Loading automation status" : aiPaused ? "Resume AI auto-replies" : "Pause AI auto-replies"}
           >
             <Sparkles
@@ -488,8 +486,8 @@ export function TopBar({ onOpenSearch, automation }: TopBarProps) {
                       type="button"
                       onClick={() => setTheme(t)}
                       className={`capitalize px-2 py-1 rounded text-xs transition ${theme === t
-                          ? "bg-surface-muted font-bold text-text border border-border"
-                          : "text-text-muted hover:text-text"
+                        ? "bg-surface-muted font-bold text-text border border-border"
+                        : "text-text-muted hover:text-text"
                         }`}
                     >
                       {t}

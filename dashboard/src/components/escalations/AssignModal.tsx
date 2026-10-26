@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { AlertCircle, Users } from "lucide-react";
 import { Button } from "../ui/Button.tsx";
-import { EmptyState } from "../ui/EmptyState.tsx";
 import { Modal } from "../ui/Modal.tsx";
 import { Spinner } from "../ui/Spinner.tsx";
 import { useToast } from "../ui/Toast.tsx";
@@ -80,17 +79,18 @@ export function AssignModal({
           <Spinner label="Loading staff" />
         </div>
       ) : users.isError ? (
-        <EmptyState
-          icon={AlertCircle}
-          title="Couldn't load staff"
-          description={users.error.message}
-          action={
+        <div className="rounded-xl border border-rose-500/20 bg-rose-500/5 p-6 text-center space-y-2">
+          <div className="w-10 h-10 rounded-full bg-rose-500/10 text-rose-500 mx-auto flex items-center justify-center">
+            <AlertCircle className="w-5 h-5" />
+          </div>
+          <h4 className="text-14 font-semibold text-text">Couldn't load staff</h4>
+          <p className="text-12 text-text-muted">{users.error.message}</p>
+          <div className="pt-1">
             <Button variant="outline" onClick={() => void users.refetch()}>
               Try again
             </Button>
-          }
-          className="py-6"
-        />
+          </div>
+        </div>
       ) : (
         <fieldset>
           <legend className="sr-only">Assign to</legend>

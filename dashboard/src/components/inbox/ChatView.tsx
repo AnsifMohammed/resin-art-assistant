@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, AlertTriangle, CheckCircle2, MessageSquare, PauseCircle, PlayCircle } from "lucide-react";
+import { ArrowLeft, AlertTriangle, CheckCircle2, PauseCircle, PlayCircle } from "lucide-react";
 import { escalationReasonLabel } from "../../lib/escalationReasons.ts";
 import { ChannelIcon } from "../shared/ChannelIcon.tsx";
 import { ConfirmDialog } from "../shared/ConfirmDialog.tsx";
@@ -271,7 +271,11 @@ export function ChatView({ conversation, onBack, backOnlyOnMobile = false, onRes
         aria-label="Messages"
       >
         {messages.length === 0 && !pendingText ? (
-          <EmptyState icon={MessageSquare} title="No messages yet" />
+          <EmptyState
+            size="compact"
+            title="No messages yet"
+            description="When this customer sends a message or you reply, it will appear here."
+          />
         ) : (
           <div className="flex flex-col gap-3">
             {messages.map((m, i) => {

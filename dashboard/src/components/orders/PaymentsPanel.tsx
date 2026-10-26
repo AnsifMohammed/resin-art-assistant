@@ -17,6 +17,7 @@ import {
   useVoidPayment,
 } from "../../hooks/usePayments.ts";
 import { formatDateTime } from "../../lib/format.ts";
+import { EmptyState } from "../shared/EmptyState.tsx";
 import type { Payment, PaymentKind } from "../../types/index.ts";
 
 export interface PaymentsPanelProps {
@@ -381,11 +382,12 @@ export function PaymentsPanel({ orderId, orderTotal: initialOrderTotal }: Paymen
             Loading payment records...
           </div>
         ) : paymentsList.length === 0 ? (
-          <div className="p-4 rounded-xl border border-dashed border-border bg-surface/50 text-center space-y-1.5">
-            <p className="text-12 font-medium text-text-muted">No payments recorded yet</p>
-            <p className="text-[11px] text-text-muted">
-              Advance or balance payments recorded by an admin will appear here.
-            </p>
+          <div className="rounded-xl border border-border bg-surface p-4">
+            <EmptyState
+              size="compact"
+              title="No payments recorded yet"
+              description="Advance or balance payments recorded by an admin will appear here."
+            />
           </div>
         ) : (
           <div className="rounded-xl border border-border bg-surface divide-y divide-border/60 overflow-hidden shadow-xs">

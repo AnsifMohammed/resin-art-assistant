@@ -22,9 +22,9 @@ interface DemoAccount {
  */
 const DEMO_ACCOUNTS: DemoAccount[] = import.meta.env.DEV
   ? [
-      { role: "admin", label: "Demo admin", email: "asha@asharesins.com", password: "changeme123" },
-      { role: "staff", label: "Demo staff", email: "priya@asharesins.com", password: "staffpass123" },
-    ]
+    { role: "admin", label: "Demo admin", email: "asha@asharesins.com", password: "changeme123" },
+    { role: "staff", label: "Demo staff", email: "priya@asharesins.com", password: "staffpass123" },
+  ]
   : [];
 
 function loginErrorMessage(err: unknown): string {
@@ -159,14 +159,13 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-dvh flex flex-col md:flex-row w-full bg-white dark:bg-[#111827] text-stone-900 dark:text-[#F1F5F9] transition-colors duration-200">
+    <div className="min-h-dvh flex flex-col lg:flex-row w-full bg-white dark:bg-[#111827] text-stone-900 dark:text-[#F1F5F9] transition-colors duration-200">
       {/* ─── LEFT HALF (Art Panel) ─────────────────────────────────────────
-          Desktop (≥1024px): 55% wide, full screen height
-          Tablet (768–1023px): 45% wide, full screen height
-          Phone (<768px): 300px header at the top
+          Desktop (≥1024px): 50% - 55% wide, full screen height
+          Mobile & Tablet (<1024px): Hidden completely as requested
       ──────────────────────────────────────────────────────────────────── */}
       <section
-        className="relative w-full h-[300px] md:h-auto md:w-[45%] lg:w-[55%] md:min-h-dvh shrink-0 overflow-hidden bg-stone-900 select-none"
+        className="hidden lg:block relative lg:w-[50%] xl:w-[55%] min-h-dvh shrink-0 overflow-hidden bg-stone-900 select-none"
         aria-label="Saba Art showcase"
       >
         <img
@@ -178,73 +177,73 @@ export default function Login() {
           }`}
         />
 
-        {/* Dark gradient overlay over bottom half: transparent at 45% -> rgba(12,10,9,0.7) at bottom */}
+        {/* Dark gradient overlay over bottom half */}
         <div
           className="absolute inset-0 pointer-events-none"
           style={{
             background:
-              "linear-gradient(to bottom, transparent 0%, transparent 45%, rgba(12, 10, 9, 0.7) 100%)",
+              "linear-gradient(to bottom, transparent 0%, transparent 40%, rgba(12, 10, 9, 0.75) 100%)",
           }}
         />
 
-        {/* Bottom-left text block: 48px from edges on desktop/tablet, 24px on phone */}
-        <div className="absolute bottom-0 left-0 p-6 md:p-12 text-white pointer-events-none">
+        {/* Bottom-left text block */}
+        <div className="absolute bottom-0 left-0 p-8 lg:p-12 xl:p-14 text-white pointer-events-none">
           {/* Small caps label */}
-          <p className="text-[13px] font-semibold tracking-[0.08em] uppercase text-white/95">
+          <p className="text-[12px] md:text-[13px] font-semibold tracking-[0.08em] uppercase text-white/95">
             HANDMADE RESIN ART · COIMBATORE
           </p>
 
-          {/* Headline (hidden on phone <768px, 28px on tablet, 34px on desktop) */}
-          <h2 className="hidden md:block mt-2.5 text-[28px] lg:text-[34px] font-semibold leading-[1.2] max-w-[520px] text-white font-['Outfit',sans-serif]">
+          {/* Headline */}
+          <h2 className="mt-2.5 text-[28px] xl:text-[34px] font-semibold leading-[1.2] max-w-[480px] lg:max-w-[520px] text-white font-['Outfit',sans-serif]">
             Every piece poured by hand. Every customer answered on time.
           </h2>
         </div>
       </section>
 
       {/* ─── RIGHT HALF (Form Panel) ────────────────────────────────────────
-          Desktop/Tablet: centered content, max-width 380px, gap 28px
-          Phone: slides up over photo (-mt-6, rounded-t-[24px], p-7 24px)
+          Desktop (≥1024px): Right half (50% or 45% wide)
+          Mobile & Tablet (<1024px): Takes full screen, cleanly centered
       ──────────────────────────────────────────────────────────────────── */}
       <section
-        className="relative flex-1 flex flex-col justify-center items-center px-6 pt-7 pb-8 -mt-6 rounded-t-[24px] md:mt-0 md:rounded-none md:p-12 lg:p-16 bg-white dark:bg-[#111827] shadow-xl md:shadow-none min-h-[calc(100dvh-276px)] md:min-h-dvh z-10"
+        className="relative flex-1 w-full min-h-dvh flex flex-col items-center justify-center px-4 sm:px-6 md:px-10 lg:px-12 xl:px-16 py-8 sm:py-10 lg:py-12 bg-white dark:bg-[#111827] overflow-y-auto overscroll-contain pb-safe pt-safe"
         aria-label="Sign in form"
       >
         {/* Floating Theme Toggle in top-right corner */}
-        <div className="absolute top-4 right-4 md:top-6 md:right-6 z-20">
+        <div className="absolute top-4 right-4 sm:top-5 sm:right-5 lg:top-6 lg:right-6 z-20">
           <button
             type="button"
             onClick={toggleTheme}
-            className="p-2.5 rounded-xl border border-stone-200 dark:border-[rgba(255,255,255,0.08)] bg-stone-50 dark:bg-[#1A2335] hover:bg-stone-100 dark:hover:bg-[#222e44] text-stone-600 dark:text-[#94A3B8] transition cursor-pointer"
+            className="p-2 sm:p-2.5 min-w-[38px] min-h-[38px] sm:min-w-[40px] sm:min-h-[40px] flex items-center justify-center rounded-xl border border-stone-200 dark:border-[rgba(255,255,255,0.08)] bg-stone-50 dark:bg-[#1A2335] hover:bg-stone-100 dark:hover:bg-[#222e44] text-stone-600 dark:text-[#94A3B8] transition cursor-pointer"
             title={`Switch to ${resolvedTheme === "dark" ? "light" : "dark"} theme`}
             aria-label="Toggle theme"
           >
             {resolvedTheme === "dark" ? (
-              <Sun size={18} className="text-amber-400" />
+              <Sun size={18} className="text-amber-400 shrink-0" />
             ) : (
-              <Moon size={18} className="text-stone-700" />
+              <Moon size={18} className="text-stone-700 shrink-0" />
             )}
           </button>
         </div>
 
-        {/* Content Centered Container (max-width 380px, vertical gap 28px) */}
-        <div className="w-full max-w-[380px] mx-auto flex flex-col gap-7">
+        {/* Content Centered Container */}
+        <div className="w-full max-w-[380px] sm:max-w-[400px] mx-auto my-auto flex flex-col gap-5 sm:gap-6 lg:gap-7">
           {/* 1. Logo Row */}
           <div
             className="flex items-center gap-2.5 animate-rise-fade"
             style={{ animationDelay: "0ms" }}
           >
             <ResinDropMark />
-            <span className="font-['Outfit',sans-serif] text-[22px] font-bold tracking-tight text-stone-900 dark:text-[#F1F5F9]">
+            <span className="font-['Outfit',sans-serif] text-[20px] sm:text-[22px] font-bold tracking-tight text-stone-900 dark:text-[#F1F5F9]">
               Saba Art
             </span>
           </div>
 
           {/* 2. Header Title & Subtitle */}
           <div className="animate-rise-fade" style={{ animationDelay: "40ms" }}>
-            <h1 className="font-['Outfit',sans-serif] text-[32px] font-semibold text-stone-900 dark:text-[#F1F5F9] tracking-tight leading-tight">
+            <h1 className="font-['Outfit',sans-serif] text-[26px] sm:text-[30px] md:text-[32px] font-semibold text-stone-900 dark:text-[#F1F5F9] tracking-tight leading-tight">
               Welcome back
             </h1>
-            <p className="text-[15px] text-stone-500 dark:text-[#94A3B8] mt-1.5 leading-normal">
+            <p className="text-[14px] sm:text-[15px] text-stone-500 dark:text-[#94A3B8] mt-1 sm:mt-1.5 leading-normal">
               Sign in to answer customers and manage your shop.
             </p>
           </div>
@@ -252,7 +251,7 @@ export default function Login() {
           {/* 3. Form */}
           <form
             onSubmit={handleSubmit}
-            className="flex flex-col gap-5 animate-rise-fade"
+            className="flex flex-col gap-4 sm:gap-5 animate-rise-fade"
             style={{ animationDelay: "80ms" }}
             noValidate
           >
@@ -276,7 +275,7 @@ export default function Login() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="name@asharesins.com"
-                className="w-full h-[48px] md:h-[46px] px-3.5 rounded-[8px] text-[16px] md:text-[14px] bg-stone-50 dark:bg-[#1A2335] border border-stone-200 dark:border-[rgba(255,255,255,0.08)] text-stone-900 dark:text-[#F1F5F9] placeholder:text-stone-400 dark:placeholder:text-stone-500 focus:outline-none focus:ring-2 focus:ring-amber-500/40 focus:border-[#F59E0B] transition"
+                className="w-full h-[46px] sm:h-[48px] md:h-[46px] px-3.5 rounded-[8px] text-[16px] md:text-[14px] bg-stone-50 dark:bg-[#1A2335] border border-stone-200 dark:border-[rgba(255,255,255,0.08)] text-stone-900 dark:text-[#F1F5F9] placeholder:text-stone-400 dark:placeholder:text-stone-500 focus:outline-none focus:ring-2 focus:ring-amber-500/40 focus:border-[#F59E0B] transition"
               />
             </div>
 
@@ -297,7 +296,7 @@ export default function Login() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full h-[48px] md:h-[46px] pl-3.5 pr-12 rounded-[8px] text-[16px] md:text-[14px] bg-stone-50 dark:bg-[#1A2335] border border-stone-200 dark:border-[rgba(255,255,255,0.08)] text-stone-900 dark:text-[#F1F5F9] placeholder:text-stone-400 dark:placeholder:text-stone-500 focus:outline-none focus:ring-2 focus:ring-amber-500/40 focus:border-[#F59E0B] transition"
+                  className="w-full h-[46px] sm:h-[48px] md:h-[46px] pl-3.5 pr-12 rounded-[8px] text-[16px] md:text-[14px] bg-stone-50 dark:bg-[#1A2335] border border-stone-200 dark:border-[rgba(255,255,255,0.08)] text-stone-900 dark:text-[#F1F5F9] placeholder:text-stone-400 dark:placeholder:text-stone-500 focus:outline-none focus:ring-2 focus:ring-amber-500/40 focus:border-[#F59E0B] transition"
                 />
                 <button
                   type="button"
@@ -327,7 +326,7 @@ export default function Login() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full h-[50px] md:h-[48px] rounded-[8px] bg-[#F59E0B] hover:bg-[#E58E00] active:scale-[0.99] text-[#111827] font-semibold text-[15px] shadow-xs flex items-center justify-center gap-2 transition cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed mt-1"
+              className="w-full h-[46px] sm:h-[50px] md:h-[48px] rounded-[8px] bg-[#F59E0B] hover:bg-[#E58E00] active:scale-[0.99] text-[#111827] font-semibold text-[15px] shadow-xs flex items-center justify-center gap-2 transition cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed mt-0.5 sm:mt-1"
             >
               {loading ? (
                 <>
@@ -342,7 +341,7 @@ export default function Login() {
 
           {/* 4. Under Form Helper Note */}
           <div className="animate-rise-fade" style={{ animationDelay: "120ms" }}>
-            <p className="text-[13px] text-stone-500 dark:text-[#94A3B8] text-center leading-relaxed">
+            <p className="text-[12px] sm:text-[13px] text-stone-500 dark:text-[#94A3B8] text-center leading-relaxed">
               Owner and helpers use the same sign-in. Forgot your password? Ask the shop owner to reset it.
             </p>
           </div>
@@ -350,29 +349,29 @@ export default function Login() {
           {/* 5. Development Only Demo Chips */}
           {import.meta.env.DEV && DEMO_ACCOUNTS.length > 0 && (
             <div
-              className="pt-4 border-t border-stone-200 dark:border-[rgba(255,255,255,0.08)] animate-rise-fade"
+              className="pt-3 sm:pt-4 border-t border-stone-200 dark:border-[rgba(255,255,255,0.08)] animate-rise-fade"
               style={{ animationDelay: "160ms" }}
             >
-              <p className="text-[11px] font-semibold text-center text-stone-400 dark:text-stone-500 uppercase tracking-wider mb-2">
+              <p className="text-[10px] sm:text-[11px] font-semibold text-center text-stone-400 dark:text-stone-500 uppercase tracking-wider mb-2">
                 Demo quick fill (dev only)
               </p>
-              <div className="flex flex-wrap items-center justify-center gap-2">
+              <div className="flex flex-wrap items-center justify-center gap-1.5 sm:gap-2">
                 {DEMO_ACCOUNTS.map((account) => (
                   <button
                     key={account.role}
                     type="button"
                     onClick={() => prefill(account)}
                     title={`Fill in ${account.email}`}
-                    className={`inline-flex items-center gap-1.5 py-1 px-3 rounded-full text-[12px] font-medium border transition active:scale-[0.98] cursor-pointer ${
+                    className={`inline-flex items-center gap-1.5 py-1 sm:py-1.5 px-2.5 sm:px-3 min-h-[32px] sm:min-h-[34px] rounded-full text-[11px] sm:text-[12px] font-medium border transition active:scale-[0.98] cursor-pointer ${
                       account.role === "admin"
                         ? "bg-emerald-500/10 text-emerald-800 dark:text-emerald-300 border-emerald-500/25 hover:bg-emerald-500/15"
                         : "bg-purple-500/10 text-purple-800 dark:text-purple-300 border-purple-500/25 hover:bg-purple-500/15"
                     }`}
                   >
                     {account.role === "admin" ? (
-                      <Shield size={12} className="text-emerald-600 dark:text-emerald-400" />
+                      <Shield size={12} className="text-emerald-600 dark:text-emerald-400 shrink-0" />
                     ) : (
-                      <User size={12} className="text-purple-600 dark:text-purple-400" />
+                      <User size={12} className="text-purple-600 dark:text-purple-400 shrink-0" />
                     )}
                     <span>{account.label}</span>
                   </button>

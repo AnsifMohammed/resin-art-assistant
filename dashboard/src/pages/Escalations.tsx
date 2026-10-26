@@ -16,7 +16,6 @@ import { toast } from "sonner";
 import { useAuth } from "../context/AuthContext.tsx";
 import { ChannelIcon } from "../components/shared/ChannelIcon.tsx";
 import { SkeletonCard } from "../components/shared/Skeleton.tsx";
-import { EmptyState } from "../components/shared/EmptyState.tsx";
 import { WindowCountdown } from "../components/inbox/WindowCountdown.tsx";
 import { AssignModal } from "../components/escalations/AssignModal.tsx";
 import { usePageTitle } from "../components/layout/PageTitle.tsx";
@@ -212,13 +211,19 @@ export default function Escalations() {
     );
   } else if (isError) {
     content = (
-      <div className="rounded-2xl border border-border bg-surface">
-        <EmptyState
-          icon={AlertTriangle}
-          title="Couldn't load escalations"
-          description={error.message}
-          action={{ label: "Try again", onClick: () => void refetch() }}
-        />
+      <div className="rounded-2xl border border-rose-500/20 bg-rose-500/5 p-8 text-center space-y-3">
+        <div className="w-12 h-12 rounded-full bg-rose-500/10 text-rose-500 mx-auto flex items-center justify-center">
+          <AlertTriangle className="w-6 h-6" />
+        </div>
+        <h3 className="text-16 font-semibold font-outfit text-text">Couldn't load escalations</h3>
+        <p className="text-13 text-text-muted max-w-sm mx-auto">{error.message}</p>
+        <button
+          type="button"
+          onClick={() => void refetch()}
+          className="px-4 py-2 rounded-lg bg-surface border border-border text-text font-semibold text-13 hover:bg-surface-muted transition cursor-pointer"
+        >
+          Try again
+        </button>
       </div>
     );
   } else if (scoped.length === 0) {
@@ -236,11 +241,11 @@ export default function Escalations() {
   } else if (filteredEscalations.length === 0) {
     content = (
       <div className="p-6 text-center rounded-xl border border-border bg-surface">
-        <p className="text-13 text-text-muted">No escalations match these filters.</p>
+        <p className="text-13 text-text-muted font-normal">No escalations match these filters.</p>
         <button
           type="button"
           onClick={clearFilters}
-          className="mt-2 text-12 font-semibold text-primary-text hover:underline cursor-pointer"
+          className="mt-2 text-12 font-medium text-primary-text hover:underline cursor-pointer"
         >
           Clear filters
         </button>

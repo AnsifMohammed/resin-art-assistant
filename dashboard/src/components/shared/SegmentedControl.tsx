@@ -45,10 +45,10 @@ export function SegmentedControl<T extends string>({
             title={optTitle}
             disabled={disabled}
             onClick={() => onChange(opt.value)}
-            className={`relative flex items-center justify-center font-medium rounded-[6px] transition-all duration-150 select-none ${itemPadding} ${
+            className={`relative flex items-center justify-center font-medium rounded-[6px] transition-colors duration-150 select-none outline-none focus:outline-none focus-visible:outline-none ring-0 focus:ring-0 border cursor-pointer ${itemPadding} ${
               isSelected
-                ? "bg-surface text-text shadow-xs font-semibold border border-border/50"
-                : "text-text-muted hover:text-text hover:bg-surface/40"
+                ? "bg-surface text-text shadow-xs font-semibold border-border/50"
+                : "border-transparent text-text-muted hover:text-text hover:bg-surface/40"
             } ${disabled ? "pointer-events-none" : ""}`}
           >
             {opt.label}

@@ -8,6 +8,7 @@ import {
 import { toast } from "sonner";
 import { InstagramIcon } from "../components/shared/InstagramIcon.tsx";
 import { SampleDataBadge } from "../components/shared/SampleDataBadge.tsx";
+import { EmptyState } from "../components/shared/EmptyState.tsx";
 import {
   mockIGRules,
   mockIGComments,
@@ -231,7 +232,14 @@ export default function IGCommentsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border/40">
-              {filteredComments.map((c) => (
+              {filteredComments.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="p-8 text-center text-text-muted text-13 font-normal">
+                    No comments found matching the filter.
+                  </td>
+                </tr>
+              ) : (
+                filteredComments.map((c) => (
                 <tr key={c.id} className="hover:bg-surface-muted/50 transition-colors">
                   <td className="p-3.5">
                     <div className="flex items-center gap-2.5">
@@ -273,9 +281,21 @@ export default function IGCommentsPage() {
                   </td>
                   <td className="p-3.5 text-right text-text-muted">{c.time}</td>
                 </tr>
-              ))}
-            </tbody>
+              ))
+            )}
+          </tbody>
           </table>
+        </div>
+      ) : rules.length === 0 ? (
+        <div className="rounded-xl border border-border bg-surface p-6 sm:p-10">
+          <EmptyState
+            title="No automation rules configured"
+            description="Create a rule to automatically reply to Instagram comments containing specific keywords."
+            action={{
+              label: "Add rule",
+              onClick: handleOpenAddRule,
+            }}
+          />
         </div>
       ) : (
         /* ─── Tab 2: Automation Rules Cards ───────────────────────────────────── */

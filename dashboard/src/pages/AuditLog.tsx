@@ -11,13 +11,13 @@ import {
   Bot,
   Cpu,
   Clock,
-  ClipboardList,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuditLog } from "../hooks/useAuditLog.ts";
 import { useUsers } from "../hooks/useUsers.ts";
 import { useAuth } from "../hooks/useAuth.ts";
 import { Avatar } from "../components/shared/Avatar.tsx";
+import { EmptyState } from "../components/shared/EmptyState.tsx";
 import { formatDateTime, formatRelative, humanize } from "../lib/format.ts";
 import type { AuditLogEntry, AuditLogParams } from "../types/index.ts";
 
@@ -357,19 +357,30 @@ export default function AuditLog() {
           ))}
         </div>
       ) : entries.length === 0 ? (
-        /* Empty State */
-        <div className="rounded-xl border border-border bg-surface p-12 text-center space-y-4 md:overflow-y-auto custom-scrollbar">
-          <div className="w-12 h-12 rounded-full bg-surface-muted text-text-muted flex items-center justify-center mx-auto">
-            <ClipboardList className="w-6 h-6" />
-          </div>
-          <div>
-            <h3 className="text-base font-semibold font-display text-text">No audit entries found</h3>
-            <p className="text-sm text-text-muted mt-1 max-w-md mx-auto">
-              {actorFilter || actionFilter
+        <div className="rounded-xl border border-border bg-surface p-6 md:p-8 md:overflow-y-auto custom-scrollbar">
+          <EmptyState
+            title={actorFilter || actionFilter ? "No audit entries match filters" : "No audit events recorded yet"}
+            description={
+              actorFilter || actionFilter
                 ? "No log entries match the selected filters. Try resetting the filters."
-                : "No audit events recorded yet."}
-            </p>
-          </div>
+                : "All staff actions, customer replies, and system events will be recorded here."
+            }
+            action={
+              actorFilter || actionFilter
+                ? {
+                    label: "Clear filters",
+                    onClick: () => {
+                      const next = new URLSearchParams(searchParams);
+                      next.delete("actorId");
+                      next.delete("action");
+                      next.delete("page");
+                      setSearchParams(next, { replace: true });
+                    },
+                    variant: "outline",
+                  }
+                : undefined
+            }
+          />
         </div>
       ) : (
         <>
