@@ -4,6 +4,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import argon2 from "argon2";
+import { invalidateKBCache } from "../ai/prompt.ts";
 import { config } from "../config.ts";
 import { extractVariables } from "../lib/templates.ts";
 import { db, sql } from "./index.ts";
@@ -161,9 +162,9 @@ async function seed() {
     const productRows = rawProducts.map((old: any, idx: number) => {
       const sizes =
         Array.isArray(old.sizes) && old.sizes.length > 0
-          ? old.sizes.map((sizeName: string) => ({
-              name: String(sizeName),
-              price: Math.round(Number(old.price) || 0),
+          ? old.sizes.map((item: any) => ({
+              name: typeof item === "object" && item !== null && item.name ? String(item.name) : String(item),
+              price: typeof item === "object" && item !== null && typeof item.price === "number" ? Math.round(item.price) : Math.round(Number(old.price) || 0),
             }))
           : [{ name: "Standard", price: Math.round(Number(old.price) || 0) }];
 
@@ -182,7 +183,31 @@ async function seed() {
       };
     });
 
-    await db.insert(products).values(productRows).onConflictDoNothing();
+    for (const prod of productRows) {
+      await db
+        .insert(products)
+        .values(prod)
+        .onConflictDoUpdate({
+          target: [products.businessId, products.slug],
+          set: {
+            name: prod.name,
+            description: prod.description,
+            sizes: prod.sizes,
+            leadTimeDays: prod.leadTimeDays,
+            customizable: prod.customizable,
+            customOptions: prod.customOptions,
+            isActive: prod.isActive,
+            sortOrder: prod.sortOrder,
+            updatedAt: new Date(),
+          },
+        });
+    }
+
+    try {
+      await invalidateKBCache(businessId);
+    } catch {
+      // Redis might not be reachable
+    }
   }
 
   console.log(`Seed complete for business ${businessId}`);

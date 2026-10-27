@@ -195,54 +195,54 @@ function address(city: string): string {
 
 /** [name, instagram handle (null = WhatsApp), city, language, plan] */
 type Plan = "auto" | "escalated" | "owner_esc" | "owner_direct" | "resolved" | "paused" | "old";
-const CUSTOMERS: ReadonlyArray<readonly [string, string | null, string, "english" | "tamil", Plan]> = [
+const CUSTOMERS: ReadonlyArray<readonly [string, string | null, string, "english", Plan]> = [
   // WhatsApp (0-26)
   ["Kavya Ramesh", null, "Coimbatore", "english", "auto"],
-  ["Arun Kumar", null, "Coimbatore", "tamil", "escalated"],
+  ["Arun Kumar", null, "Coimbatore", "english", "escalated"],
   ["Divya Subramaniam", null, "Chennai", "english", "auto"],
-  ["Karthik Rajan", null, "Tiruppur", "tamil", "resolved"],
-  ["Meena Sundaram", null, "Coimbatore", "tamil", "owner_esc"],
+  ["Karthik Rajan", null, "Tiruppur", "english", "resolved"],
+  ["Meena Sundaram", null, "Coimbatore", "english", "owner_esc"],
   ["Priyanka Venkatesh", null, "Bangalore", "english", "auto"],
-  ["Sathish Murugan", null, "Erode", "tamil", "escalated"],
+  ["Sathish Murugan", null, "Erode", "english", "escalated"],
   ["Lakshmi Narayanan", null, "Coimbatore", "english", "old"],
   ["Deepa Krishnan", null, "Coimbatore", "english", "auto"],
   ["Vignesh Balaji", null, "Salem", "english", "escalated"],
-  ["Anitha Senthil", null, "Pollachi", "tamil", "auto"],
+  ["Anitha Senthil", null, "Pollachi", "english", "auto"],
   ["Gokul Prasad", null, "Coimbatore", "english", "paused"],
-  ["Revathi Chandran", null, "Madurai", "tamil", "resolved"],
+  ["Revathi Chandran", null, "Madurai", "english", "resolved"],
   ["Harini Mohan", null, "Coimbatore", "english", "auto"],
-  ["Saravanan P", null, "Coimbatore", "tamil", "old"],
+  ["Saravanan P", null, "Coimbatore", "english", "old"],
   ["Nithya Raghavan", null, "Chennai", "english", "owner_direct"],
-  ["Ramya Selvam", null, "Coimbatore", "tamil", "auto"],
+  ["Ramya Selvam", null, "Coimbatore", "english", "auto"],
   ["Bharath Shankar", null, "Hyderabad", "english", "escalated"],
   ["Keerthana Iyer", null, "Coimbatore", "english", "auto"],
-  ["Sowmya Rajendran", null, "Trichy", "tamil", "resolved"],
-  ["Prakash Annamalai", null, "Coimbatore", "tamil", "old"],
+  ["Sowmya Rajendran", null, "Trichy", "english", "resolved"],
+  ["Prakash Annamalai", null, "Coimbatore", "english", "old"],
   ["Janani Ganesh", null, "Coimbatore", "english", "auto"],
-  ["Dinesh Palanisamy", null, "Tiruppur", "tamil", "escalated"],
+  ["Dinesh Palanisamy", null, "Tiruppur", "english", "escalated"],
   ["Gayathri Ravi", null, "Ooty", "english", "auto"],
   ["Madhumitha K", null, "Coimbatore", "english", "auto"],
   ["Suresh Kannan", null, "Chennai", "english", "owner_esc"],
-  ["Vidhya Natarajan", null, "Coimbatore", "tamil", "auto"],
+  ["Vidhya Natarajan", null, "Coimbatore", "english", "auto"],
   // Instagram (27-44)
   ["Kaviya Thangaraj", "kavi.crafts", "Coimbatore", "english", "auto"],
   ["Shruthi Varadarajan", "shruthi_designs", "Chennai", "english", "escalated"],
   ["Nandhini Arul", "the.gift.box.cbe", "Coimbatore", "english", "auto"],
   ["Aishwarya Mani", "aishu_artsy", "Bangalore", "english", "auto"],
-  ["Vinoth Kumar", "vinoth.clicks", "Coimbatore", "tamil", "resolved"],
+  ["Vinoth Kumar", "vinoth.clicks", "Coimbatore", "english", "resolved"],
   ["Pooja Raghavan", "pooja.weds.raghav", "Chennai", "english", "auto"],
   ["Swetha Prabhu", "swetha_homedecor", "Kochi", "english", "escalated"],
   ["Hariharan K", "hari.k.makes", "Coimbatore", "english", "paused"],
-  ["Nila Sekar", "nila.reads", "Madurai", "tamil", "auto"],
+  ["Nila Sekar", "nila.reads", "Madurai", "english", "auto"],
   ["Abinaya Rajkumar", "abi_thoughtfulgifts", "Coimbatore", "english", "auto"],
   ["Sandhya Mohan", "chennai.bride.diaries", "Chennai", "english", "owner_direct"],
-  ["Rithika Sankar", "rithu.rangoli", "Coimbatore", "tamil", "auto"],
+  ["Rithika Sankar", "rithu.rangoli", "Coimbatore", "english", "auto"],
   ["Sneha Reddy", "blr.plantmom", "Bangalore", "english", "escalated"],
   ["Mithun Das", "mithun_photography", "Coimbatore", "english", "old"],
-  ["Yazhini Elango", "yazhini.crafts", "Erode", "tamil", "resolved"],
+  ["Yazhini Elango", "yazhini.crafts", "Erode", "english", "resolved"],
   ["Anusha Arjun", "arjun.and.anu", "Coimbatore", "english", "auto"],
   ["Fathima Nazeer", "kochi.cafe.hopper", "Kochi", "english", "auto"],
-  ["Tharun Kumar", "tharun.tk", "Coimbatore", "tamil", "auto"],
+  ["Tharun Kumar", "tharun.tk", "Coimbatore", "english", "auto"],
 ];
 
 /** Day (IST days ago) each conversation was last active. */
@@ -306,7 +306,7 @@ const ORDER_SPECS: OrderSpec[] = [
   // ready
   { cust: 8, status: "ready", days: 7, items: [["resin-tray-large", 1, { dried_flowers: "yes" }]], dueInDays: 2 },
   { cust: 36, status: "ready", days: 8, items: [["keychain-set-3", 3, { shape: "heart" }]], pickup: true },
-  { cust: 2, status: "ready", days: 10, items: [["resin-clock-12in", 1, { name: "Subramaniam Illam" }]], overdueDays: 2 },
+  { cust: 2, status: "ready", days: 10, items: [["resin-clock-12in", 1, { name: "Subramaniam Family" }]], overdueDays: 2 },
   // dispatched
   { cust: 5, status: "dispatched", days: 9, items: [["ocean-coaster-set-4", 1], ["bookmarks-set-4", 1]], duplicateVoid: true },
   { cust: 30, status: "dispatched", days: 11, items: [["photo-frame-5x7", 2]] },
@@ -318,7 +318,7 @@ const ORDER_SPECS: OrderSpec[] = [
   { cust: 28, status: "delivered", days: 16, items: [["ocean-coaster-set-4", 1]] },
   { cust: 33, status: "delivered", days: 14, items: [["resin-tray-large", 1]] },
   { cust: 2, status: "delivered", days: 26, items: [["keychain-set-3", 2], ["bookmarks-set-4", 2]] },
-  { cust: 27, status: "delivered", days: 24, items: [], custom: [["Resin House Name Plate (12 inch)", "Round name plate, 'Thangaraj Illam', Tamil + English", 1500, 1]], pickup: true, cashOnPickup: true },
+  { cust: 27, status: "delivered", days: 24, items: [], custom: [["Resin House Name Plate (12 inch)", "Round name plate, 'Thangaraj Residence', English", 1500, 1]], pickup: true, cashOnPickup: true },
   { cust: 35, status: "delivered", days: 13, items: [["bookmarks-set-4", 3]] },
   { cust: 0, status: "delivered", days: 33, items: [["resin-tray-large", 1], ["ocean-coaster-set-4", 1]] },
   { cust: 29, status: "delivered", days: 38, items: [["keychain-set-3", 20]], discountPct: 10 },
@@ -575,7 +575,7 @@ function build(ctx: Ctx) {
   const shortName = (p: Product) => p.name.replace(/^Resin /, "").toLowerCase();
   const askPrice = (p: Product, ta: boolean) =>
     ta
-      ? pick([`${shortName(p)} evlo price?`, `Hi akka, ${shortName(p)} rate enna?`, `${p.name} price sollunga`])
+      ? pick([`Hi, how much is the ${shortName(p)}?`, `Could you share the price of ${p.name}?`, `What is the price for ${shortName(p)}?`])
       : pick([`Hi, how much is the ${p.name}?`, `Saw your reel 😍 What's the price of the ${shortName(p)}?`, `Price for ${p.name} pls`]);
   const priceReply = (p: Product) =>
     `Hi! 😊 The ${p.name} is ${rs(p.price)}.` +
@@ -583,7 +583,7 @@ function build(ctx: Ctx) {
     ` It takes about ${p.lead} days to make. Shall I send a few design photos?`;
   const askDelivery = (city: string, ta: boolean) =>
     ta
-      ? pick([`${city} ku delivery panuveengala?`, `${city} la delivery evlo naal aagum?`])
+      ? pick([`Do you deliver to ${city}?`, `How many days for delivery to ${city}?`])
       : pick([`Do you deliver to ${city}?`, `How many days for delivery to ${city}?`]);
   const deliveryReply = (city: string) => {
     const z = zone(city);
@@ -593,24 +593,24 @@ function build(ctx: Ctx) {
   };
   const askCare = (ta: boolean) =>
     ta
-      ? pick(["Epdi maintain pananum? Water la wash panalama?", "Veyil la vechaa colour pogumaa?"])
+      ? pick(["How do I clean it? Will it get scratches?", "Can I keep it near the window? Will the colour fade?"])
       : pick(["How do I clean it? Will it get scratches?", "Can I keep it near the window? Will the colour fade?"]);
   const CARE_REPLY =
     "Easy! Keep it away from direct sunlight and heat, wipe with a soft dry cloth and don't soak it in water. It'll stay glossy for years 🌸";
   const askCustomName = (p: Product, ta: boolean) =>
     ta
-      ? `Name potu ${shortName(p)} panna mudiyuma? En ponnu ku gift`
+      ? `Can you add a custom name on the ${shortName(p)}? It is a gift for my daughter`
       : pick([`Can you add my daughter's name on the ${shortName(p)}?`, `Can I get the ${shortName(p)} in blue and gold with a name on it?`]);
   const customNameReply = (p: Product) =>
     `Of course! 💛 The ${p.name} is ${rs(p.price)} with the name included. Which colours do you like? I'll share a few options.`;
   const askBeforeDiwali = (ta: boolean) =>
-    ta ? "Inniki order panna Diwali ku munnadi kidaikuma?" : "If I order today, will it reach before Diwali?";
+    "If I order today, will it reach in time before Diwali?";
   const diwaliReply = (p: Product, city: string) =>
     `Yes, if you confirm in the next 2-3 days ✨ The ${p.name} takes about ${p.lead} days to make, plus ${zone(city).days} days for delivery to ${city}.`;
 
   function autoSteps(i: number): { steps: Step[]; tag: ConvTag; anchor?: { idx: number; ms: number } } {
     const [, , city, lang] = CUSTOMERS[i]!;
-    const ta = lang === "tamil";
+    const ta = false;
     const latestPlan = orderPlans.filter((o) => o.spec.cust === i).sort((a, b) => b.createdAt - a.createdAt)[0];
     const latestOrder = latestPlan?.spec;
     let anchor: { idx: number; ms: number } | undefined;
@@ -653,7 +653,7 @@ function build(ctx: Ctx) {
       anchor = { idx: steps.length, ms: latestPlan.createdAt - between(8, 40) * MIN };
       steps.push({
         k: "c",
-        text: ta ? "Ok super, book pannunga. Advance ippo anupuren 🙏" : pick(["Ok lovely, please book it. I'll pay the advance now", "Perfect, let's go ahead with the order!"]),
+        text: pick(["Ok lovely, please book it. I'll pay the advance now", "Perfect, let's go ahead with the order!"]),
       });
       steps.push({
         k: "ai",
@@ -667,7 +667,7 @@ function build(ctx: Ctx) {
       if (deliveredAt) {
         // Thank-you message a few hours after delivery (gap measured from the AI reply ~1 min after the anchor).
         steps.push({ k: "gap", hours: Math.max(2, (daytime(deliveredAt + between(2, 8) * HOUR) - anchor.ms) / HOUR) });
-        steps.push({ k: "c", text: ta ? "Parcel vandhuduchu, romba azhaga irukku!! 😍 Thank you" : "Got the parcel today, it's so pretty!! 😍 Thank you" });
+        steps.push({ k: "c", text: "Got the parcel today, it's so pretty!! 😍 Thank you" });
         steps.push({
           k: "ai",
           text: "Yay, so happy you loved it! 🥰 Do share a photo if you can. Tip: keep it away from direct sunlight so the colours stay bright.",
@@ -693,7 +693,7 @@ function build(ctx: Ctx) {
     const SORRY = "I'm so sorry about this. I've passed it to our team and someone will get back to you very shortly 🙏";
     switch (i) {
       case 1: return { tag: "order_confirmed", steps: [
-        { k: "c", text: "Tray order status enna? Gold foil design" },
+        { k: "c", text: "What is my tray order status? Gold foil design" },
         { k: "ai", text: `Hi ${first}! Your ${tray.name} is being made right now ✨ We'll message you as soon as it's ready.`, intent: "delivery", facts: ["order.status"] },
         { k: "gap", hours: 24 },
         { k: "c", text: "I paid already, where is my order? It was supposed to come yesterday" },
@@ -701,8 +701,8 @@ function build(ctx: Ctx) {
         { k: "c", text: "Hello? Please update", gapMin: 95 },
       ] };
       case 6: return { tag: "custom_order", steps: [
-        { k: "c", text: "Vanakkam. Do you make resin tables?" },
-        { k: "ai", text: "Vanakkam! 😊 We make coasters, trays, clocks, frames, keychains and bookmarks, and we customise all of them. Could you tell me what you have in mind?", intent: "custom_order", facts: ["products"] },
+        { k: "c", text: "Hello! Do you make custom resin tables?" },
+        { k: "ai", text: "Hello! 😊 We make coasters, trays, clocks, frames, keychains and bookmarks, and we customise all of them. Could you tell me what you have in mind?", intent: "custom_order", facts: ["products"] },
         { k: "c", text: "How much for a 6 feet resin dining table with river design? Teak wood" },
         { k: "esc", reason: "missing_facts", intent: "price", draft: "That sounds stunning! Let me check with our artist on a 6 ft table and get back to you with a quote.", missing: ["product:6ft river dining table.price", "lead_time"] },
       ] };
@@ -717,9 +717,9 @@ function build(ctx: Ctx) {
         { k: "esc", reason: "intent_unknown", intent: "unknown", draft: "Great question! Let me check with Saba and get back to you on workshops." },
       ] };
       case 22: return { tag: "payment_pending", steps: [
-        { k: "c", text: `${clock.name} with dried flowers and family name, evlo?` },
+        { k: "c", text: `How much is the ${clock.name} with dried flowers and family name?` },
         { k: "ai", text: `Hi! 😊 The ${clock.name} is ${rs(clock.price)} with dried flowers and your family name. It takes about ${clock.lead + 2} days for a custom piece.`, intent: "custom_order", facts: [`product:${clock.slug}.price`, "custom_orders.lead_time_extra_days"], tag: "custom_order" },
-        { k: "c", text: "Ok book pannunga" },
+        { k: "c", text: "Great, please go ahead and book it" },
         { k: "ai", text: `Lovely! 💛 Please pay a 50% advance of ${rs(roundTo10((clock.price + 60) / 2))} on GPay/UPI to confirm your slot.`, intent: "custom_order", facts: ["payment.advance_percent"], tag: "payment_pending" },
         { k: "c", text: "Sent money on GPay just now, screenshot attached. Please confirm", gapMin: 45 },
         { k: "esc", reason: "payment_claim", intent: "payment", draft: "Thank you! Our team will verify the payment and confirm shortly 🙏" },
@@ -741,7 +741,7 @@ function build(ctx: Ctx) {
         { k: "esc", reason: "missing_facts", intent: "custom_order", draft: "Let me check logo printing and the timeline with our team and get back to you today.", missing: ["logo printing", "rush lead time for 50 sets"] },
       ] };
       case 4: return { tag: "follow_up", steps: [
-        { k: "c", text: "Clock vandhuduchu, but the colour is very different from the photo you sent. I asked for maroon, this looks brown" },
+        { k: "c", text: "The clock arrived, but the colour is very different from the photo you sent. I asked for maroon, this looks brown" },
         { k: "esc", reason: "intent_complaint", intent: "complaint", draft: SORRY, assign: true },
         { k: "h", who: "staff", text: `Hi ${first} ma'am, Priya from Saba Art here. Really sorry about this! Could you send a photo in daylight? If it's off we'll redo it at no cost.`, gapMin: 25 },
         { k: "c", text: "Sent the photo now. Please check", gapMin: 40 },
@@ -771,7 +771,7 @@ function build(ctx: Ctx) {
         { k: "c", text: "Perfect, talk then!", gapMin: 25 },
       ] };
       case 3: return { tag: "custom_order", steps: [
-        { k: "c", text: "Resin name board for shop, 3 feet length, evlo aagum?" },
+        { k: "c", text: "How much would a 3-foot custom resin name board for a shop cost?" },
         { k: "esc", reason: "missing_facts", intent: "price", draft: "Let me check with our artist on a 3 ft shop board and come back with a quote.", missing: ["product:3ft shop name board.price"] },
         { k: "h", who: "owner", text: `Hi ${first}! A 3 ft shop board is ₹4,800 with your logo, 10 days to make. Want a mock-up?`, gapMin: 22 },
         { k: "c", text: "Ok send mock-up", gapMin: 15 },
@@ -834,7 +834,7 @@ function build(ctx: Ctx) {
       const [, , , lang] = CUSTOMERS[i]!;
       const p = pick(ctx.products);
       const early: Step[] = [
-        { k: "c", text: askPrice(p, lang === "tamil") },
+        { k: "c", text: askPrice(p, false) },
         { k: "ai", text: priceReply(p), intent: "price", facts: [`product:${p.slug}.price`, `product:${p.slug}.lead_time_days`], tag: "new_lead" },
         { k: "gap", hours: int(20, 40) * 24 + between(-2, 2) },
       ];
