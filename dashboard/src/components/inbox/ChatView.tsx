@@ -116,7 +116,9 @@ export function ChatView({ conversation, onBack, backOnlyOnMobile = false, onRes
   useSocketEvent(`message:new:${conversation.id}`, (e) => appendMessageToCache(qc, conversation.id, e.message));
 
   const messages = conversation.messages;
-  const pendingText = reply.isPending && reply.variables && "text" in reply.variables ? reply.variables.text : undefined;
+  const pendingReply =
+    reply.isPending && reply.variables && !("templateId" in reply.variables) ? reply.variables : undefined;
+  const pendingText = pendingReply?.text;
 
   /** Label for outbound messages. Messages only carry senderId (see report: contract gap). */
   const labelFor = useMemo(() => {
@@ -157,8 +159,8 @@ export function ChatView({ conversation, onBack, backOnlyOnMobile = false, onRes
   const canResolve = conversation.state === "escalated" || conversation.state === "owner_handling";
   const esc = conversation.openEscalation;
 
-  const handleSend = (text: string) =>
-    reply.mutateAsync({ text }).catch((err: unknown) => {
+  const handleSend = (payload: { text?: string | undefined; mediaUrls?: string[] | undefined }) =>
+    reply.mutateAsync(payload).catch((err: unknown) => {
       toast({
         variant: "error",
         title: "Reply not sent",
@@ -292,15 +294,15 @@ export function ChatView({ conversation, onBack, backOnlyOnMobile = false, onRes
                 </Fragment>
               );
             })}
-            {pendingText && (
+            {(pendingText || (pendingReply?.mediaUrls && pendingReply.mediaUrls.length > 0)) && (
               <MessageBubble
                 pending
                 senderLabel="You"
                 message={{
                   id: "pending",
                   senderType: user?.role === "staff" ? "staff" : "owner",
-                  content: pendingText,
-                  mediaUrls: [],
+                  content: pendingText || null,
+                  mediaUrls: pendingReply?.mediaUrls ?? [],
                   createdAt: new Date().toISOString(),
                   deliveryStatus: "queued",
                 }}

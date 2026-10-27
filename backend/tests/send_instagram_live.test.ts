@@ -60,6 +60,70 @@ describe("sendMessage with INSTAGRAM_LIVE=true and DEMO_MODE=true", () => {
     expect(logged).toContain("mid.ig.1");
   });
 
+  it("sends Instagram media attachments alongside text", async () => {
+    let callCount = 0;
+    const fetchMock = vi.fn(async () =>
+      new Response(JSON.stringify({ recipient_id: "igsid-secret", message_id: `mid.ig.${++callCount}` }), { status: 200 }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await sendMessage({
+      channelType: "instagram",
+      recipient: "igsid-secret",
+      text: "Here is your custom tray photo",
+      mediaUrls: ["https://res.cloudinary.com/test/image/upload/tray.jpg"],
+      businessId: "test-business",
+      conversationId: "conv-1",
+    });
+
+    expect(result).toEqual({ metaMessageId: "mid.ig.1" });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    // Call 1: text
+    const [, init1] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(JSON.parse(init1.body as string)).toEqual({
+      recipient: { id: "igsid-secret" },
+      message: { text: "Here is your custom tray photo" },
+    });
+    // Call 2: media attachment
+    const [, init2] = fetchMock.mock.calls[1] as unknown as [string, RequestInit];
+    expect(JSON.parse(init2.body as string)).toEqual({
+      recipient: { id: "igsid-secret" },
+      message: {
+        attachment: {
+          type: "image",
+          payload: { url: "https://res.cloudinary.com/test/image/upload/tray.jpg", is_reusable: true },
+        },
+      },
+    });
+  });
+
+  it("sends Instagram media-only replies without throwing empty text errors", async () => {
+    const fetchMock = ok("mid.ig.media-only");
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await sendMessage({
+      channelType: "instagram",
+      recipient: "igsid-secret",
+      text: "",
+      mediaUrls: ["https://res.cloudinary.com/test/video/upload/tray.mp4"],
+      businessId: "test-business",
+      conversationId: "conv-1",
+    });
+
+    expect(result).toEqual({ metaMessageId: "mid.ig.media-only" });
+    expect(fetchMock).toHaveBeenCalledOnce();
+    const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(JSON.parse(init.body as string)).toEqual({
+      recipient: { id: "igsid-secret" },
+      message: {
+        attachment: {
+          type: "video",
+          payload: { url: "https://res.cloudinary.com/test/video/upload/tray.mp4", is_reusable: true },
+        },
+      },
+    });
+  });
+
   it("keeps WhatsApp in demo mode (logged, never sent)", async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);

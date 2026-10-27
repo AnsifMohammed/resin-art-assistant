@@ -16,11 +16,12 @@ interface DemoAccount {
   password: string;
 }
 
+const SHOW_DEMO_LOGINS = import.meta.env.DEV || import.meta.env.VITE_ENABLE_DEMO_LOGINS === "true";
+
 /**
- * Seeded demo accounts (backend seed). Only offered as a prefill in development builds;
- * the ternary lets production builds drop the credentials from the bundle entirely.
+ * Seeded demo accounts (backend seed). Offered in development builds or when VITE_ENABLE_DEMO_LOGINS is true.
  */
-const DEMO_ACCOUNTS: DemoAccount[] = import.meta.env.DEV
+const DEMO_ACCOUNTS: DemoAccount[] = SHOW_DEMO_LOGINS
   ? [
     { role: "admin", label: "Demo admin", email: "asha@asharesins.com", password: "changeme123" },
     { role: "staff", label: "Demo staff", email: "priya@asharesins.com", password: "staffpass123" },
@@ -213,7 +214,7 @@ export default function Login() {
           <button
             type="button"
             onClick={toggleTheme}
-            className="p-2 sm:p-2.5 min-w-[38px] min-h-[38px] sm:min-w-[40px] sm:min-h-[40px] flex items-center justify-center rounded-xl border border-stone-200 dark:border-[rgba(255,255,255,0.08)] bg-stone-50 dark:bg-[#1A2335] hover:bg-stone-100 dark:hover:bg-[#222e44] text-stone-600 dark:text-[#94A3B8] transition cursor-pointer"
+            className="p-2.5 min-w-[42px] min-h-[42px] sm:min-w-[40px] sm:min-h-[40px] flex items-center justify-center rounded-xl border border-stone-200 dark:border-[rgba(255,255,255,0.08)] bg-stone-50 dark:bg-[#1A2335] hover:bg-stone-100 dark:hover:bg-[#222e44] text-stone-600 dark:text-[#94A3B8] transition cursor-pointer"
             title={`Switch to ${resolvedTheme === "dark" ? "light" : "dark"} theme`}
             aria-label="Toggle theme"
           >
@@ -275,7 +276,7 @@ export default function Login() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="name@asharesins.com"
-                className="w-full h-[46px] sm:h-[48px] md:h-[46px] px-3.5 rounded-[8px] text-[16px] md:text-[14px] bg-stone-50 dark:bg-[#1A2335] border border-stone-200 dark:border-[rgba(255,255,255,0.08)] text-stone-900 dark:text-[#F1F5F9] placeholder:text-stone-400 dark:placeholder:text-stone-500 focus:outline-none focus:ring-2 focus:ring-amber-500/40 focus:border-[#F59E0B] transition"
+                className="w-full h-[48px] px-3.5 rounded-[10px] text-[16px] md:text-[14px] bg-stone-50 dark:bg-[#1A2335] border border-stone-200 dark:border-[rgba(255,255,255,0.08)] text-stone-900 dark:text-[#F1F5F9] placeholder:text-stone-400 dark:placeholder:text-stone-500 focus:outline-none focus:ring-2 focus:ring-amber-500/40 focus:border-[#F59E0B] transition"
               />
             </div>
 
@@ -296,7 +297,7 @@ export default function Login() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full h-[46px] sm:h-[48px] md:h-[46px] pl-3.5 pr-12 rounded-[8px] text-[16px] md:text-[14px] bg-stone-50 dark:bg-[#1A2335] border border-stone-200 dark:border-[rgba(255,255,255,0.08)] text-stone-900 dark:text-[#F1F5F9] placeholder:text-stone-400 dark:placeholder:text-stone-500 focus:outline-none focus:ring-2 focus:ring-amber-500/40 focus:border-[#F59E0B] transition"
+                  className="w-full h-[48px] pl-3.5 pr-12 rounded-[10px] text-[16px] md:text-[14px] bg-stone-50 dark:bg-[#1A2335] border border-stone-200 dark:border-[rgba(255,255,255,0.08)] text-stone-900 dark:text-[#F1F5F9] placeholder:text-stone-400 dark:placeholder:text-stone-500 focus:outline-none focus:ring-2 focus:ring-amber-500/40 focus:border-[#F59E0B] transition"
                 />
                 <button
                   type="button"
@@ -326,7 +327,7 @@ export default function Login() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full h-[46px] sm:h-[50px] md:h-[48px] rounded-[8px] bg-[#F59E0B] hover:bg-[#E58E00] active:scale-[0.99] text-[#111827] font-semibold text-[15px] shadow-xs flex items-center justify-center gap-2 transition cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed mt-0.5 sm:mt-1"
+              className="w-full h-[50px] sm:h-[48px] rounded-[10px] bg-[#F59E0B] hover:bg-[#E58E00] active:scale-[0.99] text-[#111827] font-semibold font-['Outfit',sans-serif] text-[16px] sm:text-[15px] shadow-sm flex items-center justify-center gap-2 transition cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed mt-0.5 sm:mt-1"
             >
               {loading ? (
                 <>
@@ -346,14 +347,14 @@ export default function Login() {
             </p>
           </div>
 
-          {/* 5. Development Only Demo Chips */}
-          {import.meta.env.DEV && DEMO_ACCOUNTS.length > 0 && (
+          {/* 5. Demo Chips (dev or when VITE_ENABLE_DEMO_LOGINS is enabled) */}
+          {SHOW_DEMO_LOGINS && DEMO_ACCOUNTS.length > 0 && (
             <div
               className="pt-3 sm:pt-4 border-t border-stone-200 dark:border-[rgba(255,255,255,0.08)] animate-rise-fade"
               style={{ animationDelay: "160ms" }}
             >
               <p className="text-[10px] sm:text-[11px] font-semibold text-center text-stone-400 dark:text-stone-500 uppercase tracking-wider mb-2">
-                Demo quick fill (dev only)
+                Demo quick fill
               </p>
               <div className="flex flex-wrap items-center justify-center gap-1.5 sm:gap-2">
                 {DEMO_ACCOUNTS.map((account) => (
@@ -362,16 +363,16 @@ export default function Login() {
                     type="button"
                     onClick={() => prefill(account)}
                     title={`Fill in ${account.email}`}
-                    className={`inline-flex items-center gap-1.5 py-1 sm:py-1.5 px-2.5 sm:px-3 min-h-[32px] sm:min-h-[34px] rounded-full text-[11px] sm:text-[12px] font-medium border transition active:scale-[0.98] cursor-pointer ${
+                    className={`inline-flex items-center gap-1.5 py-1.5 px-3.5 sm:px-3 min-h-[38px] sm:min-h-[34px] rounded-full text-[13px] sm:text-[12px] font-medium border transition active:scale-[0.98] cursor-pointer ${
                       account.role === "admin"
                         ? "bg-emerald-500/10 text-emerald-800 dark:text-emerald-300 border-emerald-500/25 hover:bg-emerald-500/15"
                         : "bg-purple-500/10 text-purple-800 dark:text-purple-300 border-purple-500/25 hover:bg-purple-500/15"
                     }`}
                   >
                     {account.role === "admin" ? (
-                      <Shield size={12} className="text-emerald-600 dark:text-emerald-400 shrink-0" />
+                      <Shield size={13} className="text-emerald-600 dark:text-emerald-400 shrink-0" />
                     ) : (
-                      <User size={12} className="text-purple-600 dark:text-purple-400 shrink-0" />
+                      <User size={13} className="text-purple-600 dark:text-purple-400 shrink-0" />
                     )}
                     <span>{account.label}</span>
                   </button>

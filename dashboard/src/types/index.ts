@@ -360,9 +360,9 @@ export interface ConversationDetailResponse {
   conversation: ConversationDetail;
 }
 
-/** Body is exactly one of { text } or { templateId, variables? }. */
+/** Body is text with optional media, media without text, or an approved template. */
 export type ReplyRequest =
-  | { text: string }
+  | { text?: string | undefined; mediaUrls?: string[] | undefined }
   | { templateId: string; variables?: Record<string, string> };
 
 export interface ReplyResponse {

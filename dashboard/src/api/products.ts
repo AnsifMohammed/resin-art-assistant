@@ -72,7 +72,7 @@ export async function uploadToCloudinary(file: File): Promise<string> {
     }
 
     const res = await fetch(
-      `https://api.cloudinary.com/v1_1/${sig.cloudName}/image/upload`,
+      `https://api.cloudinary.com/v1_1/${sig.cloudName}/auto/upload`,
       { method: "POST", body: formData },
     );
     if (res.ok) {
@@ -91,7 +91,7 @@ export async function uploadToCloudinary(file: File): Promise<string> {
     formData.append("file", file);
     formData.append("upload_preset", clientPreset);
     const res = await fetch(
-      `https://api.cloudinary.com/v1_1/${clientCloudName}/image/upload`,
+      `https://api.cloudinary.com/v1_1/${clientCloudName}/auto/upload`,
       { method: "POST", body: formData },
     );
     if (res.ok) {

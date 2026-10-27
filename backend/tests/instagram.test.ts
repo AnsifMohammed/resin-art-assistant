@@ -90,6 +90,52 @@ describe("sendInstagramText", () => {
   });
 });
 
+describe("sendInstagramMedia", () => {
+  it("sends an image attachment with the correct Meta payload", async () => {
+    fetchMock.mockResolvedValue(json({ message_id: "mid.media.img1" }));
+    const res = await ig.sendInstagramMedia({
+      recipientId: "igsid-1",
+      mediaUrl: "https://res.cloudinary.com/demo/image/upload/sample.jpg",
+    });
+
+    expect(res).toEqual({ metaMessageId: "mid.media.img1" });
+    const [url, init] = call();
+    expect(url).toContain("/me/messages");
+    expect(JSON.parse(init.body as string)).toEqual({
+      recipient: { id: "igsid-1" },
+      message: {
+        attachment: {
+          type: "image",
+          payload: {
+            url: "https://res.cloudinary.com/demo/image/upload/sample.jpg",
+            is_reusable: true,
+          },
+        },
+      },
+    });
+  });
+
+  it("detects video attachments from URL extension or path", async () => {
+    fetchMock.mockResolvedValue(json({ message_id: "mid.media.vid1" }));
+    await ig.sendInstagramMedia({
+      recipientId: "igsid-1",
+      mediaUrl: "https://res.cloudinary.com/demo/video/upload/demo.mp4",
+    });
+
+    const [, init] = call();
+    expect(JSON.parse(init.body as string).message.attachment.type).toBe("video");
+  });
+
+  it("validates recipientId and mediaUrl", async () => {
+    await expect(ig.sendInstagramMedia({ recipientId: "", mediaUrl: "http://example.com/img.png" })).rejects.toMatchObject({
+      code: "VALIDATION_ERROR",
+    });
+    await expect(ig.sendInstagramMedia({ recipientId: "igsid-1", mediaUrl: "" })).rejects.toMatchObject({
+      code: "VALIDATION_ERROR",
+    });
+  });
+});
+
 describe("Meta error mapping", () => {
   const cases: Array<[Response, number, string]> = [
     [metaError(190, 463), 502, "META_TOKEN_INVALID"],

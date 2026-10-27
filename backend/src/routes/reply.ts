@@ -19,12 +19,21 @@ import { requireStaffOrAdmin } from "../middleware/requireStaffOrAdmin.ts";
 import { emitConversationUpdated, emitMessageNew } from "../realtime/events.ts";
 import { sendMessage } from "../services/send.ts";
 
-// Either free text or a template (+ variable values). Strict objects so a body
-// with both (or neither) matches no branch.
+// Either free text (with optional media attachments) or a template (+ variable values).
 const replySchema = z.union([
-  z.strictObject({
-    text: z.string().min(1).max(4096),
-  }),
+  z
+    .object({
+      text: z.string().max(4096).optional(),
+      mediaUrls: z.array(z.string().url()).max(10).optional(),
+    })
+    .refine(
+      (data) =>
+        (data.text && data.text.trim().length > 0) ||
+        (Array.isArray(data.mediaUrls) && data.mediaUrls.length > 0),
+      {
+        message: "Either text or at least one media URL is required",
+      },
+    ),
   z.strictObject({
     templateId: z.string().min(1),
     variables: z.record(z.string(), z.string().max(1000)).optional(),
@@ -170,12 +179,14 @@ export const replyRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
 
       // 3a. Resolve the text to send (template is always loaded on the template branch).
       const text =
-        "text" in body
-          ? body.text
-          : renderTemplateReply(template!, channel.type, {
+        "templateId" in body
+          ? renderTemplateReply(template!, channel.type, {
               customerName: customer.name ?? customer.handleOrPhone,
               ...body.variables,
-            });
+            })
+          : (body.text?.trim() || null);
+
+      const mediaUrls = "mediaUrls" in body && Array.isArray(body.mediaUrls) ? body.mediaUrls : [];
 
       // 4. Update conversation state to owner_handling (pauses AI for human handling)
       await db
@@ -193,6 +204,7 @@ export const replyRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
           senderType: request.user.role === "admin" ? "owner" : "staff",
           senderId: request.user.sub,
           content: text,
+          mediaUrls,
           deliveryStatus: "queued",
           ...(template ? { metadata: { templateId: template.id, templateName: template.name } } : {}),
         })
@@ -206,7 +218,8 @@ export const replyRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
         const result = await sendMessage({
           channelType: channel.type,
           recipient: customer.handleOrPhone,
-          text,
+          text: text ?? undefined,
+          mediaUrls,
           businessId,
           conversationId: id,
         });
@@ -257,7 +270,8 @@ export const replyRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
         details: {
           messageId: newMsg?.id,
           ...(template ? { templateId: template.id } : {}),
-          preview: text.slice(0, 100),
+          preview: (text ?? "").slice(0, 100),
+          mediaCount: mediaUrls.length,
         },
       });
 

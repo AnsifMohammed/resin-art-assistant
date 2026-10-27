@@ -1,5 +1,5 @@
 import { useId, useState } from "react";
-import { AlertCircle, Bot, ChevronDown, Sparkles } from "lucide-react";
+import { AlertCircle, Bot, ChevronDown, ExternalLink, Sparkles } from "lucide-react";
 import { cn } from "../../lib/cn.ts";
 import { escalationReasonLabel } from "../../lib/escalationReasons.ts";
 import { formatTime, humanize } from "../../lib/format.ts";
@@ -110,6 +110,35 @@ function AiReasoning({ decision }: { decision: AiDecisionSummary }) {
   );
 }
 
+type FileCategory = "image" | "video" | "document";
+
+function getFileCategory(url: string): { category: FileCategory; ext: string; filename: string } {
+  try {
+    const cleanUrl = url.split("?")[0]?.split("#")[0] ?? url;
+    const filename = decodeURIComponent(cleanUrl.split("/").pop() || "attachment");
+    const ext = filename.split(".").pop()?.toLowerCase() || "";
+
+    if (["jpg", "jpeg", "png", "gif", "webp", "svg", "avif"].includes(ext) || url.includes("/image/upload/")) {
+      return { category: "image", ext, filename };
+    }
+    if (["mp4", "webm", "mov", "mkv", "avi", "m4v"].includes(ext) || url.includes("/video/upload/")) {
+      return { category: "video", ext, filename };
+    }
+    return { category: "document", ext, filename };
+  } catch {
+    return { category: "document", ext: "", filename: "attachment" };
+  }
+}
+
+function getDocumentBadge(ext: string): { label: string; bg: string } {
+  const e = ext.toLowerCase();
+  if (e === "pdf") return { label: "PDF", bg: "bg-red-500/20 text-red-600 dark:text-red-400" };
+  if (e === "doc" || e === "docx") return { label: "DOC", bg: "bg-blue-500/20 text-blue-600 dark:text-blue-400" };
+  if (e === "ppt" || e === "pptx") return { label: "PPT", bg: "bg-amber-500/20 text-amber-600 dark:text-amber-400" };
+  if (e === "xls" || e === "xlsx") return { label: "XLS", bg: "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400" };
+  return { label: ext.toUpperCase().slice(0, 4) || "FILE", bg: "bg-stone-500/20 text-stone-600 dark:text-stone-400" };
+}
+
 export function MessageBubble({ message, senderLabel, pending = false }: MessageBubbleProps) {
   const { senderType } = message;
   const media = Array.isArray(message.mediaUrls) ? message.mediaUrls.filter((u) => typeof u === "string" && u) : [];
@@ -144,23 +173,73 @@ export function MessageBubble({ message, senderLabel, pending = false }: Message
       )}
 
       {media.length > 0 && (
-        <div className={cn("mb-1.5 grid gap-1.5", media.length > 1 ? "grid-cols-2" : "grid-cols-1")}>
-          {media.map((url, i) => (
-            <a
-              key={`${url}-${i}`}
-              href={url}
-              target="_blank"
-              rel="noreferrer noopener"
-              className="block overflow-hidden rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-            >
-              <img
-                src={url}
-                alt={`Attachment ${i + 1}`}
-                loading="lazy"
-                className="h-32 w-full max-w-[16rem] bg-black/5 object-cover"
-              />
-            </a>
-          ))}
+        <div className="mb-2 space-y-1.5">
+          {media.map((url, i) => {
+            const { category, ext, filename } = getFileCategory(url);
+
+            if (category === "video") {
+              return (
+                <div key={`${url}-${i}`} className="overflow-hidden rounded-xl bg-black/10 dark:bg-black/40">
+                  <video
+                    src={url}
+                    controls
+                    preload="metadata"
+                    className="max-h-64 w-full rounded-xl bg-black"
+                  />
+                </div>
+              );
+            }
+
+            if (category === "document") {
+              const docBadge = getDocumentBadge(ext);
+              return (
+                <a
+                  key={`${url}-${i}`}
+                  href={url}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className={cn(
+                    "flex items-center gap-2.5 rounded-xl border border-current/15 p-2.5 transition-colors cursor-pointer",
+                    senderType === "customer"
+                      ? "bg-surface-muted/60 hover:bg-surface-muted text-text"
+                      : "bg-black/10 hover:bg-black/20 text-current",
+                  )}
+                  title={`Open ${filename}`}
+                >
+                  <div
+                    className={cn(
+                      "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg font-bold text-11 shadow-2xs",
+                      docBadge.bg,
+                    )}
+                  >
+                    {docBadge.label}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-12 font-medium leading-snug">{filename}</p>
+                    <span className="text-10 opacity-75">Click to view document</span>
+                  </div>
+                  <ExternalLink className="h-4 w-4 shrink-0 opacity-70" />
+                </a>
+              );
+            }
+
+            return (
+              <a
+                key={`${url}-${i}`}
+                href={url}
+                target="_blank"
+                rel="noreferrer noopener"
+                className="block overflow-hidden rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              >
+                <img
+                  src={url}
+                  alt={`Attachment ${i + 1}`}
+                  loading="lazy"
+                  className="max-h-60 w-full max-w-[18rem] rounded-xl bg-black/5 object-cover"
+                />
+              </a>
+            );
+          })}
         </div>
       )}
 
