@@ -96,7 +96,46 @@ function mockDemoDecision(text: string): AiDecision {
     };
   }
 
-  if (lower.includes("ocean coaster set") || (lower.includes("coaster") && !text.includes("രൂപ"))) {
+  if (lower.includes("varmala") || lower.includes("preservation") || lower.includes("garland")) {
+    return {
+      intent: "price",
+      reply: "Hi! 😊 Congratulations on your wedding! 💕 Varmala preservation blocks come in 3 sizes: 6 inch (₹2,499), 9 inch (₹4,499), and 12 inch with warm LED wooden base (₹6,999). Lead time is about 18 days for careful dehydration & deep casting. Which shape do you prefer—Hexagon or Arch?",
+      facts_used: ["products.varmala-preservation-block.sizes.6 inch Hexagon / Arch.price: 2499"],
+      missing_facts: [],
+      escalate: false,
+      escalate_reason: null,
+      suggested_tag: "new_lead",
+      language_detected: "english",
+    };
+  }
+
+  if (lower.includes("thali") || lower.includes("pooja")) {
+    return {
+      intent: "price",
+      reply: "Yes, we do! 🪔 Our 8 inch festive pooja thali with 2 katoris is ₹1,350, and our 11 inch royal pooja set with diya and incense holder is ₹2,400. Beautifully embedded with real gold foil and auspicious Om/Swastik motifs. Which size would you like?",
+      facts_used: ["products.pooja-thali-set.sizes.8 inch Festive Thali with 2 Katoris.price: 1350"],
+      missing_facts: [],
+      escalate: false,
+      escalate_reason: null,
+      suggested_tag: "new_lead",
+      language_detected: "english",
+    };
+  }
+
+  if (lower.includes("nameplate")) {
+    return {
+      intent: "price",
+      reply: "Hello! 🏡 Our custom resin nameplates come in 12x8 inch acrylic (₹2,200), 16x10 inch teak wood + resin (₹3,400), and 18x12 inch luxury backlit LED (₹4,800). All customized with 3D embossed letters! Would you like wood or marble finish?",
+      facts_used: ["products.custom-nameplate.sizes.12 x 8 inch Acrylic & Resin.price: 2200"],
+      missing_facts: [],
+      escalate: false,
+      escalate_reason: null,
+      suggested_tag: "custom_order",
+      language_detected: "english",
+    };
+  }
+
+  if (lower.includes("ocean coaster set") || lower.includes("coaster")) {
     return {
       intent: "price",
       reply: "Hi! 😊 The Ocean Coaster Set of 4 is ₹1,200. We can customise colours and add a name too! Lead time is about 5 days. Interested?",
@@ -148,16 +187,16 @@ function mockDemoDecision(text: string): AiDecision {
     };
   }
 
-  if (text.includes("എത്ര") || text.includes("രൂപ") || lower.includes("keychain")) {
+  if (lower.includes("keychain") || lower.includes("initial")) {
     return {
       intent: "price",
-      reply: "Resin Keychain Set of 3 ₹450 ആണ് 😊 Colour, name, shape customise ചെയ്യാം. Interest ഉണ്ടോ?",
+      reply: "Hi! 😊 The Resin Keychain Set of 3 is ₹450. We can customise the colour, name, and shape for you. Would you like to place an order?",
       facts_used: ["products.keychain-set-3.sizes.Standard.price: 450"],
       missing_facts: [],
       escalate: false,
       escalate_reason: null,
       suggested_tag: "new_lead",
-      language_detected: text.includes("രൂപ") ? "malayalam" : "manglish",
+      language_detected: "english",
     };
   }
 
