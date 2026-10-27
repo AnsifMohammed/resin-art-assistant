@@ -1,7 +1,6 @@
 import { useState } from "react";
 import {
   UserPlus,
-  Users,
   Shield,
   Eye,
   EyeOff,
@@ -16,6 +15,7 @@ import { useUsers, useCreateUser, useUpdateUser } from "../hooks/useUsers.ts";
 import { useAuth } from "../hooks/useAuth.ts";
 import { Avatar } from "../components/shared/Avatar.tsx";
 import { ConfirmDialog } from "../components/shared/ConfirmDialog.tsx";
+import { EmptyState } from "../components/shared/EmptyState.tsx";
 import { formatRelative } from "../lib/format.ts";
 import { generatePassword } from "../lib/password.ts";
 import { isApiError } from "../api/client.ts";
@@ -263,25 +263,15 @@ export default function UserManagement() {
             ))}
           </div>
         ) : staffList.length === 0 ? (
-          /* Empty State */
-          <div className="rounded-xl border border-border bg-surface p-12 text-center space-y-4">
-            <div className="w-12 h-12 rounded-full bg-primary-soft text-primary-text flex items-center justify-center mx-auto">
-              <Users className="w-6 h-6" />
-            </div>
-            <div>
-              <h3 className="text-base font-semibold font-display text-text">No staff yet</h3>
-              <p className="text-sm text-text-muted mt-1 max-w-md mx-auto">
-                No staff yet — add your first helper to handle customer escalations during peak hours.
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={handleOpenAddModal}
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-primary text-primary-foreground font-semibold text-sm shadow-xs hover:brightness-105 transition cursor-pointer"
-            >
-              <UserPlus className="w-4 h-4" />
-              <span>Add staff</span>
-            </button>
+          <div className="rounded-xl border border-border bg-surface p-6 sm:p-10">
+            <EmptyState
+              title="No staff yet"
+              description="Add your first helper to handle customer escalations during peak hours."
+              action={{
+                label: "Add staff",
+                onClick: handleOpenAddModal,
+              }}
+            />
           </div>
         ) : (
           <>

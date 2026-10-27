@@ -4,11 +4,11 @@ import {
   ChevronRight,
   Copy,
   Edit,
-  FileText,
   Loader2,
   Plus,
   Search,
   Trash2,
+  AlertCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { ChannelIcon } from "../components/shared/ChannelIcon.tsx";
@@ -794,20 +794,25 @@ export default function TemplatesPage() {
     );
   } else if (templatesQuery.isError) {
     content = (
-      <div className="rounded-xl border border-border bg-surface">
-        <EmptyState
-          icon={FileText}
-          title="Couldn't load templates"
-          description={errorMessage(templatesQuery.error)}
-          action={{ label: "Try again", onClick: () => void templatesQuery.refetch() }}
-        />
+      <div className="rounded-xl border border-rose-500/20 bg-rose-500/5 p-8 text-center space-y-3">
+        <div className="w-12 h-12 rounded-full bg-rose-500/10 text-rose-500 mx-auto flex items-center justify-center">
+          <AlertCircle className="w-6 h-6" />
+        </div>
+        <h3 className="text-16 font-semibold font-outfit text-text">Couldn't load templates</h3>
+        <p className="text-13 text-text-muted max-w-sm mx-auto">{errorMessage(templatesQuery.error)}</p>
+        <button
+          type="button"
+          onClick={() => void templatesQuery.refetch()}
+          className="px-4 py-2 rounded-lg bg-surface border border-border text-text font-semibold text-13 hover:bg-surface-muted transition cursor-pointer"
+        >
+          Try again
+        </button>
       </div>
     );
   } else if (templates.length === 0) {
     content = (
-      <div className="rounded-xl border border-border bg-surface">
+      <div className="rounded-xl border border-border bg-surface p-6 sm:p-10">
         <EmptyState
-          icon={FileText}
           title="No templates yet"
           description="Save replies you send often, like order confirmations and delivery updates, and reuse them in one click."
           action={{ label: "New template", onClick: () => openEditor(null) }}
@@ -816,7 +821,7 @@ export default function TemplatesPage() {
     );
   } else if (filteredTemplates.length === 0) {
     content = (
-      <p className="py-10 text-center text-13 text-text-muted">
+      <p className="py-10 text-center text-13 text-text-muted font-normal">
         No templates match{searchQuery.trim() ? ` "${searchQuery.trim()}"` : " this category"}.
       </p>
     );

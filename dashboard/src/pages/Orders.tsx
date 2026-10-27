@@ -24,6 +24,7 @@ import {
 import { toast } from "sonner";
 import { ChannelIcon } from "../components/shared/ChannelIcon.tsx";
 import { Skeleton } from "../components/shared/Skeleton.tsx";
+import { EmptyState } from "../components/shared/EmptyState.tsx";
 import { PaymentsPanel } from "../components/orders/PaymentsPanel.tsx";
 import { useOrderPayments } from "../hooks/usePayments.ts";
 import {
@@ -855,16 +856,16 @@ export default function Orders() {
 
               {/* Responsive Card Grid */}
               {orders.length === 0 ? (
-                <div className="p-12 rounded-xl border border-dashed border-border bg-surface text-center space-y-3">
-                  <p className="text-13 text-text-muted">
-                    No orders currently in {COLUMNS.find((c) => c.id === selectedStatus)?.label.toLowerCase() ?? "this stage"}.
-                  </p>
-                  <button
-                    onClick={() => setSelectedStatus("all")}
-                    className="px-3.5 py-1.5 rounded-lg bg-surface-muted border border-border text-12 font-medium text-text hover:bg-border transition-colors cursor-pointer"
-                  >
-                    Back to full board
-                  </button>
+                <div className="rounded-xl border border-border bg-surface p-6 sm:p-10">
+                  <EmptyState
+                    title={`No orders in ${COLUMNS.find((c) => c.id === selectedStatus)?.label.toLowerCase() ?? "this stage"}`}
+                    description="Move an order to this stage or switch back to the full pipeline."
+                    action={{
+                      label: "Back to full board",
+                      onClick: () => setSelectedStatus("all"),
+                      variant: "outline",
+                    }}
+                  />
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 items-stretch pb-4">
@@ -949,7 +950,7 @@ export default function Orders() {
               <tbody className="divide-y divide-border/40">
                 {orders.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="p-8 text-center text-text-muted text-13">
+                    <td colSpan={7} className="p-8 text-center text-text-muted text-13 font-normal">
                       No orders found matching the filter.
                     </td>
                   </tr>

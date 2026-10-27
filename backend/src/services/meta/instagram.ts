@@ -125,6 +125,41 @@ export async function resolveInstagramToken(businessId: string = config.BUSINESS
   throw new AppError(503, "Instagram is not connected for this business", "INSTAGRAM_NOT_CONFIGURED");
 }
 
+/** Profile lookups run inside webhook handling, so they get a short timeout. */
+const PROFILE_TIMEOUT_MS = 3000;
+
+/**
+ * Display name for an Instagram customer from the User Profile API
+ * (GET /{IGSID}?fields=name,username): "Name (@username)", "@username" or "Name".
+ * Best effort: returns null on any failure so webhook handling never breaks.
+ */
+export async function fetchInstagramDisplayName(
+  igsid: string,
+  businessId: string = config.BUSINESS_ID,
+): Promise<string | null> {
+  try {
+    const token = await resolveInstagramToken(businessId);
+    const url = `${INSTAGRAM_GRAPH_HOST}/${INSTAGRAM_GRAPH_VERSION}/${encodeURIComponent(igsid)}?fields=name,username`;
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(PROFILE_TIMEOUT_MS),
+    });
+    if (!res.ok) {
+      logger.warn({ status: res.status }, "Instagram profile lookup failed");
+      return null;
+    }
+    const body = (await res.json()) as { name?: unknown; username?: unknown };
+    const name = typeof body.name === "string" ? body.name.trim() : "";
+    const username = typeof body.username === "string" ? body.username.trim() : "";
+    if (name && username) return `${name} (@${username})`;
+    if (username) return `@${username}`;
+    return name || null;
+  } catch (err) {
+    logger.warn({ errName: err instanceof Error ? err.name : "unknown" }, "Instagram profile lookup failed");
+    return null;
+  }
+}
+
 /**
  * Split text into chunks of at most `maxBytes` UTF-8 bytes, preferring to cut at
  * a line break or space. Malayalam is 3 bytes per character, so ~330 characters
@@ -213,6 +248,66 @@ export async function sendInstagramText(opts: SendInstagramTextOptions): Promise
   }
 
   return { metaMessageId: ids[0]!, metaMessageIds: ids };
+}
+
+export interface SendInstagramMediaOptions {
+  /** The customer's Instagram-scoped id (IGSID) = customers.handle_or_phone. */
+  recipientId: string;
+  mediaUrl: string;
+  /** Explicit attachment type; inferred from extension / URL if omitted. */
+  type?: "image" | "video";
+  /** Business whose token is used. Defaults to BUSINESS_ID. */
+  businessId?: string;
+  /** Use this token instead of resolving one (tests / one-off calls). */
+  accessToken?: string;
+}
+
+export interface SendInstagramMediaResult {
+  /** Meta's mid of the media message sent. */
+  metaMessageId: string;
+}
+
+/**
+ * Send an image or video attachment DM: POST https://graph.instagram.com/{version}/me/messages with
+ * `Authorization: Bearer <token>` and `{ recipient: { id }, message: { attachment: { type, payload: { url } } } }`.
+ */
+export async function sendInstagramMedia(opts: SendInstagramMediaOptions): Promise<SendInstagramMediaResult> {
+  if (!opts.recipientId) throw new AppError(400, "Instagram recipient id is required", "VALIDATION_ERROR");
+  if (!opts.mediaUrl) throw new AppError(400, "Media URL is required", "VALIDATION_ERROR");
+
+  const token = opts.accessToken ?? (await resolveInstagramToken(opts.businessId));
+  const url = `${INSTAGRAM_GRAPH_HOST}/${INSTAGRAM_GRAPH_VERSION}/me/messages`;
+
+  const ext = opts.mediaUrl.split("?")[0]?.split(".").pop()?.toLowerCase() ?? "";
+  const isVideo =
+    opts.type === "video" ||
+    ["mp4", "mov", "webm", "mkv", "avi", "m4v"].includes(ext) ||
+    opts.mediaUrl.includes("/video/upload/");
+  const attachmentType = isVideo ? "video" : "image";
+
+  const body = await graphRequest(url, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      recipient: { id: opts.recipientId },
+      message: {
+        attachment: {
+          type: attachmentType,
+          payload: {
+            url: opts.mediaUrl,
+            is_reusable: true,
+          },
+        },
+      },
+    }),
+  });
+
+  const mid = str(body.message_id);
+  if (!mid) {
+    throw new AppError(502, "Instagram API response had no message_id", "META_ERROR");
+  }
+
+  return { metaMessageId: mid };
 }
 
 export interface RefreshedInstagramToken {

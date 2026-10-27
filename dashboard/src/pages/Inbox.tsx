@@ -21,6 +21,7 @@ import { WindowCountdown } from "../components/inbox/WindowCountdown.tsx";
 import { EscalationBadge } from "../components/escalations/EscalationBadge.tsx";
 import { usePageTitle } from "../components/layout/PageTitle.tsx";
 import { ChannelIcon } from "../components/shared/ChannelIcon.tsx";
+import { SegmentedControl } from "../components/shared/SegmentedControl.tsx";
 import { OptedOutBadge } from "../components/shared/CustomerChips.tsx";
 import { CustomerNotesField } from "../components/shared/CustomerNotesField.tsx";
 import { Skeleton, SkeletonTableRow } from "../components/shared/Skeleton.tsx";
@@ -45,6 +46,7 @@ import {
   type UpdateCustomerRequest,
 } from "../types/index.ts";
 
+type ChannelFilter = "all" | "whatsapp" | "instagram";
 type FilterState = "all" | "unread" | "ai_active" | "escalated" | "owner_handling" | "paused";
 
 const FILTERS: Array<{ key: FilterState; label: string; danger?: boolean }> = [
@@ -158,12 +160,14 @@ function ConversationPane({
   onBack,
   showPanel,
   onTogglePanel,
+  onCloseChat,
   onLoaded,
 }: {
   id: string;
   onBack: () => void;
   showPanel: boolean;
   onTogglePanel: () => void;
+  onCloseChat?: () => void;
   onLoaded: (c: ConversationDetail | undefined) => void;
 }) {
   const query = useConversation(id);
@@ -195,14 +199,25 @@ function ConversationPane({
     const notFound = isApiError(query.error) && query.error.status === 404;
     return (
       <div className="flex h-full flex-col">
-        <div className="border-b border-border bg-surface p-2 md:hidden">
+        <div className="flex items-center justify-between border-b border-border bg-surface p-2">
           <button
             type="button"
             onClick={onBack}
-            className="rounded-lg px-3 py-1.5 text-13 font-medium text-text hover:bg-surface-muted cursor-pointer"
+            className="rounded-lg px-3 py-1.5 text-13 font-medium text-text hover:bg-surface-muted cursor-pointer md:hidden"
           >
             ← Back to inbox
           </button>
+          {onCloseChat && (
+            <button
+              type="button"
+              onClick={onCloseChat}
+              className="ml-auto rounded-lg border border-border bg-surface p-1.5 text-text-muted hover:bg-surface-muted hover:text-text transition-colors cursor-pointer"
+              title="Close conversation"
+              aria-label="Close conversation"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
         </div>
         <div className="flex flex-1 flex-col items-center justify-center p-8 text-center">
           {notFound ? (
@@ -235,21 +250,34 @@ function ConversationPane({
       onBack={onBack}
       backOnlyOnMobile
       headerActions={
-        <button
-          type="button"
-          onClick={onTogglePanel}
-          className={cn(
-            "rounded-lg border border-border p-1.5 transition-colors cursor-pointer",
-            showPanel
-              ? "bg-surface-muted text-text ring-1 ring-primary/20"
-              : "bg-surface text-text-muted hover:text-text",
+        <div className="flex items-center gap-1 sm:gap-1.5">
+          <button
+            type="button"
+            onClick={onTogglePanel}
+            className={cn(
+              "rounded-lg border border-border p-1.5 transition-colors cursor-pointer",
+              showPanel
+                ? "bg-surface-muted text-text ring-1 ring-primary/20"
+                : "bg-surface text-text-muted hover:text-text",
+            )}
+            title="Toggle customer details panel"
+            aria-label="Toggle customer details panel"
+            aria-pressed={showPanel}
+          >
+            {showPanel ? <PanelRightClose className="h-4 w-4" /> : <PanelRightOpen className="h-4 w-4" />}
+          </button>
+          {onCloseChat && (
+            <button
+              type="button"
+              onClick={onCloseChat}
+              className="rounded-lg border border-border bg-surface p-1.5 text-text-muted hover:bg-surface-muted hover:text-text transition-colors cursor-pointer"
+              title="Close conversation"
+              aria-label="Close conversation"
+            >
+              <X className="h-4 w-4" />
+            </button>
           )}
-          title="Toggle customer details panel"
-          aria-label="Toggle customer details panel"
-          aria-pressed={showPanel}
-        >
-          {showPanel ? <PanelRightClose className="h-4 w-4" /> : <PanelRightOpen className="h-4 w-4" />}
-        </button>
+        </div>
       }
     />
   );
@@ -540,8 +568,17 @@ export default function Inbox() {
     [setSearchParams],
   );
 
+  const userClosedChatRef = useRef(false);
+
+  const handleCloseChat = useCallback(() => {
+    userClosedChatRef.current = true;
+    setShowCustomerPanel(false);
+    updateParams({ c: null });
+  }, [updateParams]);
+
   const selectConversation = useCallback(
     (id: string) => {
+      userClosedChatRef.current = false;
       if (id !== selectedId) updateParams({ c: id });
     },
     [selectedId, updateParams],
@@ -572,7 +609,7 @@ export default function Inbox() {
     if (typeof window === "undefined") return;
     if (window.innerWidth < 768) return;
     const first = conversations[0];
-    if (!selectedId && first && !query.isLoading) {
+    if (!selectedId && first && !query.isLoading && !userClosedChatRef.current) {
       updateParams({ c: first.id }, true);
     }
   }, [selectedId, conversations, query.isLoading, updateParams]);
@@ -633,6 +670,26 @@ export default function Inbox() {
         )}
       >
         <div className="shrink-0 space-y-2 border-b border-border/70 p-3 sm:p-3.5">
+          <div className="flex items-center justify-between gap-2 pb-0.5">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <h2 className="font-outfit text-14 sm:text-15 font-bold text-text truncate">Messages</h2>
+              {total !== undefined && (
+                <span className="text-11 text-text-muted font-medium tabular-nums">({total})</span>
+              )}
+            </div>
+
+            <SegmentedControl<ChannelFilter>
+              size="sm"
+              value={channel ?? "all"}
+              onChange={(val) => updateParams({ channel: val === "all" ? null : val })}
+              options={[
+                { value: "all", label: "All" },
+                { value: "whatsapp", label: "WA" },
+                { value: "instagram", label: "IG" },
+              ]}
+            />
+          </div>
+
           <div className="relative">
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-text-muted" aria-hidden />
             <input
@@ -752,7 +809,8 @@ export default function Inbox() {
         {selectedId ? (
           <ConversationPane
             id={selectedId}
-            onBack={() => updateParams({ c: null })}
+            onBack={handleCloseChat}
+            onCloseChat={handleCloseChat}
             showPanel={showCustomerPanel}
             onTogglePanel={() => setShowCustomerPanel((v) => !v)}
             onLoaded={setOpenConversation}

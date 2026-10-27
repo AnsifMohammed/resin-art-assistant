@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyPluginAsync } from "fastify";
 import { and, eq, gte, isNull } from "drizzle-orm";
-import { config } from "../config.ts";
+import { config, isInstagramLive } from "../config.ts";
 import { db } from "../db/index.ts";
 import { auditLog, channels, conversations, customers, messages } from "../db/schema.ts";
 import { AppError } from "../lib/errors.ts";
@@ -8,7 +8,7 @@ import { logger } from "../lib/logger.ts";
 import { enqueueProcessMessage } from "../queue/enqueue.ts";
 import { applyWhatsAppStatus } from "../services/deliveryReceipts.ts";
 import { handleOptKeyword } from "../services/optOut.ts";
-import { INSTAGRAM_MAX_TEXT_BYTES, splitInstagramText } from "../services/meta/instagram.ts";
+import { fetchInstagramDisplayName, INSTAGRAM_MAX_TEXT_BYTES, splitInstagramText } from "../services/meta/instagram.ts";
 import { emitConversationUpdated, emitMessageNew } from "../realtime/events.ts";
 import {
   digitsOnly,
@@ -106,6 +106,25 @@ async function handleCustomerMessage(m: InboundCustomerMessage): Promise<void> {
       .returning();
   }
   if (!customer) throw new Error("Could not resolve customer");
+
+  // Instagram webhooks only carry the sender's id; look up their name/@username once
+  // (new customers, and older ones still named by their id). The id stays in
+  // handleOrPhone because replies are sent to it.
+  if (
+    m.channelType === "instagram" &&
+    isInstagramLive(config) &&
+    (!customer.name || customer.name === customer.handleOrPhone)
+  ) {
+    const displayName = await fetchInstagramDisplayName(m.handleOrPhone);
+    if (displayName) {
+      const [renamed] = await db
+        .update(customers)
+        .set({ name: displayName })
+        .where(eq(customers.id, customer.id))
+        .returning();
+      if (renamed) customer = renamed;
+    }
+  }
 
   const now = new Date();
   const windowClosesAt = new Date(now.getTime() + WINDOW_MS);

@@ -90,6 +90,52 @@ describe("sendInstagramText", () => {
   });
 });
 
+describe("sendInstagramMedia", () => {
+  it("sends an image attachment with the correct Meta payload", async () => {
+    fetchMock.mockResolvedValue(json({ message_id: "mid.media.img1" }));
+    const res = await ig.sendInstagramMedia({
+      recipientId: "igsid-1",
+      mediaUrl: "https://res.cloudinary.com/demo/image/upload/sample.jpg",
+    });
+
+    expect(res).toEqual({ metaMessageId: "mid.media.img1" });
+    const [url, init] = call();
+    expect(url).toContain("/me/messages");
+    expect(JSON.parse(init.body as string)).toEqual({
+      recipient: { id: "igsid-1" },
+      message: {
+        attachment: {
+          type: "image",
+          payload: {
+            url: "https://res.cloudinary.com/demo/image/upload/sample.jpg",
+            is_reusable: true,
+          },
+        },
+      },
+    });
+  });
+
+  it("detects video attachments from URL extension or path", async () => {
+    fetchMock.mockResolvedValue(json({ message_id: "mid.media.vid1" }));
+    await ig.sendInstagramMedia({
+      recipientId: "igsid-1",
+      mediaUrl: "https://res.cloudinary.com/demo/video/upload/demo.mp4",
+    });
+
+    const [, init] = call();
+    expect(JSON.parse(init.body as string).message.attachment.type).toBe("video");
+  });
+
+  it("validates recipientId and mediaUrl", async () => {
+    await expect(ig.sendInstagramMedia({ recipientId: "", mediaUrl: "http://example.com/img.png" })).rejects.toMatchObject({
+      code: "VALIDATION_ERROR",
+    });
+    await expect(ig.sendInstagramMedia({ recipientId: "igsid-1", mediaUrl: "" })).rejects.toMatchObject({
+      code: "VALIDATION_ERROR",
+    });
+  });
+});
+
 describe("Meta error mapping", () => {
   const cases: Array<[Response, number, string]> = [
     [metaError(190, 463), 502, "META_TOKEN_INVALID"],
@@ -154,5 +200,29 @@ describe("splitInstagramText", () => {
       expect(Buffer.byteLength(p, "utf8")).toBeLessThanOrEqual(1000);
       expect(p).not.toMatch(/[\uD800-\uDBFF]$/);
     }
+  });
+});
+
+describe("fetchInstagramDisplayName", () => {
+  it("returns 'Name (@username)' from the profile API", async () => {
+    fetchMock.mockResolvedValue(json({ name: "Vj Allan", username: "vj_allan05", id: "2201" }));
+    await expect(ig.fetchInstagramDisplayName("2201")).resolves.toBe("Vj Allan (@vj_allan05)");
+    const [url, init] = call();
+    expect(url).toContain("/2201?fields=name,username");
+    expect((init.headers as Record<string, string>).Authorization).toBe("Bearer env-ig-token");
+  });
+
+  it("falls back to @username or name", async () => {
+    fetchMock.mockResolvedValueOnce(json({ username: "only_handle" }));
+    await expect(ig.fetchInstagramDisplayName("1")).resolves.toBe("@only_handle");
+    fetchMock.mockResolvedValueOnce(json({ name: "Only Name" }));
+    await expect(ig.fetchInstagramDisplayName("2")).resolves.toBe("Only Name");
+  });
+
+  it("returns null instead of throwing on Meta errors or network failures", async () => {
+    fetchMock.mockResolvedValueOnce(metaError(100, undefined, 400));
+    await expect(ig.fetchInstagramDisplayName("3")).resolves.toBeNull();
+    fetchMock.mockRejectedValueOnce(new TypeError("fetch failed"));
+    await expect(ig.fetchInstagramDisplayName("4")).resolves.toBeNull();
   });
 });

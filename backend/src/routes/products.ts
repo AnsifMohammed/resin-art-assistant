@@ -8,6 +8,7 @@ import { auditLog, products } from "../db/schema.ts";
 import { AppError } from "../lib/errors.ts";
 import { authenticate } from "../middleware/authenticate.ts";
 import { requireAdmin } from "../middleware/requireAdmin.ts";
+import { requireStaffOrAdmin } from "../middleware/requireStaffOrAdmin.ts";
 
 export function slugify(text: string): string {
   const base = text
@@ -281,10 +282,10 @@ export const productRoutes: FastifyPluginAsync = async (app: FastifyInstance) =>
     },
   );
 
-  // POST /products/upload-signature - Get Cloudinary upload credentials/signature (admin only)
+  // POST /products/upload-signature - Get Cloudinary upload credentials/signature (staff or admin)
   app.post(
     "/products/upload-signature",
-    { preHandler: [authenticate, requireAdmin] },
+    { preHandler: [authenticate, requireStaffOrAdmin] },
     async () => {
       const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
       const apiKey = process.env.CLOUDINARY_API_KEY;

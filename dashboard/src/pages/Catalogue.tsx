@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import {
   Plus,
   Search,
@@ -13,6 +13,10 @@ import {
   ImageIcon,
   Loader2,
   Star,
+  LayoutGrid,
+  Table as TableIcon,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -21,10 +25,161 @@ import {
   useProducts,
   useUpdateProduct,
 } from "../hooks/useProducts.ts";
-import { uploadToCloudinary } from "../api/products.ts";
+import { uploadToCloudinary, getCloudinaryThumb } from "../api/products.ts";
 import type { Product, ProductSize } from "../types/index.ts";
 import { SlideOver } from "../components/shared/SlideOver.tsx";
 import { ConfirmDialog } from "../components/shared/ConfirmDialog.tsx";
+import { EmptyState } from "../components/shared/EmptyState.tsx";
+
+interface CatalogueProductCardProps {
+  product: Product;
+  onOpenDetail: (p: Product) => void;
+}
+
+function CatalogueProductCard({ product: p, onOpenDetail }: CatalogueProductCardProps) {
+  const [activePhotoIdx, setActivePhotoIdx] = useState(0);
+  const minPrice = Math.min(...(p.sizes.map((s) => s.price) || [0]));
+  const maxPrice = Math.max(...(p.sizes.map((s) => s.price) || [0]));
+  const priceLabel =
+    p.sizes.length > 1 && minPrice !== maxPrice
+      ? `₹${minPrice.toLocaleString("en-IN")} – ₹${maxPrice.toLocaleString("en-IN")}`
+      : `₹${minPrice.toLocaleString("en-IN")}`;
+
+  const hasMultipleImages = Boolean(p.images && p.images.length > 1);
+  const currentPhoto = p.images?.[activePhotoIdx] || p.images?.[0];
+
+  const handlePrev = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!p.images || p.images.length <= 1) return;
+    setActivePhotoIdx((prev) => (prev - 1 + p.images.length) % p.images.length);
+  };
+
+  const handleNext = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!p.images || p.images.length <= 1) return;
+    setActivePhotoIdx((prev) => (prev + 1) % p.images.length);
+  };
+
+  return (
+    <div
+      onClick={() => onOpenDetail(p)}
+      className="group relative flex flex-col rounded-xl border border-border bg-surface shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-pointer overflow-hidden"
+    >
+      {/* Photo Container */}
+      <div className="relative aspect-[4/3] w-full overflow-hidden bg-surface-muted flex items-center justify-center">
+        {currentPhoto ? (
+          <img
+            src={getCloudinaryThumb(currentPhoto, 400, 300)}
+            alt={p.name}
+            className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-300"
+            loading="lazy"
+          />
+        ) : (
+          <div
+            className="w-full h-full flex items-center justify-center text-text-muted/60"
+            aria-label="No photo"
+          >
+            <Package className="w-7 h-7 sm:w-8 sm:h-8" strokeWidth={1.5} />
+          </div>
+        )}
+
+        {/* Carousel Navigation Arrows */}
+        {hasMultipleImages && (
+          <>
+            <button
+              type="button"
+              onClick={handlePrev}
+              className="absolute left-1.5 top-1/2 -translate-y-1/2 z-10 w-6 h-6 rounded-full bg-surface/90 backdrop-blur-md shadow-xs flex items-center justify-center text-text hover:bg-surface border border-border/60 transition-opacity opacity-0 group-hover:opacity-100 max-sm:opacity-90 cursor-pointer"
+              title="Previous photo"
+              aria-label="Previous photo"
+            >
+              <ChevronLeft className="w-3.5 h-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={handleNext}
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 z-10 w-6 h-6 rounded-full bg-surface/90 backdrop-blur-md shadow-xs flex items-center justify-center text-text hover:bg-surface border border-border/60 transition-opacity opacity-0 group-hover:opacity-100 max-sm:opacity-90 cursor-pointer"
+              title="Next photo"
+              aria-label="Next photo"
+            >
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+
+            {/* Pagination Dots */}
+            <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-black/50 backdrop-blur-md">
+              {p.images.map((_, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setActivePhotoIdx(idx);
+                  }}
+                  className={`rounded-full transition-all cursor-pointer ${
+                    idx === activePhotoIdx ? "w-3 h-1 bg-white" : "w-1 h-1 bg-white/60 hover:bg-white"
+                  }`}
+                  aria-label={`Photo ${idx + 1}`}
+                />
+              ))}
+            </div>
+          </>
+        )}
+
+        {/* Lead time micro-badge */}
+        <div className="absolute top-1.5 left-1.5 sm:top-2 sm:left-2 z-10 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] sm:text-[10px] font-medium bg-surface/90 text-text backdrop-blur-md shadow-xs border border-border/50">
+          <Clock className="w-2.5 h-2.5 text-text-muted" />
+          <span>{p.leadTimeDays}d</span>
+        </div>
+
+        {/* Customizable micro-badge */}
+        {p.customizable && (
+          <div className="absolute top-1.5 right-1.5 sm:top-2 sm:right-2 z-10 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] sm:text-[10px] font-semibold bg-amber-500/90 text-white backdrop-blur-md shadow-xs">
+            <Sparkles className="w-2.5 h-2.5" />
+            <span>Custom</span>
+          </div>
+        )}
+
+        {/* Multiple photos count chip */}
+        {hasMultipleImages && (
+          <div className="absolute bottom-1.5 right-1.5 sm:bottom-2 sm:right-2 z-10 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] sm:text-[10px] font-medium bg-black/60 text-white backdrop-blur-md">
+            <ImageIcon className="w-2.5 h-2.5" />
+            <span>
+              {activePhotoIdx + 1}/{p.images.length}
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* Compact Card Body */}
+      <div className="flex-1 p-2 sm:p-2.5 flex flex-col justify-between gap-1 sm:gap-1.5">
+        <div>
+          <div className="flex items-start justify-between gap-1">
+            <h2 className="text-[12px] sm:text-[13px] font-semibold font-outfit text-text group-hover:text-primary-text transition-colors truncate">
+              {p.name}
+            </h2>
+          </div>
+          <div className="text-[12px] sm:text-[13px] font-bold font-outfit text-text tabular-nums mt-0.5">
+            {priceLabel}
+          </div>
+
+          {/* Sizes */}
+          {p.sizes && p.sizes.length > 0 && (
+            <p className="text-[10px] sm:text-[11px] text-text-muted truncate mt-0.5">
+              {p.sizes.map((s) => s.name).join(" · ")}
+            </p>
+          )}
+        </div>
+
+        {/* Custom Options indicator */}
+        {p.customizable && p.customOptions && p.customOptions.length > 0 && (
+          <div className="pt-1 border-t border-border/60 text-[9px] sm:text-[10px] text-text-muted truncate">
+            {p.customOptions.join(", ")}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export default function Catalogue() {
   const { data, isLoading, isError, refetch } = useProducts({ active: "true" });
@@ -34,12 +189,17 @@ export default function Catalogue() {
   const updateMutation = useUpdateProduct();
   const deleteMutation = useDeleteProduct();
 
+  const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
+  const [page, setPage] = useState(1);
+  const ITEMS_PER_PAGE = 12;
+
   const [searchQuery, setSearchQuery] = useState("");
   const [customizableOnly, setCustomizableOnly] = useState(false);
   const [sortBy, setSortBy] = useState<"name" | "price-asc" | "price-desc" | "lead-time">("name");
 
   // Selection & SlideOver state
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [detailPhotoIdx, setDetailPhotoIdx] = useState(0);
   const [isEditing, setIsEditing] = useState(false);
   const [isAddingNew, setIsAddingNew] = useState(false);
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
@@ -89,9 +249,28 @@ export default function Catalogue() {
     return result;
   }, [products, customizableOnly, searchQuery, sortBy]);
 
+  // Reset to page 1 whenever filters or search change
+  useEffect(() => {
+    setPage(1);
+  }, [searchQuery, customizableOnly, sortBy]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredProducts.length / ITEMS_PER_PAGE));
+
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
+
+  const paginatedProducts = useMemo(() => {
+    const start = (page - 1) * ITEMS_PER_PAGE;
+    return filteredProducts.slice(start, start + ITEMS_PER_PAGE);
+  }, [filteredProducts, page]);
+
   // Open product detail
   const handleOpenDetail = (p: Product) => {
     setSelectedProduct(p);
+    setDetailPhotoIdx(0);
     setIsEditing(false);
     setIsAddingNew(false);
   };
@@ -99,6 +278,7 @@ export default function Catalogue() {
   // Switch to edit mode
   const handleStartEdit = (p: Product) => {
     setSelectedProduct(p);
+    setDetailPhotoIdx(0);
     setFormName(p.name);
     setFormDescription(p.description || "");
     setFormLeadTime(p.leadTimeDays);
@@ -115,6 +295,7 @@ export default function Catalogue() {
   // Open add modal
   const handleStartAdd = () => {
     setSelectedProduct(null);
+    setDetailPhotoIdx(0);
     setFormName("");
     setFormDescription("");
     setFormLeadTime(3);
@@ -129,6 +310,7 @@ export default function Catalogue() {
   // Close SlideOver
   const handleCloseSlideOver = () => {
     setSelectedProduct(null);
+    setDetailPhotoIdx(0);
     setIsEditing(false);
     setIsAddingNew(false);
     setOptionDraft("");
@@ -193,14 +375,15 @@ export default function Catalogue() {
     }
 
     setIsUploadingImage(true);
-    const toastId = toast.loading("Uploading photo to Cloudinary...");
+    const toastId = toast.loading("Uploading image...");
 
     try {
       const secureUrl = await uploadToCloudinary(file);
       setFormImages((prev) => [...prev, secureUrl].slice(0, 5));
-      toast.success("Photo uploaded successfully", { id: toastId });
-    } catch {
-      toast.error("Photo upload failed. Please try again.", { id: toastId });
+      toast.success("Image uploaded successfully", { id: toastId });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Photo upload failed. Please try again.";
+      toast.error(msg, { id: toastId });
     } finally {
       setIsUploadingImage(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -300,24 +483,54 @@ export default function Catalogue() {
   };
 
   return (
-    <div className="space-y-6 pb-12 w-full">
+    <div className="space-y-3.5 sm:space-y-4 lg:space-y-4 pb-6 sm:pb-8 w-full">
       {/* ─── Page Header ──────────────────────────────────────────────────────── */}
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
         <div>
-          <h1 className="text-24 md:text-28 font-bold font-outfit text-text tracking-tight">
+          <h1 className="text-22 sm:text-24 lg:text-26 font-bold font-outfit text-text tracking-tight">
             Catalogue
           </h1>
-          <p className="text-13 text-text-muted mt-1 max-w-xl">
+          <p className="text-12 sm:text-13 text-text-muted mt-0.5 sm:mt-1 max-w-xl">
             Your products. The assistant quotes prices and lead times directly from this live catalogue.
           </p>
         </div>
 
         {/* Action Controls */}
-        <div className="flex flex-wrap items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
+          {/* View Toggle */}
+          <div className="flex items-center rounded-lg border border-border bg-surface p-0.5 shadow-2xs">
+            <button
+              type="button"
+              onClick={() => setViewMode("grid")}
+              className={`p-1.5 rounded-md transition-colors cursor-pointer ${
+                viewMode === "grid"
+                  ? "bg-surface-muted text-text font-bold"
+                  : "text-text-muted hover:text-text"
+              }`}
+              title="Grid view (6 per row on desktop)"
+              aria-label="Switch to grid view"
+            >
+              <LayoutGrid className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode("table")}
+              className={`p-1.5 rounded-md transition-colors cursor-pointer ${
+                viewMode === "table"
+                  ? "bg-surface-muted text-text font-bold"
+                  : "text-text-muted hover:text-text"
+              }`}
+              title="Table view"
+              aria-label="Switch to table view"
+            >
+              <TableIcon className="w-4 h-4" />
+            </button>
+          </div>
+
           <button
             type="button"
             onClick={handleStartAdd}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-primary text-primary-foreground font-semibold text-13 shadow-xs hover:brightness-105 active:scale-98 transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            className="inline-flex items-center gap-1.5 px-3.5 sm:px-4 py-2 rounded-lg bg-primary text-primary-foreground font-semibold text-13 shadow-xs hover:brightness-105 active:scale-98 transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           >
             <Plus className="w-4 h-4" />
             <span>Add product</span>
@@ -326,9 +539,9 @@ export default function Catalogue() {
       </div>
 
       {/* ─── Filter & Search Bar ────────────────────────────────────────────── */}
-      <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 p-3 rounded-xl border border-border bg-surface shadow-xs">
+      <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-2.5 sm:gap-3 p-2.5 sm:p-3 rounded-xl border border-border bg-surface shadow-xs">
         {/* Search */}
-        <div className="relative flex-1 min-w-[240px]">
+        <div className="relative flex-1 min-w-[220px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
           <input
             type="text"
@@ -347,7 +560,7 @@ export default function Catalogue() {
           )}
         </div>
 
-        <div className="flex items-center gap-2.5 flex-wrap">
+        <div className="flex items-center gap-2 sm:gap-2.5 flex-wrap">
           {/* Customizable Only Chip */}
           <button
             type="button"
@@ -382,20 +595,16 @@ export default function Catalogue() {
 
       {/* ─── Loading Skeletons ──────────────────────────────────────────────── */}
       {isLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {[1, 2, 3, 4, 5, 6].map((i) => (
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-2 sm:gap-2.5 lg:gap-3">
+          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((i) => (
             <div
               key={i}
               className="rounded-xl border border-border bg-surface overflow-hidden shadow-xs animate-pulse"
             >
               <div className="aspect-[4/3] bg-surface-muted w-full" />
-              <div className="p-4 space-y-3">
-                <div className="flex justify-between items-center">
-                  <div className="h-5 w-3/5 bg-surface-muted rounded-md" />
-                  <div className="h-5 w-1/4 bg-surface-muted rounded-md" />
-                </div>
-                <div className="h-4 w-4/5 bg-surface-muted rounded-md" />
-                <div className="h-4 w-2/5 bg-surface-muted rounded-md" />
+              <div className="p-2 sm:p-2.5 space-y-1.5">
+                <div className="h-3.5 w-3/5 bg-surface-muted rounded-md" />
+                <div className="h-3 w-4/5 bg-surface-muted rounded-md" />
               </div>
             </div>
           ))}
@@ -420,129 +629,193 @@ export default function Catalogue() {
           </button>
         </div>
       ) : filteredProducts.length === 0 ? (
-        /* Empty state */
-        <div className="rounded-xl border border-border bg-surface p-12 text-center space-y-4">
-          <div className="w-12 h-12 rounded-full bg-primary-soft text-primary-text flex items-center justify-center mx-auto">
-            <Package className="w-6 h-6" />
-          </div>
-          <div>
-            <h3 className="text-16 font-semibold font-outfit text-text">No products yet</h3>
-            <p className="text-13 text-text-muted mt-1 max-w-md mx-auto">
-              No products yet — the assistant will hand every price question to you.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={handleStartAdd}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-primary text-primary-foreground font-semibold text-13 shadow-xs hover:brightness-105 transition-all cursor-pointer"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Add product</span>
-          </button>
+        <div className="rounded-xl border border-border bg-surface p-6 sm:p-10">
+          <EmptyState
+            title={searchQuery || customizableOnly ? "No products match" : "No products yet"}
+            description={
+              searchQuery || customizableOnly
+                ? "Try adjusting your search terms or filters to find what you're looking for."
+                : "No products yet — the assistant will hand every price question to you."
+            }
+            action={
+              searchQuery || customizableOnly
+                ? {
+                    label: "Clear filters",
+                    onClick: () => {
+                      setSearchQuery("");
+                      setCustomizableOnly(false);
+                    },
+                    variant: "outline",
+                  }
+                : {
+                    label: "Add product",
+                    onClick: handleStartAdd,
+                  }
+            }
+          />
         </div>
       ) : (
-        /* ─── Product Grid ───────────────────────────────────────────────────── */
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredProducts.map((p) => {
-            const minPrice = Math.min(...(p.sizes.map((s) => s.price) || [0]));
-            const maxPrice = Math.max(...(p.sizes.map((s) => s.price) || [0]));
-            const priceLabel =
-              p.sizes.length > 1 && minPrice !== maxPrice
-                ? `₹${minPrice.toLocaleString("en-IN")} – ₹${maxPrice.toLocaleString("en-IN")}`
-                : `₹${minPrice.toLocaleString("en-IN")}`;
-            const mainPhoto = p.images?.[0];
+        <>
+          {viewMode === "grid" ? (
+            /* ─── 6-Column Responsive Product Grid (Fits single screen on desktop) ─── */
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-2 sm:gap-2.5 lg:gap-3">
+              {paginatedProducts.map((p) => (
+                <CatalogueProductCard
+                  key={p.id}
+                  product={p}
+                  onOpenDetail={handleOpenDetail}
+                />
+              ))}
+            </div>
+          ) : (
+            /* ─── Table View (Orders Pattern) ────────────────────────── */
+            <div className="rounded-xl border border-border bg-surface overflow-hidden shadow-xs">
+              <div className="overflow-x-auto custom-scrollbar">
+                <table className="w-full text-left text-13 border-collapse">
+                  <thead className="bg-surface-muted border-b border-border text-11 uppercase font-semibold text-text-muted">
+                    <tr>
+                      <th className="p-3 w-14">Photo</th>
+                      <th className="p-3">Product Name</th>
+                      <th className="p-3">Price</th>
+                      <th className="p-3">Sizes</th>
+                      <th className="p-3">Lead Time</th>
+                      <th className="p-3">Customizable</th>
+                      <th className="p-3 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/40">
+                    {paginatedProducts.map((p) => {
+                      const minPrice = Math.min(...(p.sizes.map((s) => s.price) || [0]));
+                      const maxPrice = Math.max(...(p.sizes.map((s) => s.price) || [0]));
+                      const priceLabel =
+                        p.sizes.length > 1 && minPrice !== maxPrice
+                          ? `₹${minPrice.toLocaleString("en-IN")} – ₹${maxPrice.toLocaleString("en-IN")}`
+                          : `₹${minPrice.toLocaleString("en-IN")}`;
+                      const mainPhoto = p.images?.[0];
 
-            return (
-              <div
-                key={p.id}
-                onClick={() => handleOpenDetail(p)}
-                className="group relative flex flex-col rounded-xl border border-border bg-surface shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-pointer overflow-hidden"
-              >
-                {/* Photo */}
-                <div className="relative aspect-[4/3] w-full overflow-hidden bg-surface-muted">
-                  {mainPhoto ? (
-                    <>
-                      <img
-                        src={mainPhoto}
-                        alt={p.name}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                        loading="lazy"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-60" />
-                    </>
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-text-muted/60" aria-label="No photo">
-                      <Package className="w-10 h-10" strokeWidth={1.5} />
-                    </div>
-                  )}
-
-                  {/* Lead time badge */}
-                  <div className="absolute top-3 left-3 inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-11 font-medium bg-surface/90 text-text backdrop-blur-md shadow-xs border border-border/50">
-                    <Clock className="w-3 h-3 text-text-muted" />
-                    <span>{p.leadTimeDays} days</span>
-                  </div>
-
-                  {/* Customizable badge */}
-                  {p.customizable && (
-                    <div className="absolute top-3 right-3 inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-11 font-semibold bg-amber-500/90 text-white backdrop-blur-md shadow-xs">
-                      <Sparkles className="w-3 h-3" />
-                      <span>Customizable</span>
-                    </div>
-                  )}
-
-                  {/* Multiple photos count chip */}
-                  {p.images && p.images.length > 1 && (
-                    <div className="absolute bottom-3 right-3 inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-11 font-medium bg-black/60 text-white backdrop-blur-md">
-                      <ImageIcon className="w-3 h-3" />
-                      <span>{p.images.length} photos</span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Card Body */}
-                <div className="flex-1 p-4 flex flex-col justify-between space-y-3">
-                  <div>
-                    <div className="flex items-start justify-between gap-2">
-                      <h2 className="text-16 font-semibold font-outfit text-text group-hover:text-primary-text transition-colors line-clamp-1">
-                        {p.name}
-                      </h2>
-                      <span className="text-16 font-bold font-outfit text-text tabular-nums shrink-0">
-                        {priceLabel}
-                      </span>
-                    </div>
-
-                    {/* Sizes */}
-                    {p.sizes && p.sizes.length > 0 && (
-                      <p className="text-12 text-text-muted mt-1 line-clamp-1">
-                        <span className="font-medium text-text">Sizes:</span>{" "}
-                        {p.sizes.map((s) => s.name).join(" · ")}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Custom Options Chips */}
-                  {p.customizable && p.customOptions && p.customOptions.length > 0 && (
-                    <div className="pt-2 border-t border-border flex flex-wrap gap-1.5">
-                      {p.customOptions.slice(0, 3).map((opt, i) => (
-                        <span
-                          key={i}
-                          className="inline-flex items-center px-2 py-0.5 rounded-md text-11 bg-surface-muted text-text-muted border border-border"
+                      return (
+                        <tr
+                          key={p.id}
+                          onClick={() => handleOpenDetail(p)}
+                          className="hover:bg-surface-muted transition-colors cursor-pointer group"
                         >
-                          {opt}
-                        </span>
-                      ))}
-                      {p.customOptions.length > 3 && (
-                        <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-11 text-text-muted">
-                          +{p.customOptions.length - 3} more
-                        </span>
-                      )}
-                    </div>
-                  )}
-                </div>
+                          <td className="p-3">
+                            <div className="w-10 h-10 rounded-lg overflow-hidden bg-surface-muted border border-border/50 shrink-0">
+                              {mainPhoto ? (
+                                <img
+                                  src={getCloudinaryThumb(mainPhoto, 80, 80)}
+                                  alt={p.name}
+                                  className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                                  loading="lazy"
+                                />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center text-text-muted">
+                                  <Package className="w-4 h-4" />
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                          <td className="p-3">
+                            <div className="font-semibold text-text group-hover:text-primary-text transition-colors">
+                              {p.name}
+                            </div>
+                            {p.description && (
+                              <div className="text-11 text-text-muted line-clamp-1 max-w-xs">
+                                {p.description}
+                              </div>
+                            )}
+                          </td>
+                          <td className="p-3 font-bold font-outfit text-text tabular-nums whitespace-nowrap">
+                            {priceLabel}
+                          </td>
+                          <td className="p-3 text-text-muted text-12 max-w-xs truncate">
+                            {p.sizes?.map((s) => s.name).join(" · ") || "—"}
+                          </td>
+                          <td className="p-3 whitespace-nowrap text-12">
+                            <span className="inline-flex items-center gap-1 text-text-muted">
+                              <Clock className="w-3.5 h-3.5" />
+                              {p.leadTimeDays} days
+                            </span>
+                          </td>
+                          <td className="p-3 whitespace-nowrap">
+                            {p.customizable ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-11 font-semibold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                                <Sparkles className="w-3 h-3" />
+                                Yes
+                              </span>
+                            ) : (
+                              <span className="text-12 text-text-muted">No</span>
+                            )}
+                          </td>
+                          <td className="p-3 text-right" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex items-center justify-end gap-1">
+                              <button
+                                type="button"
+                                onClick={() => handleStartEdit(p)}
+                                className="p-1.5 rounded-md hover:bg-surface-muted text-text-muted hover:text-text cursor-pointer transition"
+                                title="Edit product"
+                              >
+                                <Pencil className="w-4 h-4" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setProductToDelete(p)}
+                                className="p-1.5 rounded-md hover:bg-rose-500/10 text-text-muted hover:text-rose-600 cursor-pointer transition"
+                                title="Delete product"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
-            );
-          })}
-        </div>
+            </div>
+          )}
+
+          {/* ─── Pagination Bar ─────────────────────────────────────────────── */}
+          {filteredProducts.length > 0 && (
+            <div className="shrink-0 flex flex-col sm:flex-row items-center justify-between gap-2.5 sm:gap-3 p-2.5 sm:p-3 rounded-xl border border-border bg-surface text-xs text-text-muted shadow-xs mt-3 sm:mt-4">
+              <span>
+                Showing{" "}
+                <span className="font-semibold text-text">
+                  {Math.min((page - 1) * ITEMS_PER_PAGE + 1, filteredProducts.length)}–
+                  {Math.min(page * ITEMS_PER_PAGE, filteredProducts.length)}
+                </span>{" "}
+                of <span className="font-semibold text-text">{filteredProducts.length}</span> products
+              </span>
+
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  disabled={page <= 1}
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-border bg-surface-muted text-text hover:bg-surface text-xs font-semibold cursor-pointer disabled:opacity-40 transition"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                  <span>Previous</span>
+                </button>
+
+                <span className="px-2 font-medium text-text">
+                  Page {page} of {totalPages}
+                </span>
+
+                <button
+                  type="button"
+                  disabled={page >= totalPages}
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-border bg-surface-muted text-text hover:bg-surface text-xs font-semibold cursor-pointer disabled:opacity-40 transition"
+                >
+                  <span>Next</span>
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       {/* ─── Product Detail & Edit SlideOver ─────────────────────────────────── */}
@@ -857,13 +1130,48 @@ export default function Catalogue() {
           <div className="space-y-6">
             {/* Photos Carousel / Main Photo */}
             <div className="space-y-2">
-              <div className="relative aspect-[4/3] w-full rounded-xl overflow-hidden border border-border shadow-xs bg-surface-muted">
-                {selectedProduct.images?.[0] ? (
-                  <img
-                    src={selectedProduct.images[0]}
-                    alt={selectedProduct.name}
-                    className="w-full h-full object-cover"
-                  />
+              <div className="relative aspect-[4/3] w-full rounded-xl overflow-hidden border border-border shadow-xs bg-surface-muted flex items-center justify-center">
+                {selectedProduct.images && selectedProduct.images.length > 0 ? (
+                  <>
+                    <img
+                      src={selectedProduct.images[detailPhotoIdx] || selectedProduct.images[0]}
+                      alt={selectedProduct.name}
+                      className="w-full h-full object-contain bg-surface-muted/60"
+                    />
+                    {selectedProduct.images.length > 1 && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setDetailPhotoIdx(
+                              (prev) =>
+                                (prev - 1 + selectedProduct.images.length) %
+                                selectedProduct.images.length
+                            )
+                          }
+                          className="absolute left-2 top-1/2 -translate-y-1/2 z-10 w-8 h-8 rounded-full bg-surface/85 backdrop-blur-md shadow-xs flex items-center justify-center text-text hover:bg-surface border border-border/60 transition cursor-pointer"
+                          aria-label="Previous photo"
+                        >
+                          <ChevronLeft className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setDetailPhotoIdx(
+                              (prev) => (prev + 1) % selectedProduct.images.length
+                            )
+                          }
+                          className="absolute right-2 top-1/2 -translate-y-1/2 z-10 w-8 h-8 rounded-full bg-surface/85 backdrop-blur-md shadow-xs flex items-center justify-center text-text hover:bg-surface border border-border/60 transition cursor-pointer"
+                          aria-label="Next photo"
+                        >
+                          <ChevronRight className="w-4 h-4" />
+                        </button>
+                        <div className="absolute bottom-2 right-2 px-2 py-0.5 rounded text-11 font-medium bg-black/60 text-white backdrop-blur-md">
+                          {detailPhotoIdx + 1} / {selectedProduct.images.length}
+                        </div>
+                      </>
+                    )}
+                  </>
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-text-muted/60" aria-label="No photo">
                     <Package className="w-12 h-12" strokeWidth={1.5} />
@@ -871,14 +1179,21 @@ export default function Catalogue() {
                 )}
               </div>
               {selectedProduct.images && selectedProduct.images.length > 1 && (
-                <div className="flex gap-2 overflow-x-auto pb-1">
+                <div className="flex gap-2 overflow-x-auto pb-1 custom-scrollbar">
                   {selectedProduct.images.map((img, i) => (
-                    <div
+                    <button
                       key={i}
-                      className="relative w-16 h-12 rounded-md overflow-hidden border border-border shrink-0"
+                      type="button"
+                      onClick={() => setDetailPhotoIdx(i)}
+                      className={`relative w-16 h-12 rounded-lg overflow-hidden border-2 transition-all cursor-pointer shrink-0 ${
+                        i === detailPhotoIdx
+                          ? "border-primary ring-2 ring-primary/20 scale-102"
+                          : "border-border/60 opacity-70 hover:opacity-100"
+                      }`}
+                      title={`View photo ${i + 1}`}
                     >
                       <img src={img} alt="" className="w-full h-full object-cover" />
-                    </div>
+                    </button>
                   ))}
                 </div>
               )}

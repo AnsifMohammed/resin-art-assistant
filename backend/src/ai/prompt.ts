@@ -105,14 +105,35 @@ export function buildConversationMessages(
   return merged.map((m) => ({ role: m.role, parts: [{ text: m.content }] }));
 }
 
-export function buildSystemPrompt(kb: Record<string, unknown>): string {
-  return `You are an AI messaging assistant for a small handmade resin art business in Kerala, India.
+/**
+ * A first name to address the customer by, or null when we only know an id/handle.
+ * Customer names look like "Priya Raman (@priya.r)", "@handle" or a numeric Instagram id.
+ */
+export function customerFirstName(name: string | null | undefined, handleOrPhone?: string | null): string | null {
+  if (!name || name === handleOrPhone) return null;
+  const withoutHandle = name.replace(/\s*\(@[^)]*\)\s*$/, "").trim();
+  if (!withoutHandle || withoutHandle.startsWith("@") || /^[+\d\s-]+$/.test(withoutHandle)) return null;
+  // NFKC turns styled Unicode letters (e.g. bold/italic "fonts") back into plain ones.
+  const first = withoutHandle.normalize("NFKC").split(/\s+/)[0]?.replace(/[^\p{L}\p{M}'-]/gu, "") ?? "";
+  return first.length >= 2 ? first : null;
+}
+
+export function buildSystemPrompt(
+  kb: Record<string, unknown>,
+  opts: { customerFirstName?: string | null } = {},
+): string {
+  const businessName = typeof kb.business_name === "string" && kb.business_name ? kb.business_name : "the shop";
+  const nameLine = opts.customerFirstName
+    ? `The customer's first name is ${opts.customerFirstName}.`
+    : "You don't know the customer's name; don't make one up.";
+
+  return `You reply to customer messages on Instagram and WhatsApp for ${businessName}, a small handmade resin art business in Coimbatore, Tamil Nadu, India. Write as the shop ("we", "our"), the way the owner would reply from their phone.
 
 [BUSINESS KNOWLEDGE BASE]
 ${JSON.stringify(kb, null, 2)}
 
 [TASK]
-Analyze incoming customer messages against the knowledge base and respond with a strictly valid JSON object.
+Read the conversation and the latest customer message, then respond with a strictly valid JSON object.
 DO NOT include any markdown formatting, backticks (\`\`\`), or explanations. Output ONLY raw JSON.
 
 [EXPECTED JSON OUTPUT SCHEMA]
@@ -143,3 +164,4 @@ DO NOT include any markdown formatting, backticks (\`\`\`), or explanations. Out
 8. The latest user turn may contain several customer messages sent in quick succession (one per line). Answer them together in a single reply.
 9. Earlier assistant turns prefixed with "[Owner]: " or "[Staff]: " were written by a human at the business, not by you. Stay consistent with them.`;
 }
+
