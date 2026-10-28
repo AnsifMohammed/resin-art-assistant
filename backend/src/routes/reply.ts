@@ -22,7 +22,7 @@ import { sendMessage } from "../services/send.ts";
 // Either free text (with optional media attachments) or a template (+ variable values).
 const replySchema = z.union([
   z
-    .object({
+    .strictObject({
       text: z.string().max(4096).optional(),
       mediaUrls: z.array(z.string().url()).max(10).optional(),
     })

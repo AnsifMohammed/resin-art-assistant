@@ -33,7 +33,9 @@ const h = vi.hoisted(() => {
   const emitConversationUpdated = vi.fn();
   const emitCustomerUpdated = vi.fn();
   const emitBroadcastUpdated = vi.fn();
-  return { state, enqueue, emitMessageNew, emitConversationUpdated, emitCustomerUpdated, emitBroadcastUpdated };
+  const emitIgCommentNew = vi.fn();
+  const emitIgCommentUpdated = vi.fn();
+  return { state, enqueue, emitMessageNew, emitConversationUpdated, emitCustomerUpdated, emitBroadcastUpdated, emitIgCommentNew, emitIgCommentUpdated };
 });
 
 vi.mock("../src/realtime/events.ts", () => ({
@@ -41,6 +43,8 @@ vi.mock("../src/realtime/events.ts", () => ({
   emitConversationUpdated: h.emitConversationUpdated,
   emitCustomerUpdated: h.emitCustomerUpdated,
   emitBroadcastUpdated: h.emitBroadcastUpdated,
+  emitIgCommentNew: h.emitIgCommentNew,
+  emitIgCommentUpdated: h.emitIgCommentUpdated,
 }));
 
 const tableName = (table: any): string => table?.[Symbol.for("drizzle:Name")] || "";
