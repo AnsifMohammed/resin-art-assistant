@@ -107,10 +107,14 @@ export function ChatView({ conversation, onBack, backOnlyOnMobile = false, onRes
   const reply = useReply(conversation.id);
   const resolve = useResolve(conversation.id);
   const [confirmResolve, setConfirmResolve] = useState(false);
+  const [imgFailed, setImgFailed] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const stickToBottom = useRef(true);
   const now = useNow(30_000);
   const isAdmin = user?.role === "admin";
+
+  // Reset profile pic error state when switching conversations.
+  useEffect(() => { setImgFailed(false); }, [conversation.id]);
 
   // Live messages for this conversation (staff rely on this; admin also gets the global message:new).
   useSocketEvent(`message:new:${conversation.id}`, (e) => appendMessageToCache(qc, conversation.id, e.message));
@@ -204,20 +208,18 @@ export function ChatView({ conversation, onBack, backOnlyOnMobile = false, onRes
                 <ArrowLeft className="h-4 w-4" />
               </button>
             )}
-            {conversation.customer.profilePicUrl ? (
+            {conversation.customer.profilePicUrl && !imgFailed ? (
               <img
                 src={conversation.customer.profilePicUrl}
                 alt={name}
                 className="h-9 w-9 shrink-0 rounded-full object-cover border border-border"
-                onError={(e) => { e.currentTarget.style.display = "none"; e.currentTarget.nextElementSibling?.removeAttribute("style"); }}
+                onError={() => setImgFailed(true)}
               />
-            ) : null}
-            <div
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-primary/20 bg-primary/10 font-outfit text-13 font-bold text-primary-text"
-              style={conversation.customer.profilePicUrl ? { display: "none" } : undefined}
-            >
-              {name.charAt(0).toUpperCase() || "?"}
-            </div>
+            ) : (
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-primary/20 bg-primary/10 font-outfit text-13 font-bold text-primary-text">
+                {name.charAt(0).toUpperCase() || "?"}
+              </div>
+            )}
             <div className="min-w-0">
               {/* Row 1: Customer Name, Channel, and Handle */}
               <div className="flex items-center gap-1.5 min-w-0">

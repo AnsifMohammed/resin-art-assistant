@@ -152,6 +152,7 @@ export const customers = pgTable("customers", {
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 }, (t) => [
+  uniqueIndex("customers_channel_handle_idx").on(t.channelId, t.handleOrPhone),
   index("customers_business_idx").on(t.businessId),
   index("customers_channel_idx").on(t.channelId),
   index("customers_business_segment_idx").on(t.businessId, t.isFavourite, t.isPriority),
@@ -172,6 +173,7 @@ export const conversations = pgTable("conversations", {
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 }, (t) => [
+  uniqueIndex("conversations_customer_unique_idx").on(t.customerId),
   index("conversations_business_state_idx").on(t.businessId, t.state),
   index("conversations_customer_idx").on(t.customerId),
   index("conversations_business_last_msg_idx").on(t.businessId, t.lastMessageAt),
