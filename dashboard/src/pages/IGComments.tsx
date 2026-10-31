@@ -670,8 +670,9 @@ export default function IGCommentsPage() {
       {/* ─── TAB 1: COMMENTS LOG ───────────────────────────────────────────── */}
       {activeTab === "comments" && (
         <div className="space-y-4">
-          {/* Sub-filter Pills with counts */}
+          {/* Action & Media Type Filter Pills (Merged single row) */}
           <div className="flex flex-wrap items-center justify-between gap-3">
+            {/* Left side: Action pills */}
             <div className="flex flex-wrap items-center gap-1.5 text-12">
               <button
                 type="button"
@@ -756,39 +757,15 @@ export default function IGCommentsPage() {
               </button>
             </div>
 
-            {/* Clear filters shortcut */}
-            {(categoryFilter || mediaFilter || (mediaTypeFilter && mediaTypeFilter !== "all") || searchTerm) && (
-              <button
-                type="button"
-                onClick={() => {
-                  setSearchTerm("");
-                  setPage(1);
-                  setSearchParams((prev) => {
-                    const next = new URLSearchParams(prev);
-                    next.delete("category");
-                    next.delete("mediaId");
-                    next.delete("mediaType");
-                    next.delete("search");
-                    return next;
-                  });
-                }}
-                className="text-11 text-text-muted hover:text-text underline cursor-pointer"
-              >
-                Reset filters
-              </button>
-            )}
-          </div>
-
-          {/* Post / Reel Filter Pills */}
-          <div className="flex flex-wrap items-center justify-between gap-2 p-2 rounded-xl bg-surface-muted/50 border border-border/60">
-            <div className="flex items-center gap-1.5 text-12">
+            {/* Right side: Media Type Pills + Reset filters */}
+            <div className="flex flex-wrap items-center gap-1.5 text-12">
               <button
                 type="button"
                 onClick={() => setFilterParam("mediaType", "all")}
                 className={`px-3 py-1 rounded-lg text-12 font-medium transition-colors cursor-pointer ${
                   !mediaTypeFilter || mediaTypeFilter === "all"
                     ? "bg-primary text-primary-foreground font-semibold shadow-xs"
-                    : "bg-surface text-text-muted hover:text-text border border-border/60"
+                    : "bg-surface-muted text-text-muted hover:text-text"
                 }`}
               >
                 All Types
@@ -799,7 +776,7 @@ export default function IGCommentsPage() {
                 className={`px-3 py-1 rounded-lg text-12 font-medium transition-colors cursor-pointer inline-flex items-center gap-1.5 ${
                   mediaTypeFilter === "post"
                     ? "bg-blue-600 text-white font-semibold shadow-xs"
-                    : "bg-surface text-text-muted hover:text-text border border-border/60"
+                    : "bg-surface-muted text-text-muted hover:text-text"
                 }`}
               >
                 <ImageIcon className="w-3.5 h-3.5" />
@@ -811,28 +788,50 @@ export default function IGCommentsPage() {
                 className={`px-3 py-1 rounded-lg text-12 font-medium transition-colors cursor-pointer inline-flex items-center gap-1.5 ${
                   mediaTypeFilter === "reel"
                     ? "bg-purple-600 text-white font-semibold shadow-xs"
-                    : "bg-surface text-text-muted hover:text-text border border-border/60"
+                    : "bg-surface-muted text-text-muted hover:text-text"
                 }`}
               >
                 <Film className="w-3.5 h-3.5" />
                 <span>Reels only</span>
               </button>
-            </div>
 
-            {/* Active media filter pill if filtered to single media */}
-            {mediaFilter && (
-              <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-lg bg-pink-500/10 border border-pink-500/20 text-11 text-pink-600 dark:text-pink-400">
-                <span>Filtered to: <strong>{activeMediaLabel}</strong></span>
+              {/* Clear filters shortcut */}
+              {(categoryFilter || mediaFilter || (mediaTypeFilter && mediaTypeFilter !== "all") || searchTerm) && (
                 <button
                   type="button"
-                  onClick={() => setFilterParam("mediaId", "all")}
-                  className="font-bold underline hover:opacity-80 cursor-pointer ml-1"
+                  onClick={() => {
+                    setSearchTerm("");
+                    setPage(1);
+                    setSearchParams((prev) => {
+                      const next = new URLSearchParams(prev);
+                      next.delete("category");
+                      next.delete("mediaId");
+                      next.delete("mediaType");
+                      next.delete("search");
+                      return next;
+                    });
+                  }}
+                  className="text-11 text-text-muted hover:text-text underline cursor-pointer ml-1"
                 >
-                  Clear
+                  Reset filters
                 </button>
-              </div>
-            )}
+              )}
+            </div>
           </div>
+
+          {/* Active media filter pill if filtered to single media */}
+          {mediaFilter && (
+            <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-lg bg-pink-500/10 border border-pink-500/20 text-11 text-pink-600 dark:text-pink-400">
+              <span>Filtered to: <strong>{activeMediaLabel}</strong></span>
+              <button
+                type="button"
+                onClick={() => setFilterParam("mediaId", "all")}
+                className="font-bold underline hover:opacity-80 cursor-pointer ml-1"
+              >
+                Clear
+              </button>
+            </div>
+          )}
 
           {/* Secondary Filters: Search, Category, Media */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
