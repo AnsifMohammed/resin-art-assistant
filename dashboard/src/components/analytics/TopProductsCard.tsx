@@ -262,11 +262,11 @@ export function TopProductsCard({ products, isLoading }: TopProductsCardProps) {
                       <span
                         className={`w-5 h-5 rounded-full text-[11px] font-bold flex items-center justify-center shrink-0 font-outfit ${
                           rank === 1
-                            ? "bg-amber-500/25 text-amber-700 dark:text-amber-300 border border-amber-500/40"
+                            ? "bg-primary/25 text-primary-text border border-primary/40"
                             : rank === 2
-                              ? "bg-amber-500/18 text-amber-700 dark:text-amber-300 border border-amber-500/30"
+                              ? "bg-primary/18 text-primary-text border border-primary/30"
                               : rank === 3
-                                ? "bg-amber-500/12 text-amber-700 dark:text-amber-300 border border-amber-500/20"
+                                ? "bg-primary/12 text-primary-text border border-primary/20"
                                 : "bg-surface text-text-muted border border-border"
                         }`}
                       >
@@ -301,7 +301,7 @@ export function TopProductsCard({ products, isLoading }: TopProductsCardProps) {
                           aria-label={`${barWidthPct}% of the top product`}
                         >
                           <div
-                            className="h-full rounded-full bg-amber-500 transition-all duration-300"
+                            className="h-full rounded-full bg-primary transition-all duration-300"
                             style={{ width: `${barWidthPct}%` }}
                           />
                         </div>

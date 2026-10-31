@@ -1,4 +1,13 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
+
+/** Read a CSS custom property from :root at render time (Recharts can't use CSS vars directly). */
+function useCssVar(name: string): string {
+  return useMemo(
+    () => getComputedStyle(document.documentElement).getPropertyValue(name).trim() || "#38C7D8",
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+}
 import {
   ResponsiveContainer,
   BarChart,
@@ -49,6 +58,7 @@ interface MainChartCardProps {
 
 export function MainChartCard({ revenueData, messagesData }: MainChartCardProps) {
   const [metric, setMetric] = useState<"revenue" | "messages">("revenue");
+  const primaryColor = useCssVar("--primary");
 
   const totalRevenue = revenueData.reduce((acc, d) => acc + d.revenue, 0);
   const totalOrders = revenueData.reduce((acc, d) => acc + d.orders, 0);
@@ -133,7 +143,7 @@ export function MainChartCard({ revenueData, messagesData }: MainChartCardProps)
           ) : (
             <div className="flex items-center gap-2.5 min-w-0 whitespace-nowrap">
               <span className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
+                <span className="w-2 h-2 rounded-full bg-primary shrink-0" />
                 <span className="text-text whitespace-nowrap">In ({totalInbound})</span>
               </span>
               <span className="flex items-center gap-1.5">
@@ -188,7 +198,7 @@ export function MainChartCard({ revenueData, messagesData }: MainChartCardProps)
                 className="text-text-muted"
               />
               <Tooltip
-                cursor={{ fill: "rgba(245, 158, 11, 0.08)" }}
+                cursor={{ fill: `color-mix(in srgb, ${primaryColor} 8%, transparent)` }}
                 content={({ active, payload, label }) => {
                   if (active && payload && payload.length > 0 && payload[0]) {
                     const point = payload[0].payload as DailyRevenueItem;
@@ -220,7 +230,7 @@ export function MainChartCard({ revenueData, messagesData }: MainChartCardProps)
                   return (
                     <Cell
                       key={`bar-cell-${entry.date}-${index}`}
-                      fill="#F59E0B"
+                      fill={primaryColor}
                       fillOpacity={isToday ? 1 : 0.75}
                     />
                   );
@@ -234,8 +244,8 @@ export function MainChartCard({ revenueData, messagesData }: MainChartCardProps)
             >
               <defs>
                 <linearGradient id="inboundGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#F59E0B" stopOpacity={0.35} />
-                  <stop offset="95%" stopColor="#F59E0B" stopOpacity={0.0} />
+                  <stop offset="5%" stopColor={primaryColor} stopOpacity={0.35} />
+                  <stop offset="95%" stopColor={primaryColor} stopOpacity={0.0} />
                 </linearGradient>
                 <linearGradient id="outboundGradient" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#0D9488" stopOpacity={0.35} />
@@ -270,7 +280,7 @@ export function MainChartCard({ revenueData, messagesData }: MainChartCardProps)
                       <div className="px-2.5 py-1.5 rounded-xl border border-border bg-surface/95 shadow-xl text-11 backdrop-blur-md space-y-0.5">
                         <p className="font-semibold text-text">{label}</p>
                         <div className="flex items-center gap-3 text-10">
-                          <span className="text-amber-600 dark:text-amber-400 font-medium">Inbound: {point.inbound}</span>
+                          <span className="text-primary-text font-medium">Inbound: {point.inbound}</span>
                           <span className="text-teal font-medium">Outbound: {point.outbound}</span>
                         </div>
                       </div>
@@ -282,7 +292,7 @@ export function MainChartCard({ revenueData, messagesData }: MainChartCardProps)
               <Area
                 type="monotone"
                 dataKey="inbound"
-                stroke="#F59E0B"
+                stroke={primaryColor}
                 strokeWidth={2}
                 fillOpacity={1}
                 fill="url(#inboundGradient)"

@@ -134,7 +134,7 @@ export function AiHealthCard({
         <div className="flex h-2 w-full rounded-full overflow-hidden gap-[2px] bg-surface-muted">
           <div
             style={{ width: `${autoShare}%` }}
-            className="bg-amber-500 h-full rounded-l-full transition-all duration-500"
+            className="bg-primary h-full rounded-l-full transition-all duration-500"
             title={`AI answered: ${autoShare}% (${autoRepliesCount ?? 0})`}
           />
           <div
@@ -146,7 +146,7 @@ export function AiHealthCard({
         {/* Legend */}
         <div className="flex items-center gap-3 text-[11px] text-text-muted">
           <span className="flex items-center gap-1">
-            <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
+            <span className="w-2 h-2 rounded-full bg-primary shrink-0" />
             AI {autoRepliesCount === null ? DASH : autoRepliesCount.toLocaleString("en-IN")}
           </span>
           <span className="flex items-center gap-1">

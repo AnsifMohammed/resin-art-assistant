@@ -33,11 +33,11 @@ export interface StatCardProps {
 
 const colorMap = {
   amber: {
-    accent: "text-amber-500",
-    bg: "bg-amber-500/10",
-    border: "border-amber-500/30",
+    accent: "text-primary",
+    bg: "bg-primary/10",
+    border: "border-primary/30",
     sparklineStroke: themeColors.light.primary,
-    sparklineFill: "rgba(245, 158, 11, 0.12)",
+    sparklineFill: "rgba(56, 199, 216, 0.12)",
   },
   emerald: {
     accent: "text-emerald-500",
