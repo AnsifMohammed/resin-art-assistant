@@ -164,7 +164,6 @@ export function useUpdateIgSettings() {
     mutationFn: (body: Partial<IgSettings>) => updateIgSettings(body),
     onSuccess: (data) => {
       qc.setQueryData<IgSettings>(queryKeys.igComments.settings(), data);
-      void qc.invalidateQueries({ queryKey: queryKeys.igComments.settings() });
     },
   });
 }

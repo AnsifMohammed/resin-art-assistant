@@ -327,9 +327,9 @@ export const igCommentsRoutes: FastifyPluginAsync = async (app: FastifyInstance)
     },
   );
 
-  // GET /ig-comments/media-summary - Grouped comments per post & reel
+  // GET /ig/comments/media-summary - Grouped comments per post & reel
   app.get(
-    "/ig-comments/media-summary",
+    "/ig/comments/media-summary",
     { preHandler: [authenticate, requireAdmin] },
     async (request) => {
       const businessId = request.user.businessId;

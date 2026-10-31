@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import {
   Plus,
@@ -89,12 +89,8 @@ export default function IGCommentsPage() {
   // Active top tab (3 tabs: comments, by-media, rules)
   type IgTab = "comments" | "by-media" | "rules";
   const rawTab = searchParams.get("tab");
-  const activeTab: IgTab =
-    rawTab === "rules"
-      ? "rules"
-      : rawTab === "by-media"
-        ? "by-media"
-        : "comments";
+  const IG_TABS = ["rules", "by-media", "comments"] as const;
+  const activeTab: IgTab = IG_TABS.includes(rawTab as IgTab) ? (rawTab as IgTab) : "comments";
 
   const setActiveTab = (tab: IgTab) => {
     setSearchParams((prev) => {
@@ -159,9 +155,7 @@ export default function IGCommentsPage() {
   const simulateMutation = useSimulateIgComment();
 
   // Selected Comment for Detail SlideOver
-  const [selectedCommentId, setSelectedCommentId] = useState<string | null>(
-    searchParams.get("commentId") || null,
-  );
+  const selectedCommentId = searchParams.get("commentId");
   const { data: selectedComment, isLoading: selectedCommentLoading } = useIgComment(
     selectedCommentId,
   );
@@ -203,13 +197,6 @@ export default function IGCommentsPage() {
   const [simText, setSimText] = useState("How much is this ocean resin tray?");
   const [simMediaId, setSimMediaId] = useState("");
 
-  // Sync commentId URL param
-  useEffect(() => {
-    const cid = searchParams.get("commentId");
-    if (cid && cid !== selectedCommentId) {
-      setSelectedCommentId(cid);
-    }
-  }, [searchParams]);
 
   // Master switch toggling
   const handleToggleMaster = (checked: boolean) => {
@@ -944,7 +931,6 @@ export default function IGCommentsPage() {
                         <tr
                           key={c.id}
                           onClick={() => {
-                            setSelectedCommentId(c.id);
                             setSearchParams((prev) => {
                               const next = new URLSearchParams(prev);
                               next.set("commentId", c.id);
@@ -1563,7 +1549,6 @@ export default function IGCommentsPage() {
       <SlideOver
         open={Boolean(selectedCommentId)}
         onClose={() => {
-          setSelectedCommentId(null);
           setSearchParams((prev) => {
             const next = new URLSearchParams(prev);
             next.delete("commentId");

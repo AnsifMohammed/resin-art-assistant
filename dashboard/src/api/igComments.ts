@@ -42,9 +42,9 @@ export interface IgMediaSummaryItem {
 export const listIgComments = (params: FetchCommentsParams = {}, signal?: AbortSignal) =>
   api.get<IgCommentsResponse>("/ig/comments", params, signal);
 
-/** GET /ig-comments/media-summary */
+/** GET /ig/comments/media-summary */
 export const getIgMediaSummary = (signal?: AbortSignal) =>
-  api.get<{ media: IgMediaSummaryItem[] }>("/ig-comments/media-summary", undefined, signal);
+  api.get<{ media: IgMediaSummaryItem[] }>("/ig/comments/media-summary", undefined, signal);
 
 /** GET /ig/comments/stats */
 export const getIgCommentStats = (signal?: AbortSignal) =>

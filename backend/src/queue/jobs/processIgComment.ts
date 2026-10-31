@@ -1,6 +1,9 @@
 import { and, asc, eq, inArray, ne } from "drizzle-orm";
+import { nanoid } from "nanoid";
 import { classifyComment, type IgCommentCategory } from "../../ai/commentClassifier.ts";
 import { ALWAYS_ESCALATE_PHRASES } from "../../ai/rules.ts";
+
+const LOWER_ESCALATE_PHRASES = ALWAYS_ESCALATE_PHRASES.map((p) => p.toLowerCase());
 import { config } from "../../config.ts";
 import { db } from "../../db/index.ts";
 import {
@@ -23,11 +26,17 @@ export interface ProcessIgCommentParams {
   businessId: string;
 }
 
+const _kwRegexCache = new Map<string, RegExp>();
+
 export function matchesKeyword(text: string, kw: string): boolean {
   const trimmed = kw.trim();
   if (!trimmed) return false;
-  const escaped = trimmed.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const regex = new RegExp(`(?:^|[^\\p{L}\\p{N}_])${escaped}(?:[^\\p{L}\\p{N}_]|$)`, "iu");
+  let regex = _kwRegexCache.get(trimmed);
+  if (!regex) {
+    const escaped = trimmed.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    regex = new RegExp(`(?:^|[^\\p{L}\\p{N}_])${escaped}(?:[^\\p{L}\\p{N}_]|$)`, "iu");
+    _kwRegexCache.set(trimmed, regex);
+  }
   return regex.test(text);
 }
 
@@ -46,6 +55,23 @@ export function renderReplyText(
     .replace(/\{postTitle\}/g, postTitle);
 }
 
+async function skipComment(
+  commentId: string,
+  businessId: string,
+  reason: string,
+  extra?: {
+    category?: IgCommentCategory;
+    matchedRuleId?: string | null;
+    matchedBy?: "keyword" | "ai" | null;
+  },
+): Promise<void> {
+  await db
+    .update(igComments)
+    .set({ action: "skipped", skipReason: reason, processedAt: new Date(), ...extra })
+    .where(eq(igComments.id, commentId));
+  emitIgCommentUpdated(businessId, { commentId, action: "skipped" });
+}
+
 export async function processIgCommentJob(params: ProcessIgCommentParams): Promise<void> {
   // 1. Load comment; if action !== 'pending' -> stop (idempotent).
   const [comment] = await db
@@ -57,11 +83,7 @@ export async function processIgCommentJob(params: ProcessIgCommentParams): Promi
 
   // Sub-comment replies inside a thread must not trigger auto-replies
   if (comment.parentCommentId) {
-    await db
-      .update(igComments)
-      .set({ action: "skipped", skipReason: "sub_comment", processedAt: new Date() })
-      .where(eq(igComments.id, comment.id));
-    emitIgCommentUpdated(params.businessId, { commentId: comment.id, action: "skipped" });
+    await skipComment(comment.id, params.businessId, "sub_comment");
     return;
   }
 
@@ -77,43 +99,29 @@ export async function processIgCommentJob(params: ProcessIgCommentParams): Promi
   const aiClassificationOn = igSettings.aiClassification !== false;
 
   if (!isEnabled) {
-    await db
-      .update(igComments)
-      .set({ action: "skipped", skipReason: "paused", processedAt: new Date() })
-      .where(eq(igComments.id, comment.id));
-    emitIgCommentUpdated(params.businessId, { commentId: comment.id, action: "skipped" });
+    await skipComment(comment.id, params.businessId, "paused");
     return;
   }
 
   // 3. Commenter is our account -> skipped (own_comment).
   if (config.INSTAGRAM_ACCOUNT_ID && comment.commenterIgId === config.INSTAGRAM_ACCOUNT_ID) {
-    await db
-      .update(igComments)
-      .set({ action: "skipped", skipReason: "own_comment", processedAt: new Date() })
-      .where(eq(igComments.id, comment.id));
-    emitIgCommentUpdated(params.businessId, { commentId: comment.id, action: "skipped" });
+    await skipComment(comment.id, params.businessId, "own_comment");
     return;
   }
 
   // 4. Complaint first: ALWAYS_ESCALATE_PHRASES or AI category === 'complaint'
   // -> action needs_attention, NO reply, notify admin
   const lowerText = comment.text.toLowerCase();
-  const phraseMatch = ALWAYS_ESCALATE_PHRASES.some((phrase) => lowerText.includes(phrase.toLowerCase()));
+  const phraseMatch = LOWER_ESCALATE_PHRASES.some((p) => lowerText.includes(p));
 
-  let isComplaint = phraseMatch;
   let detectedCategory: IgCommentCategory | null = phraseMatch ? "complaint" : null;
 
-  if (!isComplaint && aiClassificationOn) {
+  if (!detectedCategory && aiClassificationOn) {
     const classification = await classifyComment(comment.text);
-    if (classification.category === "complaint") {
-      isComplaint = true;
-      detectedCategory = "complaint";
-    } else {
-      detectedCategory = classification.category;
-    }
+    detectedCategory = classification.category;
   }
 
-  if (isComplaint) {
+  if (detectedCategory === "complaint") {
     await db
       .update(igComments)
       .set({
@@ -163,15 +171,13 @@ export async function processIgCommentJob(params: ProcessIgCommentParams): Promi
   }
 
   // Otherwise, if aiClassification is on, pick first rule whose categories include category
-  if (!matchedRule && aiClassificationOn) {
-    if (detectedCategory) {
-      for (const rule of applicableRules) {
-        const categories = (rule.categories as string[]) || [];
-        if (categories.includes(detectedCategory)) {
-          matchedRule = rule;
-          matchedBy = "ai";
-          break;
-        }
+  if (!matchedRule && aiClassificationOn && detectedCategory) {
+    for (const rule of applicableRules) {
+      const categories = (rule.categories as string[]) || [];
+      if (categories.includes(detectedCategory)) {
+        matchedRule = rule;
+        matchedBy = "ai";
+        break;
       }
     }
   } else if (!aiClassificationOn) {
@@ -194,16 +200,7 @@ export async function processIgCommentJob(params: ProcessIgCommentParams): Promi
 
   // 6. No rule -> skipped (no_match).
   if (!matchedRule) {
-    await db
-      .update(igComments)
-      .set({
-        action: "skipped",
-        skipReason: "no_match",
-        category: finalCategory,
-        processedAt: new Date(),
-      })
-      .where(eq(igComments.id, comment.id));
-    emitIgCommentUpdated(params.businessId, { commentId: comment.id, action: "skipped" });
+    await skipComment(comment.id, params.businessId, "no_match", { category: finalCategory });
     return;
   }
 
@@ -223,29 +220,15 @@ export async function processIgCommentJob(params: ProcessIgCommentParams): Promi
     );
 
   if (existingReplied) {
-    await db
-      .update(igComments)
-      .set({
-        action: "skipped",
-        skipReason: "already_replied",
-        category: finalCategory,
-        matchedRuleId: matchedRule.id,
-        matchedBy,
-        processedAt: new Date(),
-      })
-      .where(eq(igComments.id, comment.id));
-    emitIgCommentUpdated(params.businessId, { commentId: comment.id, action: "skipped" });
+    await skipComment(comment.id, params.businessId, "already_replied", { category: finalCategory, matchedRuleId: matchedRule.id, matchedBy });
     return;
   }
 
   // 8. DM rules: no DM if commented_at is older than 7 days or customer is opted out
   // -> fall back to public reply only (if rule has public text), else skipped (too_old / opted_out).
-  const wantsDm = matchedRule.replyMode === "dm" || matchedRule.replyMode === "both";
-  const wantsPublic = matchedRule.replyMode === "public" || matchedRule.replyMode === "both";
-
   let effectiveReplyMode: "none" | "public" | "dm" | "both" = matchedRule.replyMode;
 
-  if (wantsDm) {
+  if (matchedRule.replyMode === "dm" || matchedRule.replyMode === "both") {
     const isTooOld = Date.now() - new Date(comment.commentedAt).getTime() > 7 * 24 * 60 * 60 * 1000;
 
     const [existingCust] = await db
@@ -261,22 +244,10 @@ export async function processIgCommentJob(params: ProcessIgCommentParams): Promi
 
     if (isTooOld || isOptedOut) {
       const reason = isTooOld ? "too_old" : "opted_out";
-      const hasPublicText = Boolean(matchedRule.publicReplyText && matchedRule.publicReplyText.trim().length > 0);
-      if (wantsPublic && hasPublicText) {
+      if (matchedRule.replyMode === "both" && matchedRule.publicReplyText?.trim()) {
         effectiveReplyMode = "public";
       } else {
-        await db
-          .update(igComments)
-          .set({
-            action: "skipped",
-            skipReason: reason,
-            category: finalCategory,
-            matchedRuleId: matchedRule.id,
-            matchedBy,
-            processedAt: new Date(),
-          })
-          .where(eq(igComments.id, comment.id));
-        emitIgCommentUpdated(params.businessId, { commentId: comment.id, action: "skipped" });
+        await skipComment(comment.id, params.businessId, reason, { category: finalCategory, matchedRuleId: matchedRule.id, matchedBy });
         return;
       }
     }
@@ -288,17 +259,31 @@ export async function processIgCommentJob(params: ProcessIgCommentParams): Promi
   let dmMessageId: string | null = null;
   let dmText: string | null = null;
 
+  // Simulated comments (created by /simulate/ig-comment) have fake metaCommentIds
+  // that don't exist on Instagram. Mock the API calls to avoid 400 errors.
+  const isSimulated = comment.metaCommentId.startsWith("demo_");
+
   try {
     if ((effectiveReplyMode === "public" || effectiveReplyMode === "both") && matchedRule.publicReplyText) {
       publicReplyText = renderReplyText(matchedRule.publicReplyText, comment.commenterUsername, comment.mediaCaption);
-      const replyRes = await replyToComment(comment.metaCommentId, publicReplyText, params.businessId);
-      publicReplyId = replyRes.id;
+      if (isSimulated) {
+        publicReplyId = `demo_reply_${nanoid()}`;
+        logger.info({ commentId: comment.id }, "[SIMULATE] Public reply mocked (not sent to Instagram)");
+      } else {
+        const replyRes = await replyToComment(comment.metaCommentId, publicReplyText, params.businessId);
+        publicReplyId = replyRes.id;
+      }
     }
 
     if ((effectiveReplyMode === "dm" || effectiveReplyMode === "both") && matchedRule.dmText) {
       dmText = renderReplyText(matchedRule.dmText, comment.commenterUsername, comment.mediaCaption);
-      const dmRes = await sendPrivateReply(comment.metaCommentId, dmText, params.businessId);
-      dmMessageId = dmRes.messageId;
+      if (isSimulated) {
+        dmMessageId = `demo_mid_${nanoid()}`;
+        logger.info({ commentId: comment.id }, "[SIMULATE] DM reply mocked (not sent to Instagram)");
+      } else {
+        const dmRes = await sendPrivateReply(comment.metaCommentId, dmText, params.businessId);
+        dmMessageId = dmRes.messageId;
+      }
     }
   } catch (err: any) {
     const errMsg = err instanceof Error ? err.message : String(err);
@@ -459,29 +444,13 @@ export async function processIgCommentJob(params: ProcessIgCommentParams): Promi
   }
 
   // 11. Save action, reply texts/ids, audit log, emit
-  let finalAction: "replied_public" | "dm_sent" | "replied_both" = "replied_both";
-  if (publicReplyId && dmMessageId) {
-    finalAction = "replied_both";
-  } else if (publicReplyId) {
-    finalAction = "replied_public";
-  } else if (dmMessageId) {
-    finalAction = "dm_sent";
-  } else {
-    // If reply_mode was none or neither was sent
-    await db
-      .update(igComments)
-      .set({
-        action: "skipped",
-        skipReason: "no_match",
-        category: finalCategory,
-        matchedRuleId: matchedRule.id,
-        matchedBy,
-        processedAt: new Date(),
-      })
-      .where(eq(igComments.id, comment.id));
-    emitIgCommentUpdated(params.businessId, { commentId: comment.id, action: "skipped" });
+  if (!publicReplyId && !dmMessageId) {
+    await skipComment(comment.id, params.businessId, "no_match", { category: finalCategory, matchedRuleId: matchedRule.id, matchedBy });
     return;
   }
+
+  const finalAction: "replied_public" | "dm_sent" | "replied_both" =
+    publicReplyId && dmMessageId ? "replied_both" : publicReplyId ? "replied_public" : "dm_sent";
 
   await db
     .update(igComments)
