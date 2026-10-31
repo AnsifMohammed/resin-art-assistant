@@ -476,8 +476,21 @@ function CustomerPanel({ conversation, onClose }: { conversation: ConversationDe
         </div>
 
         <div className="rounded-xl border border-border/60 bg-surface-muted p-3.5 text-center">
-          <div className="mx-auto mb-2 flex h-14 w-14 items-center justify-center rounded-full border-2 border-primary bg-primary/20 font-outfit text-22 font-bold text-primary-text">
-            {name.charAt(0).toUpperCase() || "?"}
+          <div className="mx-auto mb-2 h-14 w-14 relative">
+            {customer.profilePicUrl ? (
+              <img
+                src={customer.profilePicUrl}
+                alt={name}
+                className="h-14 w-14 rounded-full object-cover border-2 border-primary"
+                onError={(e) => { e.currentTarget.style.display = "none"; (e.currentTarget.nextElementSibling as HTMLElement | null)?.removeAttribute("style"); }}
+              />
+            ) : null}
+            <div
+              className="flex h-14 w-14 items-center justify-center rounded-full border-2 border-primary bg-primary/20 font-outfit text-22 font-bold text-primary-text"
+              style={customer.profilePicUrl ? { display: "none" } : undefined}
+            >
+              {name.charAt(0).toUpperCase() || "?"}
+            </div>
           </div>
           <h4 className="font-outfit text-15 font-bold text-text">{name}</h4>
           <div className="mt-0.5 flex items-center justify-center gap-1.5 text-11 text-text-muted">
