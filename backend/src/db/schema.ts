@@ -142,6 +142,7 @@ export const customers = pgTable("customers", {
   handleOrPhone: text("handle_or_phone").notNull(),
   language: text("language").default("english"),
   notes: text("notes"),
+  profilePicUrl: text("profile_pic_url"),
   city: text("city"),
   isFavourite: boolean("is_favourite").notNull().default(false),
   isPriority: boolean("is_priority").notNull().default(false),
@@ -151,6 +152,7 @@ export const customers = pgTable("customers", {
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 }, (t) => [
+  uniqueIndex("customers_channel_handle_idx").on(t.channelId, t.handleOrPhone),
   index("customers_business_idx").on(t.businessId),
   index("customers_channel_idx").on(t.channelId),
   index("customers_business_segment_idx").on(t.businessId, t.isFavourite, t.isPriority),
@@ -171,6 +173,7 @@ export const conversations = pgTable("conversations", {
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 }, (t) => [
+  uniqueIndex("conversations_customer_unique_idx").on(t.customerId),
   index("conversations_business_state_idx").on(t.businessId, t.state),
   index("conversations_customer_idx").on(t.customerId),
   index("conversations_business_last_msg_idx").on(t.businessId, t.lastMessageAt),
@@ -505,6 +508,7 @@ export const igComments = pgTable("ig_comments", {
   mediaCaption: text("media_caption"),
   commenterIgId: text("commenter_ig_id").notNull(),
   commenterUsername: text("commenter_username"),
+  commenterProfilePicUrl: text("commenter_profile_pic_url"),
   text: text("text").notNull(),
   commentedAt: timestamp("commented_at").notNull(),
   category: igCommentCategoryEnum("category"),

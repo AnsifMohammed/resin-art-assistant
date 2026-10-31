@@ -1,0 +1,1 @@
+ALTER TABLE "ig_comments" ADD COLUMN "commenter_profile_pic_url" text;

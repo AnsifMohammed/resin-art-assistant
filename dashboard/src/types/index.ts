@@ -179,6 +179,7 @@ export interface Customer {
   channelId: string;
   name: string | null;
   handleOrPhone: string;
+  profilePicUrl: string | null;
   language: string | null;
   notes: string | null;
   city?: string | null;
@@ -914,6 +915,7 @@ export interface IgComment {
   mediaCaption: string | null;
   commenterIgId: string;
   commenterUsername: string | null;
+  commenterProfilePicUrl: string | null;
   text: string;
   commentedAt: ISODateString;
   category: IgCommentCategory | null;

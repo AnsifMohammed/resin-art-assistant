@@ -232,6 +232,7 @@ export const conversationRoutes: FastifyPluginAsync = async (app: FastifyInstanc
           id: item.customer.id,
           name: item.customer.name,
           handleOrPhone: item.customer.handleOrPhone,
+          profilePicUrl: item.customer.profilePicUrl ?? null,
         },
         channelType: (item.channel?.type || "whatsapp") as "instagram" | "whatsapp",
         lastMessage: item.lastMessage ?? null,

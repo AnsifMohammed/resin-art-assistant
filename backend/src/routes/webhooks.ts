@@ -13,6 +13,7 @@ import {
   fetchInstagramDisplayName,
   type IgMedia,
   INSTAGRAM_MAX_TEXT_BYTES,
+  fetchCommenterProfilePic,
   listRecentMedia,
   splitInstagramText,
 } from "../services/meta/instagram.ts";
@@ -102,7 +103,7 @@ async function handleCustomerMessage(m: InboundCustomerMessage): Promise<void> {
 
   let customer = await findCustomer(chan.id, m.handleOrPhone);
   if (!customer) {
-    [customer] = await db
+    const [inserted] = await db
       .insert(customers)
       .values({
         businessId: config.BUSINESS_ID,
@@ -110,26 +111,36 @@ async function handleCustomerMessage(m: InboundCustomerMessage): Promise<void> {
         name: m.customerName,
         handleOrPhone: m.handleOrPhone,
       })
+      .onConflictDoNothing()
       .returning();
+    customer = inserted ?? (await findCustomer(chan.id, m.handleOrPhone));
   }
   if (!customer) throw new Error("Could not resolve customer");
 
-  // Instagram webhooks only carry the sender's id; look up their name/@username once
-  // (new customers, and older ones still named by their id). The id stays in
-  // handleOrPhone because replies are sent to it.
-  if (
-    m.channelType === "instagram" &&
-    isInstagramLive(config) &&
-    (!customer.name || customer.name === customer.handleOrPhone)
-  ) {
-    const displayName = await fetchInstagramDisplayName(m.handleOrPhone);
-    if (displayName) {
-      const [renamed] = await db
-        .update(customers)
-        .set({ name: displayName })
-        .where(eq(customers.id, customer.id))
-        .returning();
-      if (renamed) customer = renamed;
+  // Instagram webhooks only carry the sender's id; look up their name/@username and
+  // profile picture once. The id stays in handleOrPhone because replies are sent to it.
+  if (m.channelType === "instagram" && isInstagramLive(config)) {
+    const needsName = !customer.name || customer.name === customer.handleOrPhone;
+    const needsPic = !customer.profilePicUrl;
+
+    if (needsName || needsPic) {
+      const [displayName, profilePicUrl] = await Promise.all([
+        needsName ? fetchInstagramDisplayName(m.handleOrPhone).catch(() => null) : Promise.resolve(null),
+        needsPic ? fetchCommenterProfilePic(m.handleOrPhone, config.BUSINESS_ID).catch(() => null) : Promise.resolve(null),
+      ]);
+
+      const updates: Record<string, unknown> = {};
+      if (displayName) updates.name = displayName;
+      if (profilePicUrl) updates.profilePicUrl = profilePicUrl;
+
+      if (Object.keys(updates).length > 0) {
+        const [updated] = await db
+          .update(customers)
+          .set(updates)
+          .where(eq(customers.id, customer.id))
+          .returning();
+        if (updated) customer = updated;
+      }
     }
   }
 
@@ -139,7 +150,7 @@ async function handleCustomerMessage(m: InboundCustomerMessage): Promise<void> {
   let conv = await findConversation(customer.id);
   const isNewConv = !conv;
   if (!conv) {
-    [conv] = await db
+    const [insertedConv] = await db
       .insert(conversations)
       .values({
         businessId: config.BUSINESS_ID,
@@ -150,7 +161,9 @@ async function handleCustomerMessage(m: InboundCustomerMessage): Promise<void> {
         lastMessageAt: now,
         windowClosesAt,
       })
+      .onConflictDoNothing()
       .returning();
+    conv = insertedConv ?? (await findConversation(customer.id));
   }
   if (!conv) throw new Error("Could not resolve conversation");
 
@@ -533,6 +546,9 @@ async function processInstagram(body: any): Promise<void> {
           mediaCaption = found.caption;
         }
 
+        const commenterIgId = fromId || "unknown";
+        const commenterProfilePicUrl = await fetchCommenterProfilePic(commenterIgId, config.BUSINESS_ID).catch(() => null);
+
         const [inserted] = await db
           .insert(igComments)
           .values({
@@ -544,8 +560,9 @@ async function processInstagram(body: any): Promise<void> {
             mediaPermalink,
             mediaThumbnailUrl,
             mediaCaption,
-            commenterIgId: fromId || "unknown",
+            commenterIgId,
             commenterUsername: fromUsername || null,
+            commenterProfilePicUrl,
             text,
             commentedAt: timestamp,
             action: "pending",

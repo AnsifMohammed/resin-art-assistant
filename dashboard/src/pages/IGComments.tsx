@@ -972,9 +972,25 @@ export default function IGCommentsPage() {
                             </div>
                           </td>
 
-                          {/* Commenter handle */}
-                          <td className="p-3.5 font-medium text-pink-600 dark:text-pink-400 whitespace-nowrap">
-                            @{c.commenterUsername || "user"}
+                          {/* Commenter handle + profile pic */}
+                          <td className="p-3.5 whitespace-nowrap">
+                            <div className="flex items-center gap-2">
+                              {c.commenterProfilePicUrl ? (
+                                <img
+                                  src={c.commenterProfilePicUrl}
+                                  alt={c.commenterUsername || "user"}
+                                  className="w-7 h-7 rounded-full object-cover shrink-0 border border-border"
+                                  onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+                                />
+                              ) : (
+                                <div className="w-7 h-7 rounded-full bg-[#38C7D8]/20 text-[#0E7D8D] dark:text-[#67E8F9] flex items-center justify-center text-10 font-bold shrink-0">
+                                  {(c.commenterUsername || "U")[0]?.toUpperCase()}
+                                </div>
+                              )}
+                              <span className="font-medium text-pink-600 dark:text-pink-400">
+                                @{c.commenterUsername || "user"}
+                              </span>
+                            </div>
                           </td>
 
                           {/* Comment text */}
@@ -1609,9 +1625,23 @@ export default function IGCommentsPage() {
               </span>
               <div className="p-4 rounded-xl border border-border bg-surface space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="font-bold text-pink-600 dark:text-pink-400">
-                    @{selectedComment.commenterUsername || "user"}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    {selectedComment.commenterProfilePicUrl ? (
+                      <img
+                        src={selectedComment.commenterProfilePicUrl}
+                        alt={selectedComment.commenterUsername || "user"}
+                        className="w-8 h-8 rounded-full object-cover border border-border"
+                        onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+                      />
+                    ) : (
+                      <div className="w-8 h-8 rounded-full bg-[#38C7D8]/20 text-[#0E7D8D] dark:text-[#67E8F9] flex items-center justify-center text-12 font-bold">
+                        {(selectedComment.commenterUsername || "U")[0]?.toUpperCase()}
+                      </div>
+                    )}
+                    <span className="font-bold text-pink-600 dark:text-pink-400">
+                      @{selectedComment.commenterUsername || "user"}
+                    </span>
+                  </div>
                   <span className="text-11 text-text-muted">
                     {formatDateTime(selectedComment.commentedAt)}
                   </span>
