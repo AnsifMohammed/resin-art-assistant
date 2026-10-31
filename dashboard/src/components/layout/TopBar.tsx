@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   Search,
   Bell,
@@ -24,11 +24,8 @@ import { customerLabel, formatRelative } from "../../lib/format.ts";
 import { Avatar } from "../shared/Avatar.tsx";
 import { ChannelIcon } from "../shared/ChannelIcon.tsx";
 import { RoleBadge } from "../shared/StatusBadge.tsx";
-import { SegmentedControl } from "../shared/SegmentedControl.tsx";
 import type { AutomationControl } from "./AppShell.tsx";
 import { usePageTitleValue } from "./PageTitle.tsx";
-
-type ChannelFilter = "all" | "whatsapp" | "instagram";
 
 interface TopBarProps {
   onOpenSearch: () => void;
@@ -88,61 +85,6 @@ function ConnectionDot() {
   );
 }
 
-/**
- * Channel filter. Real on /inbox (drives the inbox's ?channel= filter). Disabled on /analytics
- * because GET /analytics has no channel filter. Hidden where it would do nothing.
- */
-function ChannelFilterControl({ pathname }: { pathname: string }) {
-  const [params, setParams] = useSearchParams();
-
-  if (pathname === "/inbox") {
-    const raw = params.get("channel");
-    const value: ChannelFilter = raw === "whatsapp" || raw === "instagram" ? raw : "all";
-    return (
-      <SegmentedControl<ChannelFilter>
-        size="sm"
-        value={value}
-        onChange={(next) =>
-          setParams((prev) => {
-            const p = new URLSearchParams(prev);
-            if (next === "all") p.delete("channel");
-            else p.set("channel", next);
-            return p;
-          })
-        }
-        options={[
-          {
-            value: "all",
-            label: <span className="px-1">All</span>,
-            title: "All channels",
-          },
-          {
-            value: "whatsapp",
-            label: (
-              <span className="flex items-center gap-1">
-                <ChannelIcon channel="whatsapp" size={13} className="shrink-0" />
-                <span className="hidden sm:inline">WhatsApp</span>
-              </span>
-            ),
-            title: "WhatsApp",
-          },
-          {
-            value: "instagram",
-            label: (
-              <span className="flex items-center gap-1">
-                <ChannelIcon channel="instagram" size={13} className="shrink-0" />
-                <span className="hidden sm:inline">Instagram</span>
-              </span>
-            ),
-            title: "Instagram",
-          },
-        ]}
-      />
-    );
-  }
-
-  return null;
-}
 
 /** Bell: real open escalations (GET /escalations, scoped to the user's role by the server). */
 function NotificationsMenu() {
@@ -379,11 +321,6 @@ export function TopBar({ onOpenSearch, automation }: TopBarProps) {
 
       {/* Right: Actions */}
       <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-        {/* Channel Filter (on /inbox or /analytics, neatly grouped with controls) */}
-        <div className="hidden sm:flex items-center">
-          <ChannelFilterControl pathname={currentPath} />
-        </div>
-
         {/* ⌘K Search Button */}
         <button
           type="button"
@@ -401,31 +338,35 @@ export function TopBar({ onOpenSearch, automation }: TopBarProps) {
         {/* Connection Dot */}
         <ConnectionDot />
 
-        {/* AI Pill (Admin Only, real GET /settings + POST /settings/pause with confirm) */}
+        {/* AI Toggle (Admin Only) */}
         {isAdmin && (
           <button
             type="button"
+            role="switch"
             onClick={automation.requestToggle}
             disabled={aiPaused === undefined || automation.pending}
-            aria-pressed={aiPaused === true}
-            className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 rounded-full text-xs font-semibold select-none transition active:scale-98 cursor-pointer disabled:cursor-default disabled:opacity-70 shrink-0 ${aiPaused === undefined
-                ? "bg-surface-muted text-text-muted border border-border"
-                : aiPaused
-                  ? "bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/30"
-                  : "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30"
-              }`}
+            aria-checked={aiPaused === false}
             title={aiPaused === undefined ? "Loading automation status" : aiPaused ? "Resume AI auto-replies" : "Pause AI auto-replies"}
+            className="flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-semibold select-none transition active:scale-98 cursor-pointer disabled:cursor-default disabled:opacity-60 shrink-0 hover:bg-surface-muted"
           >
             <Sparkles
               size={12}
-              className={`shrink-0 ${aiPaused === undefined ? "text-text-muted" : aiPaused ? "text-rose-500" : "text-emerald-500"}`}
+              className={`shrink-0 transition-colors ${aiPaused === undefined || aiPaused ? "text-text-muted" : "text-emerald-500"}`}
             />
-            <span className="hidden xs:inline sm:inline">
-              {aiPaused === undefined ? "AI …" : aiPaused ? "AI paused" : "AI on"}
-            </span>
-            <span className="xs:hidden sm:hidden">
-              {aiPaused ? "Paused" : "On"}
-            </span>
+            <span className={`hidden xs:inline transition-colors ${aiPaused ? "text-text-muted" : "text-text"}`}>AI</span>
+            {/* Track */}
+            <div className={`relative h-[18px] w-8 rounded-full border transition-all duration-200 ${
+              aiPaused === undefined ? "bg-surface-muted border-border"
+              : aiPaused ? "bg-surface-muted border-border"
+              : "bg-emerald-500/20 border-emerald-500/40"
+            }`}>
+              {/* Thumb */}
+              <div className={`absolute top-0.5 h-3 w-3 rounded-full shadow-sm transition-all duration-200 ${
+                aiPaused === undefined ? "left-0.5 bg-border"
+                : aiPaused ? "left-0.5 bg-text-muted/60"
+                : "left-[calc(100%-14px)] bg-emerald-500"
+              }`} />
+            </div>
           </button>
         )}
 
