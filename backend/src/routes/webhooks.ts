@@ -103,7 +103,7 @@ async function handleCustomerMessage(m: InboundCustomerMessage): Promise<void> {
 
   let customer = await findCustomer(chan.id, m.handleOrPhone);
   if (!customer) {
-    [customer] = await db
+    const [inserted] = await db
       .insert(customers)
       .values({
         businessId: config.BUSINESS_ID,
@@ -111,7 +111,9 @@ async function handleCustomerMessage(m: InboundCustomerMessage): Promise<void> {
         name: m.customerName,
         handleOrPhone: m.handleOrPhone,
       })
+      .onConflictDoNothing()
       .returning();
+    customer = inserted ?? (await findCustomer(chan.id, m.handleOrPhone));
   }
   if (!customer) throw new Error("Could not resolve customer");
 
@@ -148,7 +150,7 @@ async function handleCustomerMessage(m: InboundCustomerMessage): Promise<void> {
   let conv = await findConversation(customer.id);
   const isNewConv = !conv;
   if (!conv) {
-    [conv] = await db
+    const [insertedConv] = await db
       .insert(conversations)
       .values({
         businessId: config.BUSINESS_ID,
@@ -159,7 +161,9 @@ async function handleCustomerMessage(m: InboundCustomerMessage): Promise<void> {
         lastMessageAt: now,
         windowClosesAt,
       })
+      .onConflictDoNothing()
       .returning();
+    conv = insertedConv ?? (await findConversation(customer.id));
   }
   if (!conv) throw new Error("Could not resolve conversation");
 
