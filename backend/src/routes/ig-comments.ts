@@ -52,6 +52,7 @@ const listQuerySchema = z.object({
   action: z.string().optional(),
   category: z.string().optional(),
   mediaId: z.string().optional(),
+  mediaType: z.enum(["post", "reel"]).optional(),
   search: z.string().optional(),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(25),
@@ -175,6 +176,10 @@ export const igCommentsRoutes: FastifyPluginAsync = async (app: FastifyInstance)
 
       if (q.mediaId) {
         conditions.push(eq(igComments.mediaId, q.mediaId));
+      }
+
+      if (q.mediaType) {
+        conditions.push(eq(igComments.mediaType, q.mediaType));
       }
 
       if (q.search) {
@@ -317,6 +322,55 @@ export const igCommentsRoutes: FastifyPluginAsync = async (app: FastifyInstance)
       };
     },
   );
+
+  // GET /ig-comments/media-summary & /ig/comments/media-summary - Grouped comments per post & reel
+  const handleMediaSummary = async (request: any) => {
+    const businessId = request.user.businessId;
+
+    const rows = await db
+      .select({
+        mediaId: igComments.mediaId,
+        mediaType: igComments.mediaType,
+        mediaCaption: igComments.mediaCaption,
+        mediaThumbnailUrl: igComments.mediaThumbnailUrl,
+        mediaPermalink: igComments.mediaPermalink,
+        total: count(),
+        needsAttention: sql<number>`count(case when ${igComments.action} = 'needs_attention' then 1 end)`,
+        replied: sql<number>`count(case when ${igComments.action} in ('replied_public', 'dm_sent', 'replied_both') then 1 end)`,
+        skipped: sql<number>`count(case when ${igComments.action} = 'skipped' then 1 end)`,
+        failed: sql<number>`count(case when ${igComments.action} = 'failed' then 1 end)`,
+      })
+      .from(igComments)
+      .where(eq(igComments.businessId, businessId))
+      .groupBy(
+        igComments.mediaId,
+        igComments.mediaType,
+        igComments.mediaCaption,
+        igComments.mediaThumbnailUrl,
+        igComments.mediaPermalink,
+      )
+      .orderBy(desc(sql`max(${igComments.commentedAt})`));
+
+    const media = rows.map((r) => ({
+      mediaId: r.mediaId,
+      mediaType: (r.mediaType === "reel" ? "reel" : "post") as "post" | "reel",
+      mediaCaption: r.mediaCaption,
+      mediaThumbnailUrl: r.mediaThumbnailUrl,
+      mediaPermalink: r.mediaPermalink,
+      counts: {
+        total: Number(r.total || 0),
+        needs_attention: Number(r.needsAttention || 0),
+        replied: Number(r.replied || 0),
+        skipped: Number(r.skipped || 0),
+        failed: Number(r.failed || 0),
+      },
+    }));
+
+    return { media };
+  };
+
+  app.get("/ig-comments/media-summary", { preHandler: [authenticate, requireAdmin] }, handleMediaSummary);
+  app.get("/ig/comments/media-summary", { preHandler: [authenticate, requireAdmin] }, handleMediaSummary);
 
   // GET /ig/comments/:id - Get single comment detail
   app.get<{ Params: { id: string } }>(

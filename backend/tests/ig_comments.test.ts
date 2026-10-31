@@ -71,6 +71,33 @@ function answer(q: FakeQuery): any[] | undefined {
   if (q.table === "ig_comments" && "count" in q.fields && !q.groupBy) {
     return [{ count: fake.rows("ig_comments").length }];
   }
+  if (q.table === "ig_comments" && q.groupBy && "mediaId" in q.fields) {
+    const groups = new Map<string, any>();
+    for (const r of fake.rows("ig_comments")) {
+      const mid = r.mediaId;
+      if (!groups.has(mid)) {
+        groups.set(mid, {
+          mediaId: mid,
+          mediaType: r.mediaType || "post",
+          mediaCaption: r.mediaCaption,
+          mediaThumbnailUrl: r.mediaThumbnailUrl,
+          mediaPermalink: r.mediaPermalink,
+          total: 0,
+          needsAttention: 0,
+          replied: 0,
+          skipped: 0,
+          failed: 0,
+        });
+      }
+      const entry = groups.get(mid);
+      entry.total++;
+      if (r.action === "needs_attention") entry.needsAttention++;
+      else if (["replied_public", "dm_sent", "replied_both"].includes(r.action)) entry.replied++;
+      else if (r.action === "skipped") entry.skipped++;
+      else if (r.action === "failed") entry.failed++;
+    }
+    return [...groups.values()];
+  }
   if (q.table === "ig_comments" && q.groupBy && "action" in q.fields && "count" in q.fields) {
     const groups = new Map<string, number>();
     for (const r of fake.rows("ig_comments")) {
@@ -764,6 +791,99 @@ describe("Instagram Comments & Rules API", () => {
       expect(comment.mediaId).toBe("media_reel_1");
       expect(rt.emitIgCommentNew).toHaveBeenCalled();
       expect(enqueueIgMock.enqueueProcessIgComment).toHaveBeenCalled();
+    });
+  });
+
+  describe("Media Type Filter & Media Summary", () => {
+    it("GET /ig/comments?mediaType=reel filters by media type", async () => {
+      fake.tables.ig_comments = [
+        {
+          id: "c-1",
+          businessId: "biz-1",
+          metaCommentId: "m-1",
+          mediaId: "reel-1",
+          mediaType: "reel",
+          commenterIgId: "u-1",
+          text: "Reel comment",
+          commentedAt: new Date(),
+          action: "replied_public",
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        {
+          id: "c-2",
+          businessId: "biz-1",
+          metaCommentId: "m-2",
+          mediaId: "post-1",
+          mediaType: "post",
+          commenterIgId: "u-2",
+          text: "Post comment",
+          commentedAt: new Date(),
+          action: "pending",
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+      ];
+
+      const res = await app.inject({
+        method: "GET",
+        url: "/ig/comments?mediaType=reel",
+        headers: { authorization: `Bearer ${adminToken}` },
+      });
+
+      expect(res.statusCode).toBe(200);
+      const json = res.json();
+      expect(json.comments).toHaveLength(1);
+      expect(json.comments[0].mediaType).toBe("reel");
+    });
+
+    it("GET /ig-comments/media-summary returns grouped media with counts", async () => {
+      fake.tables.ig_comments = [
+        {
+          id: "c-1",
+          businessId: "biz-1",
+          metaCommentId: "m-1",
+          mediaId: "reel-1",
+          mediaType: "reel",
+          mediaCaption: "Cool ocean reel",
+          mediaThumbnailUrl: "https://example.com/r1.jpg",
+          commenterIgId: "u-1",
+          text: "Reel comment",
+          commentedAt: new Date(),
+          action: "needs_attention",
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        {
+          id: "c-2",
+          businessId: "biz-1",
+          metaCommentId: "m-2",
+          mediaId: "reel-1",
+          mediaType: "reel",
+          mediaCaption: "Cool ocean reel",
+          commenterIgId: "u-2",
+          text: "Another comment",
+          commentedAt: new Date(),
+          action: "replied_public",
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+      ];
+
+      const res = await app.inject({
+        method: "GET",
+        url: "/ig-comments/media-summary",
+        headers: { authorization: `Bearer ${adminToken}` },
+      });
+
+      expect(res.statusCode).toBe(200);
+      const json = res.json();
+      expect(json.media).toHaveLength(1);
+      expect(json.media[0].mediaId).toBe("reel-1");
+      expect(json.media[0].mediaType).toBe("reel");
+      expect(json.media[0].counts.total).toBe(2);
+      expect(json.media[0].counts.needs_attention).toBe(1);
+      expect(json.media[0].counts.replied).toBe(1);
     });
   });
 });

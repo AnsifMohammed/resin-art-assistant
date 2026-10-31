@@ -94,6 +94,7 @@ export const queryKeys = {
     detail: (id: string) => [...queryKeys.igComments.details(), id] as const,
     rules: () => [...queryKeys.igComments.all, "rules"] as const,
     media: () => [...queryKeys.igComments.all, "media"] as const,
+    mediaSummary: () => [...queryKeys.igComments.all, "mediaSummary"] as const,
     settings: () => [...queryKeys.igComments.all, "settings"] as const,
   },
 };

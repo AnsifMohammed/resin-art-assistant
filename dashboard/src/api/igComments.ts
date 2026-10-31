@@ -16,14 +16,34 @@ export interface FetchCommentsParams {
   action?: string | undefined;
   category?: string | undefined;
   mediaId?: string | undefined;
+  mediaType?: "post" | "reel" | undefined;
   search?: string | undefined;
   page?: number | undefined;
   limit?: number | undefined;
 }
 
+export interface IgMediaSummaryItem {
+  mediaId: string;
+  mediaType: "post" | "reel";
+  mediaCaption: string | null;
+  mediaThumbnailUrl: string | null;
+  mediaPermalink: string | null;
+  counts: {
+    total: number;
+    needs_attention: number;
+    replied: number;
+    skipped: number;
+    failed: number;
+  };
+}
+
 /** GET /ig/comments */
 export const listIgComments = (params: FetchCommentsParams = {}, signal?: AbortSignal) =>
   api.get<IgCommentsResponse>("/ig/comments", params, signal);
+
+/** GET /ig-comments/media-summary */
+export const getIgMediaSummary = (signal?: AbortSignal) =>
+  api.get<{ media: IgMediaSummaryItem[] }>("/ig-comments/media-summary", undefined, signal);
 
 /** GET /ig/comments/stats */
 export const getIgCommentStats = (signal?: AbortSignal) =>

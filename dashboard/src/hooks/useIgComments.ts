@@ -5,6 +5,7 @@ import {
   dismissIgComment,
   getIgComment,
   getIgCommentStats,
+  getIgMediaSummary,
   getIgSettings,
   listIgComments,
   listIgMedia,
@@ -136,6 +137,15 @@ export function useIgMedia() {
     queryFn: ({ signal }) => listIgMedia(signal),
     select: (res) => res.media,
     staleTime: 5 * 60 * 1000,
+  });
+}
+
+/** GET /ig-comments/media-summary */
+export function useIgMediaSummary() {
+  return useQuery({
+    queryKey: queryKeys.igComments.mediaSummary(),
+    queryFn: ({ signal }) => getIgMediaSummary(signal),
+    select: (res) => res.media,
   });
 }
 

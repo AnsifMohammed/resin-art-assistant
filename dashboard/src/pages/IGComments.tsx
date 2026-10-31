@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import {
   Plus,
@@ -46,6 +46,7 @@ import {
   useReorderIgRules,
   useTestIgRule,
   useIgMedia,
+  useIgMediaSummary,
   useIgSettings,
   useUpdateIgSettings,
   useManualReplyIgComment,
@@ -84,9 +85,17 @@ const CATEGORY_COLORS: Record<IgCommentCategory, string> = {
 export default function IGCommentsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // Active top tab
-  const activeTab = (searchParams.get("tab") as "log" | "rules") || "log";
-  const setActiveTab = (tab: "log" | "rules") => {
+  // Active top tab (3 tabs: comments, by-media, rules)
+  type IgTab = "comments" | "by-media" | "rules";
+  const rawTab = searchParams.get("tab");
+  const activeTab: IgTab =
+    rawTab === "rules"
+      ? "rules"
+      : rawTab === "by-media"
+        ? "by-media"
+        : "comments";
+
+  const setActiveTab = (tab: IgTab) => {
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);
       next.set("tab", tab);
@@ -98,6 +107,7 @@ export default function IGCommentsPage() {
   const actionFilter = (searchParams.get("action") as string) || "all";
   const categoryFilter = (searchParams.get("category") as IgCommentCategory) || "";
   const mediaFilter = (searchParams.get("mediaId") as string) || "";
+  const mediaTypeFilter = searchParams.get("mediaType") || "";
   const [searchTerm, setSearchTerm] = useState(searchParams.get("search") || "");
   const debouncedSearch = useDebounced(searchTerm, 300);
   const [page, setPage] = useState(1);
@@ -115,6 +125,7 @@ export default function IGCommentsPage() {
     action: actionFilter === "all" ? undefined : actionFilter,
     category: categoryFilter || undefined,
     mediaId: mediaFilter || undefined,
+    mediaType: mediaTypeFilter === "post" || mediaTypeFilter === "reel" ? mediaTypeFilter : undefined,
     search: debouncedSearch || undefined,
     page,
     limit: 25,
@@ -122,6 +133,16 @@ export default function IGCommentsPage() {
 
   const { data: rules = [], isLoading: rulesLoading } = useIgRules();
   const { data: mediaList = [] } = useIgMedia();
+  const { data: mediaSummary = [], isLoading: summaryLoading } = useIgMediaSummary();
+
+  const posts = useMemo(
+    () => mediaSummary.filter((m) => m.mediaType === "post"),
+    [mediaSummary],
+  );
+  const reels = useMemo(
+    () => mediaSummary.filter((m) => m.mediaType === "reel"),
+    [mediaSummary],
+  );
 
   // Mutations
   const createRuleMutation = useCreateIgRule();
@@ -423,7 +444,7 @@ export default function IGCommentsPage() {
             description: `Action: ${data.comment.action} (matched by ${data.comment.matchedBy || "none"})`,
           });
           setIsSimulateModalOpen(false);
-          setActiveTab("log");
+          setActiveTab("comments");
         },
         onError: (err) => {
           toast.error("Simulation failed", { description: err.message });
@@ -594,14 +615,25 @@ export default function IGCommentsPage() {
         <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={() => setActiveTab("log")}
+            onClick={() => setActiveTab("comments")}
             className={`px-4 py-2.5 font-semibold text-13 border-b-2 transition-colors cursor-pointer ${
-              activeTab === "log"
+              activeTab === "comments"
                 ? "border-primary text-primary-text"
                 : "border-transparent text-text-muted hover:text-text"
             }`}
           >
             Comments Log ({counts.all})
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("by-media")}
+            className={`px-4 py-2.5 font-semibold text-13 border-b-2 transition-colors cursor-pointer ${
+              activeTab === "by-media"
+                ? "border-primary text-primary-text"
+                : "border-transparent text-text-muted hover:text-text"
+            }`}
+          >
+            By Media ({mediaSummary.length})
           </button>
           <button
             type="button"
@@ -630,7 +662,7 @@ export default function IGCommentsPage() {
       </div>
 
       {/* ─── TAB 1: COMMENTS LOG ───────────────────────────────────────────── */}
-      {activeTab === "log" && (
+      {activeTab === "comments" && (
         <div className="space-y-4">
           {/* Sub-filter Pills with counts */}
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -697,7 +729,7 @@ export default function IGCommentsPage() {
             </div>
 
             {/* Clear filters shortcut */}
-            {(categoryFilter || mediaFilter || searchTerm) && (
+            {(categoryFilter || mediaFilter || mediaTypeFilter || searchTerm) && (
               <button
                 type="button"
                 onClick={() => {
@@ -706,6 +738,7 @@ export default function IGCommentsPage() {
                     const next = new URLSearchParams(prev);
                     next.delete("category");
                     next.delete("mediaId");
+                    next.delete("mediaType");
                     next.delete("search");
                     return next;
                   });
@@ -714,6 +747,64 @@ export default function IGCommentsPage() {
               >
                 Reset filters
               </button>
+            )}
+          </div>
+
+          {/* Post / Reel Filter Pills */}
+          <div className="flex flex-wrap items-center justify-between gap-2 p-2 rounded-xl bg-surface-muted/50 border border-border/60">
+            <div className="flex items-center gap-1.5 text-12">
+              <span className="text-11 font-semibold uppercase tracking-wider text-text-muted mr-1">
+                Media:
+              </span>
+              <button
+                type="button"
+                onClick={() => setFilterParam("mediaType", "all")}
+                className={`px-3 py-1 rounded-lg text-12 font-medium transition-colors cursor-pointer ${
+                  !mediaTypeFilter || mediaTypeFilter === "all"
+                    ? "bg-primary text-primary-foreground font-semibold shadow-xs"
+                    : "bg-surface text-text-muted hover:text-text border border-border/60"
+                }`}
+              >
+                All Types
+              </button>
+              <button
+                type="button"
+                onClick={() => setFilterParam("mediaType", "post")}
+                className={`px-3 py-1 rounded-lg text-12 font-medium transition-colors cursor-pointer inline-flex items-center gap-1.5 ${
+                  mediaTypeFilter === "post"
+                    ? "bg-blue-600 text-white font-semibold shadow-xs"
+                    : "bg-surface text-text-muted hover:text-text border border-border/60"
+                }`}
+              >
+                <ImageIcon className="w-3.5 h-3.5" />
+                <span>Posts only</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setFilterParam("mediaType", "reel")}
+                className={`px-3 py-1 rounded-lg text-12 font-medium transition-colors cursor-pointer inline-flex items-center gap-1.5 ${
+                  mediaTypeFilter === "reel"
+                    ? "bg-purple-600 text-white font-semibold shadow-xs"
+                    : "bg-surface text-text-muted hover:text-text border border-border/60"
+                }`}
+              >
+                <Film className="w-3.5 h-3.5" />
+                <span>Reels only</span>
+              </button>
+            </div>
+
+            {/* Active media filter pill if filtered to single media */}
+            {mediaFilter && (
+              <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-lg bg-pink-500/10 border border-pink-500/20 text-11 text-pink-600 dark:text-pink-400">
+                <span>Filtered to media: <strong className="font-mono">{mediaFilter}</strong></span>
+                <button
+                  type="button"
+                  onClick={() => setFilterParam("mediaId", "all")}
+                  className="font-bold underline hover:opacity-80 cursor-pointer ml-1"
+                >
+                  Clear
+                </button>
+              </div>
             )}
           </div>
 
@@ -990,7 +1081,246 @@ export default function IGCommentsPage() {
         </div>
       )}
 
-      {/* ─── TAB 2: AUTO-REPLY RULES ───────────────────────────────────────── */}
+      {/* ─── TAB 2: BY MEDIA (POSTS & REELS GROUPED) ───────────────────────── */}
+      {activeTab === "by-media" && (
+        <div className="space-y-6">
+          {summaryLoading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="p-4 rounded-xl border border-border bg-surface flex items-center gap-4">
+                  <Skeleton className="w-[60px] h-[60px] rounded-lg shrink-0" />
+                  <div className="flex-1 space-y-2">
+                    <Skeleton className="w-3/4 h-4" />
+                    <Skeleton className="w-1/2 h-3" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : mediaSummary.length === 0 ? (
+            <div className="rounded-xl border border-border bg-surface p-8">
+              <EmptyState
+                title="No media comments recorded"
+                description="When customers leave comments on your Instagram posts or reels, they will be categorized and summarized here."
+                size="compact"
+              />
+            </div>
+          ) : (
+            <div className="space-y-8">
+              {/* Posts Section */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between pb-1.5 border-b border-border">
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-md bg-blue-500/10 text-blue-500 flex items-center justify-center">
+                      <ImageIcon className="w-3.5 h-3.5" />
+                    </div>
+                    <h2 className="text-15 font-bold font-outfit text-text">
+                      Posts ({posts.length})
+                    </h2>
+                  </div>
+                  <span className="text-12 text-text-muted">
+                    {posts.reduce((acc, p) => acc + p.counts.total, 0)} total comments
+                  </span>
+                </div>
+
+                {posts.length === 0 ? (
+                  <p className="text-12 text-text-muted italic py-3">No posts with comments found.</p>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                    {posts.map((item) => (
+                      <div
+                        key={item.mediaId}
+                        onClick={() => {
+                          setSearchParams((prev) => {
+                            const next = new URLSearchParams(prev);
+                            next.set("tab", "comments");
+                            next.set("mediaId", item.mediaId);
+                            next.delete("mediaType");
+                            return next;
+                          });
+                        }}
+                        className="p-3.5 rounded-xl border border-border bg-surface hover:border-primary/50 hover:shadow-xs transition-all cursor-pointer flex items-start gap-3.5 group"
+                      >
+                        {/* Thumbnail 60x60 */}
+                        <div className="relative shrink-0">
+                          {item.mediaThumbnailUrl ? (
+                            <img
+                              src={item.mediaThumbnailUrl}
+                              alt=""
+                              className="w-[60px] h-[60px] rounded-lg object-cover border border-border bg-surface-muted shrink-0"
+                            />
+                          ) : (
+                            <div className="w-[60px] h-[60px] rounded-lg border border-border bg-surface-muted flex items-center justify-center shrink-0 text-text-muted">
+                              <ImageIcon className="w-6 h-6" />
+                            </div>
+                          )}
+                          <span className="absolute -top-1.5 -left-1.5 px-1.5 py-0.5 rounded text-[9px] font-bold font-outfit uppercase tracking-wider bg-blue-500 text-white shadow-2xs">
+                            POST
+                          </span>
+                        </div>
+
+                        {/* Caption & Counts */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-1">
+                            <p className="text-12 font-semibold text-text line-clamp-2 leading-snug group-hover:text-primary transition-colors">
+                              {item.mediaCaption || "Untitled Post"}
+                            </p>
+                            {item.mediaPermalink && (
+                              <a
+                                href={item.mediaPermalink}
+                                target="_blank"
+                                rel="noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                className="text-text-muted hover:text-pink-500 transition-colors p-1 shrink-0"
+                                title="Open on Instagram"
+                              >
+                                <ExternalLink className="w-3.5 h-3.5" />
+                              </a>
+                            )}
+                          </div>
+
+                          {/* Count Chips */}
+                          <div className="flex flex-wrap items-center gap-1.5 mt-2.5 text-11">
+                            <span className="px-2 py-0.5 rounded-md font-bold font-outfit bg-surface-muted border border-border text-text">
+                              {item.counts.total} comments
+                            </span>
+                            {item.counts.needs_attention > 0 && (
+                              <span className="px-2 py-0.5 rounded-md font-semibold bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/30">
+                                {item.counts.needs_attention} needs attention
+                              </span>
+                            )}
+                            {item.counts.replied > 0 && (
+                              <span className="px-2 py-0.5 rounded-md font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                                {item.counts.replied} replied
+                              </span>
+                            )}
+                            {item.counts.skipped > 0 && (
+                              <span className="px-2 py-0.5 rounded-md text-text-muted bg-surface-muted border border-border">
+                                {item.counts.skipped} skipped
+                              </span>
+                            )}
+                            {item.counts.failed > 0 && (
+                              <span className="px-2 py-0.5 rounded-md font-semibold bg-red-500/10 text-danger border border-red-500/30">
+                                {item.counts.failed} failed
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Reels Section */}
+              <div className="space-y-3 pt-2">
+                <div className="flex items-center justify-between pb-1.5 border-b border-border">
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-md bg-purple-500/10 text-purple-500 flex items-center justify-center">
+                      <Film className="w-3.5 h-3.5" />
+                    </div>
+                    <h2 className="text-15 font-bold font-outfit text-text">
+                      Reels ({reels.length})
+                    </h2>
+                  </div>
+                  <span className="text-12 text-text-muted">
+                    {reels.reduce((acc, r) => acc + r.counts.total, 0)} total comments
+                  </span>
+                </div>
+
+                {reels.length === 0 ? (
+                  <p className="text-12 text-text-muted italic py-3">No reels with comments found.</p>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                    {reels.map((item) => (
+                      <div
+                        key={item.mediaId}
+                        onClick={() => {
+                          setSearchParams((prev) => {
+                            const next = new URLSearchParams(prev);
+                            next.set("tab", "comments");
+                            next.set("mediaId", item.mediaId);
+                            next.delete("mediaType");
+                            return next;
+                          });
+                        }}
+                        className="p-3.5 rounded-xl border border-border bg-surface hover:border-primary/50 hover:shadow-xs transition-all cursor-pointer flex items-start gap-3.5 group"
+                      >
+                        {/* Thumbnail 60x60 */}
+                        <div className="relative shrink-0">
+                          {item.mediaThumbnailUrl ? (
+                            <img
+                              src={item.mediaThumbnailUrl}
+                              alt=""
+                              className="w-[60px] h-[60px] rounded-lg object-cover border border-border bg-surface-muted shrink-0"
+                            />
+                          ) : (
+                            <div className="w-[60px] h-[60px] rounded-lg border border-border bg-surface-muted flex items-center justify-center shrink-0 text-text-muted">
+                              <Film className="w-6 h-6" />
+                            </div>
+                          )}
+                          <span className="absolute -top-1.5 -left-1.5 px-1.5 py-0.5 rounded text-[9px] font-bold font-outfit uppercase tracking-wider bg-purple-600 text-white shadow-2xs">
+                            REEL
+                          </span>
+                        </div>
+
+                        {/* Caption & Counts */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-1">
+                            <p className="text-12 font-semibold text-text line-clamp-2 leading-snug group-hover:text-primary transition-colors">
+                              {item.mediaCaption || "Untitled Reel"}
+                            </p>
+                            {item.mediaPermalink && (
+                              <a
+                                href={item.mediaPermalink}
+                                target="_blank"
+                                rel="noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                className="text-text-muted hover:text-pink-500 transition-colors p-1 shrink-0"
+                                title="Open on Instagram"
+                              >
+                                <ExternalLink className="w-3.5 h-3.5" />
+                              </a>
+                            )}
+                          </div>
+
+                          {/* Count Chips */}
+                          <div className="flex flex-wrap items-center gap-1.5 mt-2.5 text-11">
+                            <span className="px-2 py-0.5 rounded-md font-bold font-outfit bg-surface-muted border border-border text-text">
+                              {item.counts.total} comments
+                            </span>
+                            {item.counts.needs_attention > 0 && (
+                              <span className="px-2 py-0.5 rounded-md font-semibold bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/30">
+                                {item.counts.needs_attention} needs attention
+                              </span>
+                            )}
+                            {item.counts.replied > 0 && (
+                              <span className="px-2 py-0.5 rounded-md font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                                {item.counts.replied} replied
+                              </span>
+                            )}
+                            {item.counts.skipped > 0 && (
+                              <span className="px-2 py-0.5 rounded-md text-text-muted bg-surface-muted border border-border">
+                                {item.counts.skipped} skipped
+                              </span>
+                            )}
+                            {item.counts.failed > 0 && (
+                              <span className="px-2 py-0.5 rounded-md font-semibold bg-red-500/10 text-danger border border-red-500/30">
+                                {item.counts.failed} failed
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ─── TAB 3: AUTO-REPLY RULES ───────────────────────────────────────── */}
       {activeTab === "rules" && (
         <div className="space-y-4">
           {rulesLoading ? (
