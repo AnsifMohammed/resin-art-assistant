@@ -8,17 +8,17 @@ import type { AiDecisionSummary, Message, SenderType } from "../../types/index.t
 /** Bubble styles (new design; theme tokens so they work in light and dark). */
 const bubbleStyles: Record<SenderType, string> = {
   customer: "bg-surface border border-border text-text self-start rounded-2xl rounded-tl-sm",
-  ai: "bg-gradient-to-br from-violet-600/90 to-violet-700 text-white self-end rounded-2xl rounded-tr-sm",
-  owner: "bg-primary text-primary-foreground self-end rounded-2xl rounded-tr-sm",
-  staff: "bg-teal text-white self-end rounded-2xl rounded-tr-sm",
+  ai: "bg-violet-500/10 border border-violet-500/20 text-violet-900 dark:text-violet-200 self-end rounded-2xl rounded-tr-sm",
+  owner: "bg-primary/12 border border-primary/25 text-primary-text self-end rounded-2xl rounded-tr-sm",
+  staff: "bg-teal-500/10 border border-teal-500/20 text-teal-900 dark:text-teal-200 self-end rounded-2xl rounded-tr-sm",
   system: "text-text-muted text-11 text-center self-center",
 };
 
 const metaTone: Record<SenderType, string> = {
   customer: "text-text-muted",
-  ai: "text-white/80",
-  owner: "text-primary-foreground/70",
-  staff: "text-white/80",
+  ai: "text-violet-600/70 dark:text-violet-300/70",
+  owner: "text-primary-text/60",
+  staff: "text-teal-700/70 dark:text-teal-300/70",
   system: "text-text-muted",
 };
 
