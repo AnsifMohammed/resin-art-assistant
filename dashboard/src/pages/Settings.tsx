@@ -426,7 +426,7 @@ export default function Settings() {
             onClick={handleSaveSettings}
             disabled={!dirty || formDisabled}
             title={dirty ? "Save business hours, away message and alerts" : "No changes to save"}
-            className="px-4 py-2 rounded-xl bg-primary hover:bg-amber-600 text-primary-foreground font-semibold text-13 shadow-xs cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-primary"
+            className="px-4 py-2 rounded-xl bg-primary hover:bg-[#2BAFC0] text-primary-foreground font-semibold text-13 shadow-xs cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-primary"
           >
             {save.isPending ? "Saving…" : "Save Changes"}
           </button>
@@ -840,7 +840,7 @@ export default function Settings() {
                     {theme === "light" && <CheckCircle2 className="w-4 h-4 text-primary" />}
                   </div>
                   <h4 className="font-bold text-14 text-text">Light Theme</h4>
-                  <p className="text-11 text-text-muted">Clean stone #FAFAF9 with warm amber accents</p>
+                  <p className="text-11 text-text-muted">Clean stone #FAFAF9 with Saba Art cyan accents</p>
                 </div>
 
                 {/* Dark */}

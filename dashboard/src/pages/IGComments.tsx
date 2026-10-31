@@ -154,7 +154,7 @@ export default function IGCommentsPage() {
         {activeTab === "rules" && (
           <button
             onClick={handleOpenAddRule}
-            className="px-4 py-2 rounded-xl bg-primary hover:bg-amber-600 text-primary-foreground text-13 font-semibold inline-flex items-center gap-1.5 shadow-xs cursor-pointer"
+            className="px-4 py-2 rounded-xl bg-primary hover:bg-[#2BAFC0] text-primary-foreground text-13 font-semibold inline-flex items-center gap-1.5 shadow-xs cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             <span>Add Rule</span>
@@ -533,7 +533,7 @@ export default function IGCommentsPage() {
               <button
                 type="button"
                 onClick={handleSaveRule}
-                className="px-5 py-2 rounded-xl bg-primary hover:bg-amber-600 text-primary-foreground font-semibold text-13 cursor-pointer shadow-xs"
+                className="px-5 py-2 rounded-xl bg-primary hover:bg-[#2BAFC0] text-primary-foreground font-semibold text-13 cursor-pointer shadow-xs"
               >
                 Save Rule
               </button>

@@ -961,7 +961,7 @@ export default function BroadcastPage() {
                     onClick={() => {
                       if (validate(primaryAction)) setShowConfirmModal(true);
                     }}
-                    className="px-5 py-2.5 rounded-xl bg-primary hover:bg-amber-600 text-primary-foreground font-semibold text-13 inline-flex items-center gap-2 shadow-xs cursor-pointer disabled:opacity-60"
+                    className="px-5 py-2.5 rounded-xl bg-primary hover:bg-[#2BAFC0] text-primary-foreground font-semibold text-13 inline-flex items-center gap-2 shadow-xs cursor-pointer disabled:opacity-60"
                   >
                     {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                     <span>{mode === "schedule" ? "Schedule Broadcast" : "Send Broadcast Now"}</span>
@@ -1165,7 +1165,7 @@ export default function BroadcastPage() {
                   setShowConfirmModal(false);
                   submit(primaryAction);
                 }}
-                className="flex-1 py-2 rounded-lg bg-primary hover:bg-amber-600 text-primary-foreground text-13 font-semibold cursor-pointer shadow-xs"
+                className="flex-1 py-2 rounded-lg bg-primary hover:bg-[#2BAFC0] text-primary-foreground text-13 font-semibold cursor-pointer shadow-xs"
               >
                 Confirm
               </button>

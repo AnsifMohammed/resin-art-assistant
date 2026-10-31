@@ -432,7 +432,7 @@ function TemplateEditor({
         type="button"
         onClick={handleSave}
         disabled={!canSave}
-        className="px-5 py-2 rounded-xl bg-primary hover:bg-amber-600 text-primary-foreground font-semibold text-13 cursor-pointer shadow-xs inline-flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-primary"
+        className="px-5 py-2 rounded-xl bg-primary hover:bg-[#2BAFC0] text-primary-foreground font-semibold text-13 cursor-pointer shadow-xs inline-flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-primary"
       >
         {isPending && <Loader2 className="w-4 h-4 animate-spin" />}
         <span>{isPending ? "Saving..." : "Save Template"}</span>
@@ -863,7 +863,7 @@ export default function TemplatesPage() {
         <button
           type="button"
           onClick={() => openEditor(null)}
-          className="px-4 py-2 rounded-xl bg-primary hover:bg-amber-600 text-primary-foreground text-13 font-semibold inline-flex items-center gap-1.5 shadow-xs cursor-pointer"
+          className="px-4 py-2 rounded-xl bg-primary hover:bg-[#2BAFC0] text-primary-foreground text-13 font-semibold inline-flex items-center gap-1.5 shadow-xs cursor-pointer"
         >
           <Plus className="w-4 h-4" />
           <span>New Template</span>

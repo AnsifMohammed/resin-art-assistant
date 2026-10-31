@@ -124,7 +124,7 @@ export function Sidebar() {
           <>
             <div className="flex items-center gap-2.5 min-w-0">
               {/* Saba Resin Drop Mark */}
-              <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-amber-600 to-amber-400 flex items-center justify-center text-white font-bold shadow-xs shrink-0 aspect-square">
+              <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-[#2BAFC0] to-[#38C7D8] flex items-center justify-center text-white font-bold shadow-xs shrink-0 aspect-square">
                 <span className="text-sm">S</span>
               </div>
               <div className="flex flex-col min-w-0">
@@ -155,7 +155,7 @@ export function Sidebar() {
             aria-label="Expand sidebar"
           >
             {/* Saba Resin Drop Mark - fixed dimensions & aspect ratio, never squished */}
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-amber-600 to-amber-400 flex items-center justify-center text-white font-bold shadow-xs shrink-0 aspect-square group-hover:scale-105 transition-transform">
+            <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-[#2BAFC0] to-[#38C7D8] flex items-center justify-center text-white font-bold shadow-xs shrink-0 aspect-square group-hover:scale-105 transition-transform">
               <span className="text-sm font-bold">S</span>
             </div>
 

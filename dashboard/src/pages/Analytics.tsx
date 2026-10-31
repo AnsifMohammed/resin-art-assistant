@@ -314,7 +314,7 @@ export default function Analytics() {
         </p>
         <button
           onClick={() => void analytics.refetch()}
-          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-12 font-medium hover:bg-amber-600 transition-colors shadow-2xs active:scale-95 cursor-pointer"
+          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-12 font-medium hover:bg-[#2BAFC0] transition-colors shadow-2xs active:scale-95 cursor-pointer"
         >
           <RefreshCw className="w-3.5 h-3.5" />
           <span>Retry</span>
@@ -406,7 +406,7 @@ export default function Analytics() {
               <button
                 type="button"
                 onClick={applyCustomRange}
-                className="px-2.5 py-1 rounded-md bg-primary text-primary-foreground text-11 font-medium hover:bg-amber-600 transition-colors cursor-pointer"
+                className="px-2.5 py-1 rounded-md bg-primary text-primary-foreground text-11 font-medium hover:bg-[#2BAFC0] transition-colors cursor-pointer"
               >
                 Apply
               </button>

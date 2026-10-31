@@ -419,7 +419,7 @@ function CustomerDetail({ initial, open, onClose }: { initial: CustomerListItem;
           disabled={!c.conversationId}
           onClick={() => c.conversationId && navigate(`/inbox?c=${encodeURIComponent(c.conversationId)}`)}
           title={c.conversationId ? undefined : "No conversation with this customer yet"}
-          className="w-full py-2.5 rounded-xl bg-primary hover:bg-amber-600 text-primary-foreground font-semibold text-13 inline-flex items-center justify-center gap-2 cursor-pointer shadow-xs disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-primary"
+          className="w-full py-2.5 rounded-xl bg-primary hover:bg-[#2BAFC0] text-primary-foreground font-semibold text-13 inline-flex items-center justify-center gap-2 cursor-pointer shadow-xs disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-primary"
         >
           <MessageSquare className="w-4 h-4" />
           <span>{c.conversationId ? "Open Conversation in Inbox" : "No conversation yet"}</span>

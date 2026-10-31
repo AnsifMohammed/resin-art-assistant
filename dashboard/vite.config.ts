@@ -15,7 +15,7 @@ export default defineConfig({
         name: "Resin Art Assistant",
         short_name: "Resin Art",
         description: "Customer messaging dashboard",
-        theme_color: "#10b981", // emerald-500, matches the UI
+        theme_color: "#38C7D8", // Saba Art brand cyan
         background_color: "#ffffff",
         display: "standalone",
         orientation: "portrait",

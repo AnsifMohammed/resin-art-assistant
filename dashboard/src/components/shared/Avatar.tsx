@@ -7,7 +7,7 @@ interface AvatarProps {
 
 // Stable distinct hues for names
 const AVATAR_COLORS = [
-  "#F59E0B", // amber
+  "#38C7D8", // cyan
   "#0F766E", // teal
   "#8B5CF6", // violet
   "#3B82F6", // blue

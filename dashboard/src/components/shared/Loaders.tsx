@@ -28,7 +28,7 @@ export function ResinSpinner({
   const toneClasses = {
     primary: {
       track: "border-primary/20",
-      head: "border-t-primary border-r-amber-400",
+      head: "border-t-primary border-r-[#2BAFC0]",
     },
     teal: {
       track: "border-teal/20",

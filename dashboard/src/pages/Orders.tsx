@@ -745,7 +745,7 @@ export default function Orders() {
         <div className="flex items-center gap-2">
           <button
             onClick={handleOpenCreateModal}
-            className="px-3.5 py-2 rounded-xl bg-primary hover:bg-amber-600 text-primary-foreground font-semibold text-13 flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+            className="px-3.5 py-2 rounded-xl bg-primary hover:bg-[#2BAFC0] text-primary-foreground font-semibold text-13 flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             <span>New Order</span>
@@ -1087,7 +1087,7 @@ export default function Orders() {
                   <button
                     type="button"
                     onClick={handleAddItem}
-                    className="text-11 font-semibold text-primary hover:text-amber-600 flex items-center gap-1 cursor-pointer"
+                    className="text-11 font-semibold text-primary hover:text-[#2BAFC0] flex items-center gap-1 cursor-pointer"
                   >
                     <Plus className="w-3.5 h-3.5" /> Add Item
                   </button>
@@ -1251,7 +1251,7 @@ export default function Orders() {
                 <button
                   type="submit"
                   disabled={createOrderMutation.isPending}
-                  className="px-4 py-2 rounded-lg bg-primary hover:bg-amber-600 text-primary-foreground text-13 font-semibold flex items-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-50"
+                  className="px-4 py-2 rounded-lg bg-primary hover:bg-[#2BAFC0] text-primary-foreground text-13 font-semibold flex items-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-50"
                 >
                   {createOrderMutation.isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                   <span>Create Order</span>
@@ -1314,7 +1314,7 @@ export default function Orders() {
                 <button
                   type="button"
                   onClick={() => handleOpenStatusDialog(liveActiveOrder, liveActiveOrder.status)}
-                  className="text-11 font-semibold text-primary hover:text-amber-600 cursor-pointer"
+                  className="text-11 font-semibold text-primary hover:text-[#2BAFC0] cursor-pointer"
                 >
                   Change Status
                 </button>
@@ -1391,7 +1391,7 @@ export default function Orders() {
                     <button
                       type="button"
                       onClick={() => handleStartEditing(liveActiveOrder)}
-                      className="text-11 font-medium text-primary hover:text-amber-600 flex items-center gap-1 cursor-pointer"
+                      className="text-11 font-medium text-primary hover:text-[#2BAFC0] flex items-center gap-1 cursor-pointer"
                     >
                       <Edit2 className="w-3 h-3" /> Edit Order & Prices
                     </button>
@@ -1517,7 +1517,7 @@ export default function Orders() {
                   <button
                     type="button"
                     onClick={handleEditAddItem}
-                    className="text-11 font-semibold text-primary hover:text-amber-600 flex items-center gap-1 cursor-pointer"
+                    className="text-11 font-semibold text-primary hover:text-[#2BAFC0] flex items-center gap-1 cursor-pointer"
                   >
                     <Plus className="w-3.5 h-3.5" /> Add Product
                   </button>
@@ -1699,7 +1699,7 @@ export default function Orders() {
                     <button
                       type="button"
                       onClick={() => handleStartEditing(liveActiveOrder)}
-                      className="px-4 py-1.5 rounded-lg bg-primary hover:bg-amber-600 text-12 font-semibold text-primary-foreground flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors"
+                      className="px-4 py-1.5 rounded-lg bg-primary hover:bg-[#2BAFC0] text-12 font-semibold text-primary-foreground flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors"
                     >
                       <Edit2 className="w-3.5 h-3.5" />
                       <span>Edit Order</span>
@@ -1858,7 +1858,7 @@ export default function Orders() {
                 type="button"
                 onClick={confirmStatusUpdate}
                 disabled={updateOrderStatusMutation.isPending}
-                className="px-4 py-2 rounded-lg bg-primary hover:bg-amber-600 text-primary-foreground text-13 font-semibold cursor-pointer shadow-xs flex items-center gap-1.5 disabled:opacity-50"
+                className="px-4 py-2 rounded-lg bg-primary hover:bg-[#2BAFC0] text-primary-foreground text-13 font-semibold cursor-pointer shadow-xs flex items-center gap-1.5 disabled:opacity-50"
               >
                 {updateOrderStatusMutation.isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                 <span>Confirm Update</span>

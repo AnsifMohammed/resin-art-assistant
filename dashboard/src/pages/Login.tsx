@@ -65,10 +65,10 @@ function ResinDropMark() {
       aria-hidden="true"
     >
       <defs>
-        <linearGradient id="amber-drop-grad" x1="17" y1="2" x2="17" y2="32" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#FBBF24" />
-          <stop offset="0.5" stopColor="#F59E0B" />
-          <stop offset="1" stopColor="#D97706" />
+        <linearGradient id="cyan-drop-grad" x1="17" y1="2" x2="17" y2="32" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#67E8F9" />
+          <stop offset="0.5" stopColor="#38C7D8" />
+          <stop offset="1" stopColor="#2BAFC0" />
         </linearGradient>
         <linearGradient id="teal-wave-grad" x1="4" y1="23" x2="30" y2="32" gradientUnits="userSpaceOnUse">
           <stop stopColor="#0F766E" />
@@ -79,8 +79,8 @@ function ResinDropMark() {
         </clipPath>
       </defs>
       <g clipPath="url(#drop-shape-clip)">
-        {/* Main Amber Resin Body */}
-        <rect width="34" height="34" fill="url(#amber-drop-grad)" />
+        {/* Main Cyan Resin Body */}
+        <rect width="34" height="34" fill="url(#cyan-drop-grad)" />
         {/* Teal Wave At Bottom */}
         <path
           d="M4 23.5C8.5 21.5 13 25 17.5 23.5C22 22 26 25 30.5 23V34H4V23.5Z"
@@ -276,7 +276,7 @@ export default function Login() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="name@asharesins.com"
-                className="w-full h-[48px] px-3.5 rounded-[10px] text-[16px] md:text-[14px] bg-stone-50 dark:bg-[#1A2335] border border-stone-200 dark:border-[rgba(255,255,255,0.08)] text-stone-900 dark:text-[#F1F5F9] placeholder:text-stone-400 dark:placeholder:text-stone-500 focus:outline-none focus:ring-2 focus:ring-amber-500/40 focus:border-[#F59E0B] transition"
+                className="w-full h-[48px] px-3.5 rounded-[10px] text-[16px] md:text-[14px] bg-stone-50 dark:bg-[#1A2335] border border-stone-200 dark:border-[rgba(255,255,255,0.08)] text-stone-900 dark:text-[#F1F5F9] placeholder:text-stone-400 dark:placeholder:text-stone-500 focus:outline-none focus:ring-2 focus:ring-[#38C7D8]/40 focus:border-[#38C7D8] transition"
               />
             </div>
 
@@ -297,7 +297,7 @@ export default function Login() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full h-[48px] pl-3.5 pr-12 rounded-[10px] text-[16px] md:text-[14px] bg-stone-50 dark:bg-[#1A2335] border border-stone-200 dark:border-[rgba(255,255,255,0.08)] text-stone-900 dark:text-[#F1F5F9] placeholder:text-stone-400 dark:placeholder:text-stone-500 focus:outline-none focus:ring-2 focus:ring-amber-500/40 focus:border-[#F59E0B] transition"
+                  className="w-full h-[48px] pl-3.5 pr-12 rounded-[10px] text-[16px] md:text-[14px] bg-stone-50 dark:bg-[#1A2335] border border-stone-200 dark:border-[rgba(255,255,255,0.08)] text-stone-900 dark:text-[#F1F5F9] placeholder:text-stone-400 dark:placeholder:text-stone-500 focus:outline-none focus:ring-2 focus:ring-[#38C7D8]/40 focus:border-[#38C7D8] transition"
                 />
                 <button
                   type="button"
