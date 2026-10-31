@@ -505,6 +505,7 @@ export const igComments = pgTable("ig_comments", {
   mediaCaption: text("media_caption"),
   commenterIgId: text("commenter_ig_id").notNull(),
   commenterUsername: text("commenter_username"),
+  commenterProfilePicUrl: text("commenter_profile_pic_url"),
   text: text("text").notNull(),
   commentedAt: timestamp("commented_at").notNull(),
   category: igCommentCategoryEnum("category"),
