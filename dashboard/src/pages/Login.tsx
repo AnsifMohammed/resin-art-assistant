@@ -8,6 +8,7 @@ import { useTheme } from "../context/ThemeContext.tsx";
 import { canVisit, roleHome } from "../guards/roleHome.ts";
 import type { Role } from "../types/index.ts";
 import { ResinSpinner } from "../components/shared/Loaders.tsx";
+import { SabaLogo } from "../components/shared/SabaLogo.tsx";
 
 interface DemoAccount {
   role: Role;
@@ -48,57 +49,6 @@ function loginErrorMessage(err: unknown): string {
 function destinationFor(role: Role, from: Location | undefined): string {
   if (from && canVisit(role, from.pathname)) return `${from.pathname}${from.search}${from.hash}`;
   return roleHome(role);
-}
-
-/**
- * Amber resin drop logo mark with ocean-teal wave at the bottom and gloss highlight.
- */
-function ResinDropMark() {
-  return (
-    <svg
-      width="34"
-      height="34"
-      viewBox="0 0 34 34"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      className="shrink-0"
-      aria-hidden="true"
-    >
-      <defs>
-        <linearGradient id="cyan-drop-grad" x1="17" y1="2" x2="17" y2="32" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#67E8F9" />
-          <stop offset="0.5" stopColor="#38C7D8" />
-          <stop offset="1" stopColor="#2BAFC0" />
-        </linearGradient>
-        <linearGradient id="teal-wave-grad" x1="4" y1="23" x2="30" y2="32" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#0F766E" />
-          <stop offset="1" stopColor="#14B8A6" />
-        </linearGradient>
-        <clipPath id="drop-shape-clip">
-          <path d="M17 2.5C17 2.5 5.5 16.5 5.5 22.8C5.5 28.5 10.5 32 17 32C23.5 32 28.5 28.5 28.5 22.8C28.5 16.5 17 2.5 17 2.5Z" />
-        </clipPath>
-      </defs>
-      <g clipPath="url(#drop-shape-clip)">
-        {/* Main Cyan Resin Body */}
-        <rect width="34" height="34" fill="url(#cyan-drop-grad)" />
-        {/* Teal Wave At Bottom */}
-        <path
-          d="M4 23.5C8.5 21.5 13 25 17.5 23.5C22 22 26 25 30.5 23V34H4V23.5Z"
-          fill="url(#teal-wave-grad)"
-        />
-        {/* Curved Glossy Highlight */}
-        <ellipse
-          cx="13"
-          cy="12.5"
-          rx="2.8"
-          ry="6"
-          transform="rotate(-28 13 12.5)"
-          fill="white"
-          fillOpacity="0.32"
-        />
-      </g>
-    </svg>
-  );
 }
 
 export default function Login() {
@@ -233,7 +183,7 @@ export default function Login() {
             className="flex items-center gap-2.5 animate-rise-fade"
             style={{ animationDelay: "0ms" }}
           >
-            <ResinDropMark />
+            <SabaLogo className="w-8 h-8 rounded-sm" />
             <span className="font-['Outfit',sans-serif] text-[20px] sm:text-[22px] font-bold tracking-tight text-stone-900 dark:text-[#F1F5F9]">
               Saba Art
             </span>

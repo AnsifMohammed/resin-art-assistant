@@ -149,6 +149,34 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
           void qc.invalidateQueries({ queryKey: queryKeys.broadcasts.all });
         }),
       );
+
+      // Instagram comments & stats
+      const invalidateIgComments = () => {
+        void qc.invalidateQueries({ queryKey: queryKeys.igComments.all });
+      };
+
+      offs.push(
+        transport.on("ig_comment:new", () => {
+          invalidateIgComments();
+        }),
+      );
+
+      offs.push(
+        transport.on("ig_comment:updated", (e) => {
+          invalidateIgComments();
+          if (e.action === "needs_attention") {
+            toast({
+              variant: "warning",
+              title: "New comment needs attention",
+              description: "A customer comment has been flagged as a complaint or sensitive message",
+              action: {
+                label: "Open",
+                onClick: () => navigate("/ig-comments?action=needs_attention"),
+              },
+            });
+          }
+        }),
+      );
     } else {
       // Staff: only their own assignments (gained or lost). Per-conversation messages are subscribed by
       // the chat view via useSocketEvent(`message:new:${conversationId}`).
@@ -180,6 +208,7 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
         void qc.invalidateQueries({ queryKey: queryKeys.settings.all });
         void qc.invalidateQueries({ queryKey: queryKeys.customers.all });
         void qc.invalidateQueries({ queryKey: queryKeys.broadcasts.all });
+        void qc.invalidateQueries({ queryKey: queryKeys.igComments.all });
       }
     }
     wasConnected.current = true;

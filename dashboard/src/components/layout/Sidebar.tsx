@@ -18,6 +18,7 @@ import {
   LogOut,
 } from "lucide-react";
 import { InstagramIcon } from "../shared/InstagramIcon.tsx";
+import { SabaLogo } from "../shared/SabaLogo.tsx";
 import { useAuth } from "../../context/AuthContext.tsx";
 import { useEscalations } from "../../hooks/useEscalations.ts";
 import { Avatar } from "../shared/Avatar.tsx";
@@ -123,10 +124,8 @@ export function Sidebar() {
         {!collapsed ? (
           <>
             <div className="flex items-center gap-2.5 min-w-0">
-              {/* Saba Resin Drop Mark */}
-              <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-[#2BAFC0] to-[#38C7D8] flex items-center justify-center text-white font-bold shadow-xs shrink-0 aspect-square">
-                <span className="text-sm">S</span>
-              </div>
+              {/* Saba 4-Tile Logo Mark */}
+              <SabaLogo className="w-7 h-7 rounded-sm" />
               <div className="flex flex-col min-w-0">
                 <span className="font-display font-bold text-sm tracking-tight text-text truncate">
                   Saba Art
@@ -154,10 +153,8 @@ export function Sidebar() {
             title="Expand sidebar"
             aria-label="Expand sidebar"
           >
-            {/* Saba Resin Drop Mark - fixed dimensions & aspect ratio, never squished */}
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-[#2BAFC0] to-[#38C7D8] flex items-center justify-center text-white font-bold shadow-xs shrink-0 aspect-square group-hover:scale-105 transition-transform">
-              <span className="text-sm font-bold">S</span>
-            </div>
+            {/* Saba 4-Tile Logo Mark */}
+            <SabaLogo className="w-7 h-7 rounded-sm group-hover:scale-105 transition-transform" />
 
             {/* Expand indicator icon overlay badge */}
             <span className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-surface border border-border flex items-center justify-center text-text-muted group-hover:text-primary transition-colors shadow-2xs">

@@ -120,6 +120,12 @@ export const envSchema = z
     DATABASE_URL: z
       .string()
       .regex(/^postgres(ql)?:\/\//, "must be a postgres:// or postgresql:// URL"),
+    // Optional separate URL for pg-boss (session-mode pooler or direct connection).
+    // Falls back to DATABASE_URL when unset.
+    QUEUE_DATABASE_URL: z
+      .string()
+      .regex(/^postgres(ql)?:\/\//, "must be a postgres:// or postgresql:// URL")
+      .optional(),
     // Path (relative to the backend/ directory) to a CA cert used to verify
     // the Postgres server's TLS certificate. Empty/unset = unset (no
     // verification changes vs. current behaviour).
@@ -136,6 +142,7 @@ export const envSchema = z
     META_APP_ID: optional(),
     META_APP_SECRET: optional(),
     META_VERIFY_TOKEN: optional(),
+    META_GRAPH_BASE_URL: optional(),
     INSTAGRAM_ACCESS_TOKEN: optional(),
     INSTAGRAM_ACCOUNT_ID: optional(),
     // Instagram API with Instagram Login: the Instagram app id/secret shown in
