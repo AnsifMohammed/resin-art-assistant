@@ -69,7 +69,7 @@ function getActivityStatus(dateStr?: string | null): { color: string; label: str
   if (isNaN(d.getTime())) return { color: "bg-border", label: "Unknown", ring: "ring-border/40" };
   const hours = (Date.now() - d.getTime()) / (1000 * 3600);
   if (hours <= 24) return { color: "bg-emerald-500", label: "Active today", ring: "ring-emerald-500/40" };
-  if (hours <= 24 * 7) return { color: "bg-amber-500", label: "Active this week", ring: "ring-amber-500/40" };
+  if (hours <= 24 * 7) return { color: "bg-[#38C7D8]", label: "Active this week", ring: "ring-[#38C7D8]/40" };
   return { color: "bg-text-muted/40", label: "Inactive", ring: "ring-border/40" };
 }
 
@@ -463,7 +463,7 @@ function TableSegmentChips({ customer }: { customer: CustomerListItem }) {
   return (
     <div className="flex items-center gap-1.5 min-w-0 overflow-hidden">
       {isVip && (
-        <span className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-gradient-to-r from-amber-500/20 to-amber-400/10 text-amber-600 dark:text-amber-400 border border-amber-500/30 flex items-center gap-0.5 shadow-2xs">
+        <span className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-gradient-to-r from-[#38C7D8]/20 to-[#38C7D8]/10 text-[#0E7D8D] dark:text-[#67E8F9] border border-[#38C7D8]/30 flex items-center gap-0.5 shadow-2xs">
           <Sparkles className="w-2.5 h-2.5" />
           <span>VIP</span>
         </span>
@@ -706,7 +706,7 @@ function CustomerTable({
                   <div role="cell" className={`${cell} gap-3`}>
                     <div className="relative shrink-0">
                       <div
-                        className="w-9 h-9 rounded-full bg-gradient-to-br from-amber-500/20 via-primary/20 to-primary/10 border border-primary/30 flex items-center justify-center font-bold text-12 font-outfit text-primary-text shadow-2xs"
+                        className="w-9 h-9 rounded-full bg-gradient-to-br from-[#38C7D8]/20 via-primary/20 to-primary/10 border border-primary/30 flex items-center justify-center font-bold text-12 font-outfit text-primary-text shadow-2xs"
                         aria-hidden
                       >
                         {initials(c)}
@@ -771,7 +771,7 @@ function CustomerTable({
                   {/* 5. Lifetime Spend Column */}
                   <div role="cell" className={`${cell} ${right} tabular-nums font-bold font-outfit text-13`}>
                     {c.totalSpend > 0 ? (
-                      <span className={c.totalSpend >= 5000 ? "text-amber-600 dark:text-amber-400 font-extrabold" : "text-text"}>
+                      <span className={c.totalSpend >= 5000 ? "text-[#0E7D8D] dark:text-[#38C7D8] font-extrabold" : "text-text"}>
                         {formatRupees(c.totalSpend)}
                       </span>
                     ) : (
@@ -928,7 +928,7 @@ function CustomerKpiRibbon({
         aria-pressed={isRepeat}
         className={`p-3 sm:p-3.5 rounded-xl border text-left transition-all cursor-pointer relative group flex flex-col justify-between min-h-[72px] sm:min-h-[76px] ${
           isRepeat
-            ? "border-amber-500/80 ring-2 ring-amber-500/25 bg-amber-500/[0.04] shadow-xs"
+            ? "border-[#38C7D8]/80 ring-2 ring-[#38C7D8]/25 bg-[#38C7D8]/[0.04] shadow-xs"
             : "border-border bg-surface hover:border-border/80 hover:bg-surface-muted/30 shadow-2xs"
         }`}
       >
@@ -937,7 +937,7 @@ function CustomerKpiRibbon({
             Repeat Buyers
           </span>
           <div className={`w-7 h-7 rounded-lg flex items-center justify-center transition-transform group-hover:scale-105 ${
-            isRepeat ? "bg-amber-500 text-white" : "bg-amber-500/10 text-amber-500"
+            isRepeat ? "bg-[#38C7D8] text-white" : "bg-[#38C7D8]/10 text-[#38C7D8]"
           }`}>
             <Sparkles className="w-3.5 h-3.5" />
           </div>
@@ -948,7 +948,7 @@ function CustomerKpiRibbon({
               {counts?.repeat_buyers ?? 0}
             </span>
             {isRepeat && (
-              <span className="text-10 font-bold px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 uppercase">
+              <span className="text-10 font-bold px-1.5 py-0.5 rounded-full bg-[#38C7D8]/15 text-[#0E7D8D] dark:text-[#67E8F9] uppercase">
                 Active
               </span>
             )}
@@ -1200,7 +1200,7 @@ export default function Customers() {
                   <div className="flex items-start justify-between gap-2 mb-2">
                     <div className="flex items-center gap-3 min-w-0">
                       <div className="relative shrink-0">
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-amber-500/20 via-primary/20 to-primary/10 border border-primary/30 flex items-center justify-center font-bold text-15 font-outfit text-primary-text shadow-2xs">
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#38C7D8]/20 via-primary/20 to-primary/10 border border-primary/30 flex items-center justify-center font-bold text-15 font-outfit text-primary-text shadow-2xs">
                           {initials(c)}
                         </div>
                         <span
@@ -1235,7 +1235,7 @@ export default function Customers() {
 
                   <div className="flex flex-wrap items-center gap-1.5 mb-3">
                     {isVip && (
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-gradient-to-r from-amber-500/20 to-amber-400/10 text-amber-600 dark:text-amber-400 border border-amber-500/30 flex items-center gap-0.5 shadow-2xs">
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-gradient-to-r from-[#38C7D8]/20 to-[#38C7D8]/10 text-[#0E7D8D] dark:text-[#67E8F9] border border-[#38C7D8]/30 flex items-center gap-0.5 shadow-2xs">
                         <Sparkles className="w-2.5 h-2.5" />
                         <span>VIP</span>
                       </span>
@@ -1257,7 +1257,7 @@ export default function Customers() {
                   <div className="grid grid-cols-2 gap-2 p-2.5 rounded-lg border border-border/40 bg-surface-muted text-center text-12">
                     <div>
                       <span className="text-11 text-text-muted block">Spend</span>
-                      <strong className={`tabular-nums font-outfit text-14 ${isVip ? "text-amber-600 dark:text-amber-400 font-extrabold" : "text-text"}`}>
+                      <strong className={`tabular-nums font-outfit text-14 ${isVip ? "text-[#0E7D8D] dark:text-[#38C7D8] font-extrabold" : "text-text"}`}>
                         {formatRupees(c.totalSpend)}
                       </strong>
                     </div>

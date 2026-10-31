@@ -42,7 +42,7 @@ function BodyPreview({ body }: { body: string }) {
         part.variable ? (
           <span
             key={i}
-            className="mx-0.5 inline-block rounded bg-amber-500/15 px-1 font-mono text-11 font-semibold text-amber-600 dark:text-amber-400"
+            className="mx-0.5 inline-block rounded bg-[#38C7D8]/15 px-1 font-mono text-11 font-semibold text-[#0E7D8D] dark:text-[#67E8F9]"
           >
             {part.text}
           </span>

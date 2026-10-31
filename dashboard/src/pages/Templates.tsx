@@ -109,7 +109,7 @@ function TemplateBody({ body }: { body: string }) {
         part.variable !== null ? (
           <span
             key={i}
-            className="inline-block px-1.5 py-0.2 mx-0.5 rounded bg-amber-500/15 text-amber-600 dark:text-amber-400 font-mono text-11 font-semibold"
+            className="inline-block px-1.5 py-0.2 mx-0.5 rounded bg-[#38C7D8]/15 text-[#0E7D8D] dark:text-[#67E8F9] font-mono text-11 font-semibold"
           >
             {part.text}
           </span>
@@ -190,7 +190,7 @@ function TemplateCard({
             {t.variables.map((v) => (
               <span
                 key={v}
-                className="px-1.5 py-0.2 rounded text-[10px] font-mono font-medium bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                className="px-1.5 py-0.2 rounded text-[10px] font-mono font-medium bg-[#38C7D8]/10 text-[#0E7D8D] dark:text-[#67E8F9]"
               >
                 {`{${v}}`}
               </span>
@@ -568,7 +568,7 @@ function TemplateEditor({
                 type="button"
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => insertVariable(v)}
-                className="px-2 py-0.5 rounded text-11 font-mono font-semibold bg-amber-500/10 text-amber-600 dark:text-amber-400 hover:bg-amber-500/20 transition-colors cursor-pointer"
+                className="px-2 py-0.5 rounded text-11 font-mono font-semibold bg-[#38C7D8]/10 text-[#0E7D8D] dark:text-[#67E8F9] hover:bg-[#38C7D8]/20 transition-colors cursor-pointer"
               >
                 +{`{${v}}`}
               </button>
@@ -585,7 +585,7 @@ function TemplateEditor({
             detectedVariables.map((v) => (
               <span
                 key={v}
-                className="px-1.5 py-0.2 rounded text-[10px] font-mono font-medium bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                className="px-1.5 py-0.2 rounded text-[10px] font-mono font-medium bg-[#38C7D8]/10 text-[#0E7D8D] dark:text-[#67E8F9]"
               >
                 {`{${v}}`}
               </span>

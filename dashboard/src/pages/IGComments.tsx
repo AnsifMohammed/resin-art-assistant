@@ -77,7 +77,7 @@ const CATEGORY_COLORS: Record<IgCommentCategory, string> = {
   custom_order: "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20",
   availability: "bg-teal-500/10 text-teal-600 dark:text-teal-400 border-teal-500/20",
   compliment: "bg-pink-500/10 text-pink-600 dark:text-pink-400 border-pink-500/20",
-  question: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20",
+  question: "bg-[#38C7D8]/10 text-[#0E7D8D] dark:text-[#67E8F9] border-[#38C7D8]/20",
   complaint: "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20",
   spam: "bg-gray-500/10 text-gray-500 border-gray-500/20",
   other: "bg-surface-muted text-text-muted border-border",

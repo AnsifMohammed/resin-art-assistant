@@ -278,7 +278,7 @@ function NotificationsMenu() {
                           {customerLabel(e.conversation.customer)}
                         </span>
                       </span>
-                      <span className="text-[10px] text-amber-600 dark:text-amber-400 shrink-0 whitespace-nowrap">
+                      <span className="text-[10px] text-[#0E7D8D] dark:text-[#67E8F9] shrink-0 whitespace-nowrap">
                         {formatRelative(e.createdAt)}
                       </span>
                     </div>

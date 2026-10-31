@@ -133,7 +133,7 @@ function CatalogueProductCard({ product: p, onOpenDetail }: CatalogueProductCard
 
         {/* Customizable micro-badge */}
         {p.customizable && (
-          <div className="absolute top-1.5 right-1.5 sm:top-2 sm:right-2 z-10 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] sm:text-[10px] font-semibold bg-amber-500/90 text-white backdrop-blur-md shadow-xs">
+          <div className="absolute top-1.5 right-1.5 sm:top-2 sm:right-2 z-10 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] sm:text-[10px] font-semibold bg-[#38C7D8] text-white backdrop-blur-md shadow-xs">
             <Sparkles className="w-2.5 h-2.5" />
             <span>Custom</span>
           </div>
@@ -739,7 +739,7 @@ export default function Catalogue() {
                           </td>
                           <td className="p-3 whitespace-nowrap">
                             {p.customizable ? (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-11 font-semibold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-11 font-semibold bg-[#38C7D8]/10 text-[#0E7D8D] dark:text-[#67E8F9] border border-[#38C7D8]/20">
                                 <Sparkles className="w-3 h-3" />
                                 Yes
                               </span>
@@ -1238,7 +1238,7 @@ export default function Catalogue() {
                   Customizable
                 </p>
                 <p className="text-15 font-semibold text-text flex items-center gap-1.5 mt-1">
-                  <Sparkles className="w-4 h-4 text-amber-500" />
+                  <Sparkles className="w-4 h-4 text-[#38C7D8]" />
                   <span>{selectedProduct.customizable ? "Yes" : "Fixed"}</span>
                 </p>
               </div>
