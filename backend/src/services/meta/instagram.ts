@@ -547,3 +547,43 @@ export async function listRecentMedia(
   }
   return result;
 }
+
+/**
+ * Fetch the profile picture URL for an Instagram commenter by their IGSID.
+ * Returns null in demo mode or on any API error (non-fatal).
+ * Result is cached in Redis for 6 hours since profile pics change infrequently.
+ */
+export async function fetchCommenterProfilePic(
+  igsid: string,
+  businessId: string = config.BUSINESS_ID,
+): Promise<string | null> {
+  if (!igsid || igsid.startsWith("ig_")) return null; // simulated commenter
+
+  const cacheKey = `ig:profile_pic:${igsid}`;
+  try {
+    const cached = await redis.get<string>(cacheKey);
+    if (cached) return cached;
+  } catch {
+    // cache miss is fine
+  }
+
+  if (!isInstagramLive(config)) return null;
+
+  try {
+    const token = await resolveInstagramToken(businessId);
+    const url = `${getGraphBaseUrl()}/${INSTAGRAM_GRAPH_VERSION}/${encodeURIComponent(igsid)}?fields=profile_pic&access_token=${token}`;
+    const body = await graphRequest(url, { method: "GET" });
+    const picUrl = typeof body.profile_pic === "string" ? body.profile_pic : null;
+    if (picUrl) {
+      try {
+        await redis.setex(cacheKey, 6 * 60 * 60, picUrl);
+      } catch {
+        // ignore cache write failures
+      }
+    }
+    return picUrl;
+  } catch (err) {
+    logger.warn({ err, igsid }, "Failed to fetch Instagram commenter profile pic");
+    return null;
+  }
+}

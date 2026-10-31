@@ -914,6 +914,7 @@ export interface IgComment {
   mediaCaption: string | null;
   commenterIgId: string;
   commenterUsername: string | null;
+  commenterProfilePicUrl: string | null;
   text: string;
   commentedAt: ISODateString;
   category: IgCommentCategory | null;

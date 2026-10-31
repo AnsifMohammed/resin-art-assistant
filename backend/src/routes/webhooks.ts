@@ -13,6 +13,7 @@ import {
   fetchInstagramDisplayName,
   type IgMedia,
   INSTAGRAM_MAX_TEXT_BYTES,
+  fetchCommenterProfilePic,
   listRecentMedia,
   splitInstagramText,
 } from "../services/meta/instagram.ts";
@@ -533,6 +534,9 @@ async function processInstagram(body: any): Promise<void> {
           mediaCaption = found.caption;
         }
 
+        const commenterIgId = fromId || "unknown";
+        const commenterProfilePicUrl = await fetchCommenterProfilePic(commenterIgId, config.BUSINESS_ID).catch(() => null);
+
         const [inserted] = await db
           .insert(igComments)
           .values({
@@ -544,8 +548,9 @@ async function processInstagram(body: any): Promise<void> {
             mediaPermalink,
             mediaThumbnailUrl,
             mediaCaption,
-            commenterIgId: fromId || "unknown",
+            commenterIgId,
             commenterUsername: fromUsername || null,
+            commenterProfilePicUrl,
             text,
             commentedAt: timestamp,
             action: "pending",
