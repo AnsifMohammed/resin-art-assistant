@@ -15,6 +15,7 @@ import {
   AlertCircle,
   Sparkles,
   Search,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Play,
@@ -863,11 +864,11 @@ export default function IGCommentsPage() {
             </div>
 
             {/* Category Dropdown */}
-            <div>
+            <div className="relative">
               <select
                 value={categoryFilter}
                 onChange={(e) => setFilterParam("category", e.target.value)}
-                className="w-full py-2 px-3 rounded-xl border border-border bg-surface text-13 text-text focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
+                className="w-full py-2 pl-3 pr-8 rounded-xl border border-border bg-surface text-13 text-text focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer appearance-none"
               >
                 <option value="">All Categories</option>
                 {CATEGORIES.map((cat) => (
@@ -876,14 +877,15 @@ export default function IGCommentsPage() {
                   </option>
                 ))}
               </select>
+              <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" aria-hidden />
             </div>
 
             {/* Media Dropdown */}
-            <div>
+            <div className="relative">
               <select
                 value={mediaFilter}
                 onChange={(e) => setFilterParam("mediaId", e.target.value)}
-                className="w-full py-2 px-3 rounded-xl border border-border bg-surface text-13 text-text focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer truncate"
+                className="w-full py-2 pl-3 pr-8 rounded-xl border border-border bg-surface text-13 text-text focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer truncate appearance-none"
               >
                 <option value="">All Posts & Reels</option>
                 {mediaList.map((m) => (
@@ -892,6 +894,7 @@ export default function IGCommentsPage() {
                   </option>
                 ))}
               </select>
+              <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" aria-hidden />
             </div>
           </div>
 
@@ -2236,18 +2239,21 @@ export default function IGCommentsPage() {
                 <label className="block font-semibold text-text mb-1">
                   Attach to Post / Reel (optional)
                 </label>
-                <select
-                  value={simMediaId}
-                  onChange={(e) => setSimMediaId(e.target.value)}
-                  className="w-full p-2 rounded-xl border border-border bg-surface-muted text-12 text-text"
-                >
-                  <option value="">Default demo post</option>
-                  {mediaList.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      [{m.mediaType.toUpperCase()}] {m.caption ? m.caption.slice(0, 40) : m.id}
-                    </option>
-                  ))}
-                </select>
+                <div className="relative">
+                  <select
+                    value={simMediaId}
+                    onChange={(e) => setSimMediaId(e.target.value)}
+                    className="w-full p-2 pl-3 pr-8 rounded-xl border border-border bg-surface-muted text-12 text-text appearance-none cursor-pointer"
+                  >
+                    <option value="">Default demo post</option>
+                    {mediaList.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        [{m.mediaType.toUpperCase()}] {m.caption ? m.caption.slice(0, 40) : m.id}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted" aria-hidden />
+                </div>
               </div>
             </div>
 
