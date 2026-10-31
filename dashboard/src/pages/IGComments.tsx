@@ -133,6 +133,10 @@ export default function IGCommentsPage() {
 
   const { data: rules = [], isLoading: rulesLoading } = useIgRules();
   const { data: mediaList = [] } = useIgMedia();
+  const activeMedia = mediaList.find((m) => m.id === mediaFilter);
+  const activeMediaLabel = activeMedia
+    ? (activeMedia.caption ? activeMedia.caption.slice(0, 50) : activeMedia.id)
+    : mediaFilter;
   const { data: mediaSummary = [], isLoading: summaryLoading } = useIgMediaSummary();
 
   const posts = useMemo(
@@ -570,7 +574,7 @@ export default function IGCommentsPage() {
                 ? "..."
                 : stats && stats.today.comments > 0
                   ? `${Math.round((stats.today.autoReplied / stats.today.comments) * 100)}%`
-                  : "100%"}
+                  : "—"}
             </div>
             <p className="text-11 text-text-muted mt-1">
               {stats?.today.autoReplied ?? 0} auto-replied today
@@ -753,11 +757,12 @@ export default function IGCommentsPage() {
             </div>
 
             {/* Clear filters shortcut */}
-            {(categoryFilter || mediaFilter || mediaTypeFilter || searchTerm) && (
+            {(categoryFilter || mediaFilter || (mediaTypeFilter && mediaTypeFilter !== "all") || searchTerm) && (
               <button
                 type="button"
                 onClick={() => {
                   setSearchTerm("");
+                  setPage(1);
                   setSearchParams((prev) => {
                     const next = new URLSearchParams(prev);
                     next.delete("category");
@@ -777,9 +782,6 @@ export default function IGCommentsPage() {
           {/* Post / Reel Filter Pills */}
           <div className="flex flex-wrap items-center justify-between gap-2 p-2 rounded-xl bg-surface-muted/50 border border-border/60">
             <div className="flex items-center gap-1.5 text-12">
-              <span className="text-11 font-semibold uppercase tracking-wider text-text-muted mr-1">
-                Media:
-              </span>
               <button
                 type="button"
                 onClick={() => setFilterParam("mediaType", "all")}
@@ -820,7 +822,7 @@ export default function IGCommentsPage() {
             {/* Active media filter pill if filtered to single media */}
             {mediaFilter && (
               <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-lg bg-pink-500/10 border border-pink-500/20 text-11 text-pink-600 dark:text-pink-400">
-                <span>Filtered to media: <strong className="font-mono">{mediaFilter}</strong></span>
+                <span>Filtered to: <strong>{activeMediaLabel}</strong></span>
                 <button
                   type="button"
                   onClick={() => setFilterParam("mediaId", "all")}
@@ -1134,24 +1136,22 @@ export default function IGCommentsPage() {
           ) : (
             <div className="space-y-8">
               {/* Posts Section */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between pb-1.5 border-b border-border">
-                  <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-md bg-blue-500/10 text-blue-500 flex items-center justify-center">
-                      <ImageIcon className="w-3.5 h-3.5" />
+              {posts.length > 0 && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between pb-1.5 border-b border-border">
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-md bg-blue-500/10 text-blue-500 flex items-center justify-center">
+                        <ImageIcon className="w-3.5 h-3.5" />
+                      </div>
+                      <h2 className="text-15 font-bold font-outfit text-text">
+                        Posts ({posts.length})
+                      </h2>
                     </div>
-                    <h2 className="text-15 font-bold font-outfit text-text">
-                      Posts ({posts.length})
-                    </h2>
+                    <span className="text-12 text-text-muted">
+                      {posts.reduce((acc, p) => acc + p.counts.total, 0)} total comments
+                    </span>
                   </div>
-                  <span className="text-12 text-text-muted">
-                    {posts.reduce((acc, p) => acc + p.counts.total, 0)} total comments
-                  </span>
-                </div>
 
-                {posts.length === 0 ? (
-                  <p className="text-12 text-text-muted italic py-3">No posts with comments found.</p>
-                ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
                     {posts.map((item) => (
                       <div
@@ -1240,28 +1240,26 @@ export default function IGCommentsPage() {
                       </div>
                     ))}
                   </div>
-                )}
-              </div>
+                </div>
+              )}
 
               {/* Reels Section */}
-              <div className="space-y-3 pt-2">
-                <div className="flex items-center justify-between pb-1.5 border-b border-border">
-                  <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-md bg-purple-500/10 text-purple-500 flex items-center justify-center">
-                      <Film className="w-3.5 h-3.5" />
+              {reels.length > 0 && (
+                <div className="space-y-3 pt-2">
+                  <div className="flex items-center justify-between pb-1.5 border-b border-border">
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-md bg-purple-500/10 text-purple-500 flex items-center justify-center">
+                        <Film className="w-3.5 h-3.5" />
+                      </div>
+                      <h2 className="text-15 font-bold font-outfit text-text">
+                        Reels ({reels.length})
+                      </h2>
                     </div>
-                    <h2 className="text-15 font-bold font-outfit text-text">
-                      Reels ({reels.length})
-                    </h2>
+                    <span className="text-12 text-text-muted">
+                      {reels.reduce((acc, r) => acc + r.counts.total, 0)} total comments
+                    </span>
                   </div>
-                  <span className="text-12 text-text-muted">
-                    {reels.reduce((acc, r) => acc + r.counts.total, 0)} total comments
-                  </span>
-                </div>
 
-                {reels.length === 0 ? (
-                  <p className="text-12 text-text-muted italic py-3">No reels with comments found.</p>
-                ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
                     {reels.map((item) => (
                       <div
@@ -1350,8 +1348,8 @@ export default function IGCommentsPage() {
                       </div>
                     ))}
                   </div>
-                )}
-              </div>
+                </div>
+              )}
             </div>
           )}
         </div>
