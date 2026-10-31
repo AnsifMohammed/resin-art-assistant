@@ -1,10 +1,12 @@
 import { and, eq } from "drizzle-orm";
-import { config } from "../../config.ts";
+import { nanoid } from "nanoid";
+import { config, isInstagramLive } from "../../config.ts";
 import { db } from "../../db/index.ts";
 import { channels } from "../../db/schema.ts";
 import { decrypt } from "../../lib/crypto.ts";
 import { AppError } from "../../lib/errors.ts";
 import { logger } from "../../lib/logger.ts";
+import { redis } from "../../lib/redis.ts";
 
 // Instagram API with Instagram Login (NOT the Facebook-Page-based graph.facebook.com flow).
 // Docs: https://developers.facebook.com/docs/instagram-platform/instagram-api-with-instagram-login/messaging-api
@@ -15,6 +17,13 @@ export const INSTAGRAM_GRAPH_VERSION = "v26.0";
 /** Meta's limit for a text message: UTF-8, at most 1000 bytes. Longer replies are split. */
 export const INSTAGRAM_MAX_TEXT_BYTES = 1000;
 export const INSTAGRAM_REQUEST_TIMEOUT_MS = 10_000;
+
+export function getGraphBaseUrl(): string {
+  if (config.META_GRAPH_BASE_URL) {
+    return config.META_GRAPH_BASE_URL.replace(/\/+$/, "");
+  }
+  return INSTAGRAM_GRAPH_HOST;
+}
 
 // Meta error codes / subcodes we map to specific app errors.
 const TOKEN_INVALID_CODES = new Set([102, 190]);
@@ -334,4 +343,207 @@ export async function refreshInstagramToken(token: string, now: Date = new Date(
     throw new AppError(502, "Instagram token refresh returned an invalid response", "META_ERROR");
   }
   return { accessToken, expiresIn, expiresAt: new Date(now.getTime() + expiresIn * 1000) };
+}
+
+export interface IgMedia {
+  id: string;
+  mediaType: "reel" | "post" | "carousel";
+  caption: string;
+  permalink: string;
+  thumbnailUrl: string;
+  timestamp: string;
+}
+
+/**
+ * Reply publicly to an Instagram comment:
+ * POST /{comment-id}/replies with { message: text }
+ */
+export async function replyToComment(
+  commentId: string,
+  text: string,
+  businessId: string = config.BUSINESS_ID,
+): Promise<{ id: string }> {
+  if (!commentId) throw new AppError(400, "Comment ID is required", "VALIDATION_ERROR");
+  if (!text || text.trim().length === 0) throw new AppError(400, "Reply text is empty", "VALIDATION_ERROR");
+
+  if (!isInstagramLive(config)) {
+    logger.info({ commentId, textLength: text.length }, "[DEMO_MODE] Instagram comment reply logged (not sent)");
+    return { id: `demo_reply_${nanoid()}` };
+  }
+
+  const token = await resolveInstagramToken(businessId);
+  const url = `${getGraphBaseUrl()}/${INSTAGRAM_GRAPH_VERSION}/${encodeURIComponent(commentId)}/replies`;
+  const body = await graphRequest(url, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ message: text }),
+  });
+
+  const replyId = str(body.id);
+  if (!replyId) {
+    throw new AppError(502, "Instagram API response had no id", "META_ERROR");
+  }
+  return { id: replyId };
+}
+
+/**
+ * Send a private reply (DM) to an Instagram comment:
+ * POST /{ig-account-id}/messages with recipient: { comment_id: commentId }
+ */
+export async function sendPrivateReply(
+  commentId: string,
+  text: string,
+  businessId: string = config.BUSINESS_ID,
+): Promise<{ messageId: string }> {
+  if (!commentId) throw new AppError(400, "Comment ID is required", "VALIDATION_ERROR");
+  if (!text || text.trim().length === 0) throw new AppError(400, "DM text is empty", "VALIDATION_ERROR");
+
+  if (!isInstagramLive(config)) {
+    logger.info({ commentId, textLength: text.length }, "[DEMO_MODE] Instagram private reply logged (not sent)");
+    return { messageId: `demo_mid_${nanoid()}` };
+  }
+
+  const token = await resolveInstagramToken(businessId);
+  const accountId = config.INSTAGRAM_ACCOUNT_ID;
+  if (!accountId) {
+    throw new AppError(503, "Instagram account ID is not configured", "INSTAGRAM_NOT_CONFIGURED");
+  }
+
+  const url = `${getGraphBaseUrl()}/${INSTAGRAM_GRAPH_VERSION}/${encodeURIComponent(accountId)}/messages`;
+  const body = await graphRequest(url, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      recipient: { comment_id: commentId },
+      message: { text },
+    }),
+  });
+
+  const messageId = str(body.message_id) ?? str(body.id);
+  if (!messageId) {
+    throw new AppError(502, "Instagram API response had no message_id", "META_ERROR");
+  }
+  return { messageId };
+}
+
+/**
+ * List recent media (posts, reels, carousels) from Instagram.
+ * Cached in Redis for 10 minutes.
+ */
+export async function listRecentMedia(
+  limit: number = 30,
+  businessId: string = config.BUSINESS_ID,
+): Promise<IgMedia[]> {
+  const cacheKey = `ig:recent_media:${businessId}`;
+  try {
+    const cached = await redis.get<IgMedia[] | string>(cacheKey);
+    if (cached) {
+      return (typeof cached === "string" ? JSON.parse(cached) : cached) as IgMedia[];
+    }
+  } catch (err) {
+    logger.warn({ err }, "Failed to read cached media from redis");
+  }
+
+  if (!isInstagramLive(config)) {
+    const fixtureMedia: IgMedia[] = [
+      {
+        id: "demo_media_ocean_clock",
+        mediaType: "reel",
+        caption: "Ocean waves resin wall clock 🌊 Handcrafted with real sand and sea shells! Custom sizes available #resinart #oceanclock #sabaart",
+        permalink: "https://instagram.com/p/demo_reel_ocean_clock",
+        thumbnailUrl: "https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?w=400",
+        timestamp: new Date(Date.now() - 3600000 * 12).toISOString(),
+      },
+      {
+        id: "demo_media_geode_coasters",
+        mediaType: "post",
+        caption: "Set of 4 amethyst purple geode resin coasters with gold gilded edges ✨ Perfect gift! #geodecoasters #resinart",
+        permalink: "https://instagram.com/p/demo_post_geode_coasters",
+        thumbnailUrl: "https://images.unsplash.com/photo-1513519245088-0e12902e5a38?w=400",
+        timestamp: new Date(Date.now() - 3600000 * 24).toISOString(),
+      },
+      {
+        id: "demo_media_name_plaque",
+        mediaType: "reel",
+        caption: "Custom Islamic Arabic calligraphy name plaque in emerald green and gold foil 💚 DM for customized family plaques #resinplaque",
+        permalink: "https://instagram.com/p/demo_reel_name_plaque",
+        thumbnailUrl: "https://images.unsplash.com/photo-1579783902614-a3fb3927b675?w=400",
+        timestamp: new Date(Date.now() - 3600000 * 48).toISOString(),
+      },
+      {
+        id: "demo_media_flower_preservation",
+        mediaType: "post",
+        caption: "Preserved wedding flower preservation resin frame 🌸 Keep your bridal bouquet memories alive forever #flowerpreservation",
+        permalink: "https://instagram.com/p/demo_post_flower_preservation",
+        thumbnailUrl: "https://images.unsplash.com/photo-1582562124811-c09040d0a901?w=400",
+        timestamp: new Date(Date.now() - 3600000 * 72).toISOString(),
+      },
+      {
+        id: "demo_media_ocean_table",
+        mediaType: "reel",
+        caption: "Mini ocean resin side table with teak wood base 🌊 Living room statement piece #resintable",
+        permalink: "https://instagram.com/p/demo_reel_ocean_table",
+        thumbnailUrl: "https://images.unsplash.com/photo-1534447677768-be436bb09401?w=400",
+        timestamp: new Date(Date.now() - 3600000 * 96).toISOString(),
+      },
+      {
+        id: "demo_media_keychains",
+        mediaType: "carousel",
+        caption: "Alphabet letter resin keychains with rose petals & gold flakes ✨ Bulk orders welcome for wedding return gifts #keychains",
+        permalink: "https://instagram.com/p/demo_post_keychains",
+        thumbnailUrl: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=400",
+        timestamp: new Date(Date.now() - 3600000 * 120).toISOString(),
+      },
+    ];
+
+    try {
+      await redis.setex(cacheKey, 600, JSON.stringify(fixtureMedia));
+    } catch (err) {
+      logger.warn({ err }, "Failed to cache fixture media in redis");
+    }
+    return fixtureMedia;
+  }
+
+  const token = await resolveInstagramToken(businessId);
+  const accountId = config.INSTAGRAM_ACCOUNT_ID;
+  if (!accountId) {
+    throw new AppError(503, "Instagram account ID is not configured", "INSTAGRAM_NOT_CONFIGURED");
+  }
+
+  const url = `${getGraphBaseUrl()}/${INSTAGRAM_GRAPH_VERSION}/${encodeURIComponent(accountId)}/media?fields=id,media_type,media_product_type,caption,permalink,thumbnail_url,media_url,timestamp&limit=${limit}`;
+  const body = await graphRequest(url, {
+    method: "GET",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  const rawItems = Array.isArray(body.data) ? (body.data as Record<string, unknown>[]) : [];
+  const result: IgMedia[] = rawItems.map((item) => {
+    const mType = str(item.media_type) ?? "";
+    const prodType = str(item.media_product_type) ?? "";
+    const permalink = str(item.permalink) ?? "";
+    let mediaType: "reel" | "post" | "carousel" = "post";
+    if (prodType === "REELS" || permalink.includes("/reel/")) {
+      mediaType = "reel";
+    } else if (mType === "CAROUSEL_ALBUM") {
+      mediaType = "carousel";
+    } else if (mType === "VIDEO") {
+      mediaType = "reel";
+    }
+    const thumbnailUrl = str(item.thumbnail_url) ?? str(item.media_url) ?? "";
+    return {
+      id: str(item.id) ?? "",
+      mediaType,
+      caption: str(item.caption) ?? "",
+      permalink,
+      thumbnailUrl,
+      timestamp: str(item.timestamp) ?? new Date().toISOString(),
+    };
+  });
+
+  try {
+    await redis.setex(cacheKey, 600, JSON.stringify(result));
+  } catch (err) {
+    logger.warn({ err }, "Failed to cache media in redis");
+  }
+  return result;
 }

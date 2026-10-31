@@ -77,6 +77,18 @@ export const recipientStatusEnum = pgEnum("recipient_status", [
   "pending", "sent", "delivered", "read", "failed"
 ]);
 
+export const igReplyModeEnum = pgEnum("ig_reply_mode", [
+  "none", "public", "dm", "both"
+]);
+
+export const igCommentCategoryEnum = pgEnum("ig_comment_category", [
+  "price", "custom_order", "availability", "compliment", "question", "complaint", "spam", "other"
+]);
+
+export const igCommentActionEnum = pgEnum("ig_comment_action", [
+  "pending", "replied_public", "dm_sent", "replied_both", "skipped", "dismissed", "needs_attention", "failed"
+]);
+
 // ─── Tables ───────────────────────────────────────────────────────────────────
 
 // One row per business (SaaS-ready)
@@ -458,3 +470,63 @@ export const broadcastRecipients = pgTable("broadcast_recipients", {
   index("broadcast_recipients_status_idx").on(t.broadcastId, t.status),
   index("broadcast_recipients_meta_id_idx").on(t.metaMessageId),
 ]);
+
+// Instagram comment auto-reply rules
+export const igCommentRules = pgTable("ig_comment_rules", {
+  id: id(),
+  businessId: businessId(),
+  name: text("name").notNull(),
+  keywords: jsonb("keywords").$type<string[]>().notNull().default([]),
+  categories: jsonb("categories").$type<string[]>().notNull().default([]),
+  mediaIds: jsonb("media_ids").$type<string[]>().notNull().default([]),
+  replyMode: igReplyModeEnum("reply_mode").notNull().default("both"),
+  publicReplyText: text("public_reply_text"),
+  dmText: text("dm_text"),
+  isActive: boolean("is_active").notNull().default(true),
+  priority: integer("priority").notNull().default(100),
+  createdByUserId: text("created_by_user_id"),
+  updatedByUserId: text("updated_by_user_id"),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, (t) => [
+  index("ig_comment_rules_business_active_priority_idx").on(t.businessId, t.isActive, t.priority),
+]);
+
+// Instagram comments received via webhook or simulation
+export const igComments = pgTable("ig_comments", {
+  id: id(),
+  businessId: businessId(),
+  metaCommentId: text("meta_comment_id").notNull(),
+  parentCommentId: text("parent_comment_id"),
+  mediaId: text("media_id").notNull(),
+  mediaType: text("media_type"),
+  mediaPermalink: text("media_permalink"),
+  mediaThumbnailUrl: text("media_thumbnail_url"),
+  mediaCaption: text("media_caption"),
+  commenterIgId: text("commenter_ig_id").notNull(),
+  commenterUsername: text("commenter_username"),
+  text: text("text").notNull(),
+  commentedAt: timestamp("commented_at").notNull(),
+  category: igCommentCategoryEnum("category"),
+  matchedRuleId: text("matched_rule_id"),
+  matchedBy: text("matched_by"),
+  action: igCommentActionEnum("action").notNull().default("pending"),
+  skipReason: text("skip_reason"),
+  publicReplyId: text("public_reply_id"),
+  publicReplyText: text("public_reply_text"),
+  dmMessageId: text("dm_message_id"),
+  dmText: text("dm_text"),
+  customerId: text("customer_id"),
+  conversationId: text("conversation_id"),
+  error: text("error"),
+  handledByUserId: text("handled_by_user_id"),
+  processedAt: timestamp("processed_at"),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, (t) => [
+  uniqueIndex("ig_comments_business_meta_comment_idx").on(t.businessId, t.metaCommentId),
+  index("ig_comments_business_action_created_idx").on(t.businessId, t.action, t.createdAt),
+  index("ig_comments_business_media_idx").on(t.businessId, t.mediaId),
+  index("ig_comments_business_commenter_media_idx").on(t.businessId, t.commenterIgId, t.mediaId),
+]);
+

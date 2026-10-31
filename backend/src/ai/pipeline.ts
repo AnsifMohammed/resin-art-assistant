@@ -52,7 +52,7 @@ export function thinkingConfigFor(model: string): ThinkingConfig {
 /** The keyword mock is ONLY used in DEMO_MODE without a real API key. */
 export const useMockDecisions = config.DEMO_MODE && isPlaceholderKey(config.GEMINI_API_KEY);
 
-const ai = useMockDecisions
+export const ai = useMockDecisions
   ? null
   : new GoogleGenAI({
       apiKey: config.GEMINI_API_KEY,

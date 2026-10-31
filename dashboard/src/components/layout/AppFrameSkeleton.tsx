@@ -20,7 +20,7 @@ export function AppFrameSkeleton() {
       <aside className="hidden md:flex w-60 shrink-0 flex-col border-r border-border bg-surface select-none">
         {/* Logo block */}
         <div className="h-14 border-b border-border flex items-center px-4 gap-2.5 shrink-0">
-          <div className="w-7 h-7 rounded-lg bg-surface-muted animate-pulse shrink-0" />
+          <div className="w-7 h-7 rounded-sm bg-surface-muted animate-pulse shrink-0" />
           <div className="space-y-1.5 flex-1 min-w-0">
             <div className="h-3.5 w-20 bg-surface-muted rounded animate-pulse" />
             <div className="h-2 w-12 bg-surface-muted rounded animate-pulse" />

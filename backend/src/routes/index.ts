@@ -7,6 +7,7 @@ import { conversationRoutes } from "./conversations.ts";
 import { customerRoutes } from "./customers.ts";
 import { escalationRoutes } from "./escalations.ts";
 import { healthRoutes } from "./health.ts";
+import { igCommentsRoutes } from "./ig-comments.ts";
 import { legalRoutes } from "./legal.ts";
 import { knowledgeBaseRoutes } from "./knowledge-base.ts";
 import { orderRoutes } from "./orders.ts";
@@ -43,6 +44,7 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
   await app.register(paymentRoutes);
   await app.register(analyticsRoutes);
   await app.register(auditLogRoutes);
+  await app.register(igCommentsRoutes);
   await app.register(webhookRoutes);
   await app.register(websocketRoutes);
 }

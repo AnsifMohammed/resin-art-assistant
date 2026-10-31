@@ -5,6 +5,8 @@ import type {
   CustomerUpdatedPayload,
   EscalationAssignedPayload,
   EscalationNewPayload,
+  IgCommentNewPayload,
+  IgCommentUpdatedPayload,
   MessageRow,
   SettingsUpdatedPayload,
 } from "./websocket.ts";
@@ -63,6 +65,16 @@ export function emitCustomerUpdated(businessId: string, payload: CustomerUpdated
 /** A broadcast changed status or made sending progress. Admin only. */
 export function emitBroadcastUpdated(businessId: string, payload: BroadcastUpdatedPayload): void {
   publish({ kind: "broadcast:updated", businessId, payload });
+}
+
+/** A new Instagram comment was received. Admin only. */
+export function emitIgCommentNew(businessId: string, payload: IgCommentNewPayload): void {
+  publish({ kind: "ig_comment:new", businessId, payload });
+}
+
+/** An Instagram comment's action changed. Admin only. */
+export function emitIgCommentUpdated(businessId: string, payload: IgCommentUpdatedPayload): void {
+  publish({ kind: "ig_comment:updated", businessId, payload });
 }
 
 /** Close a user's sockets on every API process (deactivation). */

@@ -815,6 +815,8 @@ export interface SocketEventMap {
   "settings:updated": SettingsUpdatedEvent;
   "customer:updated": CustomerUpdatedEvent;
   "broadcast:updated": BroadcastUpdatedEvent;
+  "ig_comment:new": IgCommentNewEvent;
+  "ig_comment:updated": IgCommentUpdatedEvent;
   subscribed: SubscribedEvent;
   "subscription:denied": SubscriptionDeniedEvent;
   "subscription:revoked": SubscriptionRevokedEvent;
@@ -823,6 +825,173 @@ export interface SocketEventMap {
 }
 
 export type SocketEventName = keyof SocketEventMap;
+
+// ─── Instagram Comments & Rules ───────────────────────────────────────
+
+export const IG_REPLY_MODES = ["none", "public", "dm", "both"] as const;
+export type IgReplyMode = (typeof IG_REPLY_MODES)[number];
+
+export const IG_COMMENT_CATEGORIES = [
+  "price",
+  "custom_order",
+  "availability",
+  "compliment",
+  "question",
+  "complaint",
+  "spam",
+  "other",
+] as const;
+export type IgCommentCategory = (typeof IG_COMMENT_CATEGORIES)[number];
+
+export const IG_COMMENT_ACTIONS = [
+  "pending",
+  "replied_public",
+  "dm_sent",
+  "replied_both",
+  "skipped",
+  "dismissed",
+  "needs_attention",
+  "failed",
+] as const;
+export type IgCommentAction = (typeof IG_COMMENT_ACTIONS)[number];
+
+export const IG_COMMENT_CATEGORY_LABELS: Record<IgCommentCategory, string> = {
+  price: "Price",
+  custom_order: "Custom order",
+  availability: "Availability",
+  compliment: "Compliment",
+  question: "Question",
+  complaint: "Complaint",
+  spam: "Spam",
+  other: "Other",
+};
+
+export const IG_COMMENT_ACTION_LABELS: Record<IgCommentAction, string> = {
+  pending: "Pending",
+  replied_public: "Replied publicly",
+  dm_sent: "DM sent",
+  replied_both: "Replied + DM",
+  skipped: "Skipped",
+  dismissed: "Dismissed",
+  needs_attention: "Needs attention",
+  failed: "Failed",
+};
+
+export const IG_REPLY_MODE_LABELS: Record<IgReplyMode, string> = {
+  none: "No reply",
+  public: "Public",
+  dm: "DM",
+  both: "Both",
+};
+
+export interface IgRule {
+  id: string;
+  businessId: string;
+  name: string;
+  keywords: string[];
+  categories: IgCommentCategory[];
+  mediaIds: string[];
+  replyMode: IgReplyMode;
+  publicReplyText: string | null;
+  dmText: string | null;
+  isActive: boolean;
+  priority: number;
+  createdByUserId?: string | null;
+  updatedByUserId?: string | null;
+  createdAt: ISODateString;
+  updatedAt: ISODateString;
+}
+
+export interface IgComment {
+  id: string;
+  businessId: string;
+  metaCommentId: string;
+  parentCommentId: string | null;
+  mediaId: string;
+  mediaType: "reel" | "post" | "carousel" | null;
+  mediaPermalink: string | null;
+  mediaThumbnailUrl: string | null;
+  mediaCaption: string | null;
+  commenterIgId: string;
+  commenterUsername: string | null;
+  text: string;
+  commentedAt: ISODateString;
+  category: IgCommentCategory | null;
+  matchedRuleId: string | null;
+  matchedBy: "keyword" | "ai" | null;
+  action: IgCommentAction;
+  skipReason: string | null;
+  publicReplyId: string | null;
+  publicReplyText: string | null;
+  dmMessageId: string | null;
+  dmText: string | null;
+  customerId: string | null;
+  conversationId: string | null;
+  error: string | null;
+  handledByUserId: string | null;
+  processedAt: ISODateString | null;
+  createdAt: ISODateString;
+  updatedAt: ISODateString;
+}
+
+export interface IgMedia {
+  id: string;
+  mediaType: "reel" | "post" | "carousel";
+  caption: string;
+  permalink: string;
+  thumbnailUrl: string;
+  timestamp: string;
+}
+
+export interface IgSettings {
+  enabled: boolean;
+  aiClassification: boolean;
+}
+
+export interface IgStatsBucket {
+  comments: number;
+  autoReplied: number;
+  needsAttention: number;
+}
+
+export interface IgStats {
+  today: IgStatsBucket;
+  last7d: IgStatsBucket;
+}
+
+export interface IgTestResult {
+  category: IgCommentCategory;
+  matchedRule: { id: string; name: string } | null;
+  matchedBy: "keyword" | "ai" | null;
+  wouldDo: "public" | "dm" | "both" | "needs_attention" | "skip";
+  publicPreview: string | null;
+  dmPreview: string | null;
+}
+
+export interface IgCommentsCounts {
+  all: number;
+  pending: number;
+  needs_attention: number;
+  replied: number;
+  skipped: number;
+  dismissed: number;
+  failed: number;
+}
+
+export interface IgCommentsResponse {
+  comments: IgComment[];
+  pagination: Pagination;
+  counts: IgCommentsCounts;
+}
+
+export interface IgCommentNewEvent {
+  commentId: string;
+}
+
+export interface IgCommentUpdatedEvent {
+  commentId: string;
+  action: string;
+}
 
 // ─── Products ────────────────────────────────────────────────────────
 

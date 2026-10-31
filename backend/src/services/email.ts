@@ -101,3 +101,43 @@ export async function sendStaffWelcome(opts: StaffWelcomeOptions): Promise<void>
     logger.error({ err, to: opts.to }, "Failed to send welcome email via Resend");
   }
 }
+
+export interface IgCommentAlertOptions {
+  to: string;
+  adminName: string;
+  commenterUsername?: string | null | undefined;
+  text: string;
+  mediaCaption?: string | null | undefined;
+  dashboardUrl: string;
+}
+
+export async function sendIgCommentAlert(opts: IgCommentAlertOptions): Promise<void> {
+  const handle = opts.commenterUsername ? `@${opts.commenterUsername}` : "Instagram user";
+  const subject = sanitizeHeader(`⚠️ Instagram comment needs attention: ${handle}`);
+  const html = `
+    <h2>Instagram Comment Needs Attention</h2>
+    <p>Hi ${escapeHtml(opts.adminName)},</p>
+    <p>A new comment on Instagram has been flagged as a complaint or sensitive message and requires your attention:</p>
+    <blockquote style="border-left: 3px solid #e11d48; padding-left: 12px; margin: 12px 0; color: #333;">
+      <strong>${escapeHtml(handle)}:</strong> ${escapeHtml(opts.text)}
+    </blockquote>
+    ${opts.mediaCaption ? `<p style="color: #666; font-size: 0.9em;">Post: ${escapeHtml(opts.mediaCaption.slice(0, 100))}</p>` : ""}
+    <p><a href="${escapeHtml(opts.dashboardUrl)}/ig-comments" style="display: inline-block; padding: 10px 20px; background: #000; color: #fff; text-decoration: none; border-radius: 6px;">Open in Dashboard</a></p>
+  `;
+
+  if (!resend) {
+    logger.info({ to: opts.to, subject, preview: opts.text.slice(0, 100) }, "[DEMO_MODE] IG comment alert email logged");
+    return;
+  }
+
+  try {
+    await resend.emails.send({
+      from: alertsFrom,
+      to: sanitizeHeader(opts.to),
+      subject,
+      html,
+    });
+  } catch (err) {
+    logger.error({ err, to: opts.to }, "Failed to send IG comment alert email");
+  }
+}

@@ -85,5 +85,17 @@ export const queryKeys = {
     all: ["payments"] as const,
     byOrder: (orderId: string) => [...queryKeys.payments.all, "order", orderId] as const,
   },
+  igComments: {
+    all: ["igComments"] as const,
+    lists: () => [...queryKeys.igComments.all, "list"] as const,
+    list: (params?: unknown) => [...queryKeys.igComments.lists(), params] as const,
+    stats: () => [...queryKeys.igComments.all, "stats"] as const,
+    details: () => [...queryKeys.igComments.all, "detail"] as const,
+    detail: (id: string) => [...queryKeys.igComments.details(), id] as const,
+    rules: () => [...queryKeys.igComments.all, "rules"] as const,
+    media: () => [...queryKeys.igComments.all, "media"] as const,
+    mediaSummary: () => [...queryKeys.igComments.all, "mediaSummary"] as const,
+    settings: () => [...queryKeys.igComments.all, "settings"] as const,
+  },
 };
 

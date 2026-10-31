@@ -2,14 +2,21 @@ import type { FastifyInstance, FastifyPluginAsync } from "fastify";
 import { and, eq, gte, isNull } from "drizzle-orm";
 import { config, isInstagramLive } from "../config.ts";
 import { db } from "../db/index.ts";
-import { auditLog, channels, conversations, customers, messages } from "../db/schema.ts";
+import { auditLog, channels, conversations, customers, igComments, messages } from "../db/schema.ts";
 import { AppError } from "../lib/errors.ts";
 import { logger } from "../lib/logger.ts";
 import { enqueueProcessMessage } from "../queue/enqueue.ts";
+import { enqueueProcessIgComment } from "../queue/enqueueIgComment.ts";
 import { applyWhatsAppStatus } from "../services/deliveryReceipts.ts";
 import { handleOptKeyword } from "../services/optOut.ts";
-import { fetchInstagramDisplayName, INSTAGRAM_MAX_TEXT_BYTES, splitInstagramText } from "../services/meta/instagram.ts";
-import { emitConversationUpdated, emitMessageNew } from "../realtime/events.ts";
+import {
+  fetchInstagramDisplayName,
+  type IgMedia,
+  INSTAGRAM_MAX_TEXT_BYTES,
+  listRecentMedia,
+  splitInstagramText,
+} from "../services/meta/instagram.ts";
+import { emitConversationUpdated, emitIgCommentNew, emitMessageNew } from "../realtime/events.ts";
 import {
   digitsOnly,
   isWebhookRequestAuthorized,
@@ -449,6 +456,112 @@ async function processInstagram(body: any): Promise<void> {
         });
       } catch (err) {
         logger.error({ err, metaMessageId }, "Failed to process Instagram message");
+      }
+    }
+
+    // Process comments from entry.changes where field === "comments"
+    const commentChanges = (entry?.changes ?? []).filter(
+      (change: any) => change?.field === "comments" && change?.value?.id,
+    );
+    const uniqueMediaIds: string[] = Array.from(
+      new Set(
+        commentChanges
+          .map((change: any) => change?.value?.media?.id)
+          .filter((id: any): id is string => typeof id === "string" && id.length > 0),
+      ),
+    );
+
+    const mediaMap = new Map<string, IgMedia | null>();
+    if (uniqueMediaIds.length > 0) {
+      const mediaResults = await Promise.all(
+        uniqueMediaIds.map(async (mediaId) => {
+          try {
+            const recent = await listRecentMedia(30, config.BUSINESS_ID);
+            const found = recent.find((m) => m.id === mediaId) ?? null;
+            return [mediaId, found] as const;
+          } catch (mediaErr) {
+            logger.warn({ mediaErr, mediaId }, "Could not fetch media details for comment (continuing)");
+            return [mediaId, null] as const;
+          }
+        }),
+      );
+      for (const [mId, mData] of mediaResults) {
+        mediaMap.set(mId, mData);
+      }
+    }
+
+    for (const change of entry?.changes ?? []) {
+      if (change?.field !== "comments") continue;
+      const value = change?.value;
+      if (!value) continue;
+      const commentId: string | undefined = value?.id;
+      if (!commentId) continue;
+
+      try {
+        const fromId = value?.from?.id;
+        const fromUsername = value?.from?.username;
+        const text = typeof value?.text === "string" ? value.text : "";
+        const mediaId = value?.media?.id || "";
+        const parentId = value?.parent_id || null;
+        const rawTime = value?.timestamp;
+        const timestamp = rawTime
+          ? new Date(typeof rawTime === "number" ? rawTime * 1000 : rawTime)
+          : new Date();
+
+        // Ignore comments where from.id === INSTAGRAM_ACCOUNT_ID (our own replies)
+        if (config.INSTAGRAM_ACCOUNT_ID && fromId === config.INSTAGRAM_ACCOUNT_ID) {
+          logger.info({ commentId, fromId }, "Ignoring own Instagram comment");
+          continue;
+        }
+
+        // Fill media details from prefetched media map when available (best effort, don't fail)
+        let mediaType: "reel" | "post" | "carousel" | null = null;
+        let mediaPermalink: string | null = null;
+        let mediaThumbnailUrl: string | null = null;
+        let mediaCaption: string | null = null;
+
+        const prodType = value?.media?.media_product_type;
+        if (prodType === "REELS") {
+          mediaType = "reel";
+        }
+
+        const found = mediaId ? mediaMap.get(mediaId) : null;
+        if (found) {
+          mediaType = found.mediaType;
+          mediaPermalink = found.permalink;
+          mediaThumbnailUrl = found.thumbnailUrl;
+          mediaCaption = found.caption;
+        }
+
+        const [inserted] = await db
+          .insert(igComments)
+          .values({
+            businessId: config.BUSINESS_ID,
+            metaCommentId: commentId,
+            parentCommentId: parentId,
+            mediaId,
+            mediaType,
+            mediaPermalink,
+            mediaThumbnailUrl,
+            mediaCaption,
+            commenterIgId: fromId || "unknown",
+            commenterUsername: fromUsername || null,
+            text,
+            commentedAt: timestamp,
+            action: "pending",
+          })
+          .onConflictDoNothing()
+          .returning();
+
+        if (inserted) {
+          emitIgCommentNew(config.BUSINESS_ID, { commentId: inserted.id });
+          await enqueueProcessIgComment({
+            commentId: inserted.id,
+            businessId: config.BUSINESS_ID,
+          });
+        }
+      } catch (err) {
+        logger.error({ err, commentId }, "Failed to process Instagram comment webhook");
       }
     }
   }

@@ -7,7 +7,7 @@ import argon2 from "argon2";
 import { config } from "../config.ts";
 import { extractVariables } from "../lib/templates.ts";
 import { db, sql } from "./index.ts";
-import { businesses, knowledgeBase, messageTemplates, products, users } from "./schema.ts";
+import { businesses, igCommentRules, knowledgeBase, messageTemplates, products, users } from "./schema.ts";
 
 // backend/src/db/seed.ts -> <repo>/docs/knowledge-base.json
 const KB_PATH = fileURLToPath(new URL("../../../docs/knowledge-base.json", import.meta.url));
@@ -184,6 +184,52 @@ async function seed() {
 
     await db.insert(products).values(productRows).onConflictDoNothing();
   }
+
+  // Starter Instagram auto-reply rules for Saba Art
+  // Rule 4 (Complaint) is handled automatically by the system escalation check (no rule needed).
+  const STARTER_IG_RULES = [
+    {
+      id: "rule_saba_price",
+      businessId,
+      name: "Price question",
+      keywords: ["price", "rate", "how much", "cost", "evlo", "எவ்வளவு", "rate pls"],
+      categories: ["price"],
+      mediaIds: [],
+      replyMode: "both" as const,
+      publicReplyText: "Hi {customerHandle}! Sent you the details in DM 💌",
+      dmText: "Hi! Thanks for asking about this piece 😊 Prices start from ₹… — tell me the size you like and I'll share the exact price.",
+      isActive: true,
+      priority: 10,
+    },
+    {
+      id: "rule_saba_custom_order",
+      businessId,
+      name: "Custom / order",
+      keywords: ["custom", "order", "available", "buy", "name"],
+      categories: ["custom_order", "availability"],
+      mediaIds: [],
+      replyMode: "dm" as const,
+      publicReplyText: null,
+      dmText: "Hi {customerHandle}! Thanks for your interest 😊 What colours, size, or custom name/details did you have in mind for this piece?",
+      isActive: true,
+      priority: 20,
+    },
+    {
+      id: "rule_saba_compliment",
+      businessId,
+      name: "Compliment",
+      keywords: ["beautiful", "love", "wow", "😍", "❤️", "superb"],
+      categories: ["compliment"],
+      mediaIds: [],
+      replyMode: "public" as const,
+      publicReplyText: "Thank you so much, {customerHandle}! 💕",
+      dmText: null,
+      isActive: true,
+      priority: 30,
+    },
+  ];
+
+  await db.insert(igCommentRules).values(STARTER_IG_RULES).onConflictDoNothing();
 
   console.log(`Seed complete for business ${businessId}`);
 }
