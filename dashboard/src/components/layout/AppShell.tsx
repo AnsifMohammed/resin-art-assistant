@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { Outlet, useLocation } from "react-router-dom";
-import { PauseCircle } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "../../context/AuthContext.tsx";
 import { usePause, useSettings } from "../../hooks/useSettings.ts";
@@ -47,15 +46,7 @@ export function AppShell() {
   const pause = usePause();
   const paused = isAdmin ? settings.data?.paused : undefined;
 
-  const automation: AutomationControl = {
-    paused,
-    pending: pause.isPending,
-    requestToggle: () => {
-      if (paused !== undefined) setConfirmAiOpen(true);
-    },
-  };
-
-  function confirmToggle() {
+  function doToggle() {
     if (paused === undefined) return;
     pause.mutate(!paused, {
       onSuccess: (res) => {
@@ -67,6 +58,17 @@ export function AppShell() {
       },
       onError: (err) => toast.error("Couldn't change automation", { description: err.message }),
     });
+  }
+
+  const automation: AutomationControl = {
+    paused,
+    pending: pause.isPending,
+    requestToggle: doToggle,
+  };
+
+  function confirmToggle() {
+    setConfirmAiOpen(false);
+    doToggle();
   }
 
   const fullHeight = isFullHeightRoute(location.pathname);
@@ -82,26 +84,6 @@ export function AppShell() {
           {/* Sticky Top Bar */}
           <TopBar onOpenSearch={() => setCommandPaletteOpen(true)} automation={automation} />
 
-          {/* App-wide paused banner (admin only; real state from GET /settings) */}
-          {paused === true && (
-            <div
-              role="status"
-              className="flex items-center justify-between gap-3 border-b border-rose-500/30 bg-rose-500/10 px-4 py-2 text-xs font-medium text-rose-700 dark:text-rose-300 sm:px-6"
-            >
-              <span className="flex min-w-0 items-center gap-2">
-                <PauseCircle size={15} className="shrink-0" aria-hidden />
-                <span className="truncate">AI is paused — new messages are stored but not answered</span>
-              </span>
-              <button
-                type="button"
-                onClick={automation.requestToggle}
-                disabled={pause.isPending}
-                className="shrink-0 rounded-md bg-rose-600 px-2.5 py-1 text-xs font-semibold text-white transition hover:bg-rose-700 disabled:opacity-60"
-              >
-                Resume
-              </button>
-            </div>
-          )}
 
           {/* Page Content Viewport */}
           {fullHeight ? (
