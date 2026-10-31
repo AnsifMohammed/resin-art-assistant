@@ -115,22 +115,30 @@ async function handleCustomerMessage(m: InboundCustomerMessage): Promise<void> {
   }
   if (!customer) throw new Error("Could not resolve customer");
 
-  // Instagram webhooks only carry the sender's id; look up their name/@username once
-  // (new customers, and older ones still named by their id). The id stays in
-  // handleOrPhone because replies are sent to it.
-  if (
-    m.channelType === "instagram" &&
-    isInstagramLive(config) &&
-    (!customer.name || customer.name === customer.handleOrPhone)
-  ) {
-    const displayName = await fetchInstagramDisplayName(m.handleOrPhone);
-    if (displayName) {
-      const [renamed] = await db
-        .update(customers)
-        .set({ name: displayName })
-        .where(eq(customers.id, customer.id))
-        .returning();
-      if (renamed) customer = renamed;
+  // Instagram webhooks only carry the sender's id; look up their name/@username and
+  // profile picture once. The id stays in handleOrPhone because replies are sent to it.
+  if (m.channelType === "instagram" && isInstagramLive(config)) {
+    const needsName = !customer.name || customer.name === customer.handleOrPhone;
+    const needsPic = !customer.profilePicUrl;
+
+    if (needsName || needsPic) {
+      const [displayName, profilePicUrl] = await Promise.all([
+        needsName ? fetchInstagramDisplayName(m.handleOrPhone).catch(() => null) : Promise.resolve(null),
+        needsPic ? fetchCommenterProfilePic(m.handleOrPhone, config.BUSINESS_ID).catch(() => null) : Promise.resolve(null),
+      ]);
+
+      const updates: Record<string, unknown> = {};
+      if (displayName) updates.name = displayName;
+      if (profilePicUrl) updates.profilePicUrl = profilePicUrl;
+
+      if (Object.keys(updates).length > 0) {
+        const [updated] = await db
+          .update(customers)
+          .set(updates)
+          .where(eq(customers.id, customer.id))
+          .returning();
+        if (updated) customer = updated;
+      }
     }
   }
 

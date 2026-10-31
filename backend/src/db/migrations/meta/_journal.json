@@ -71,6 +71,13 @@
       "when": 1793479694171,
       "tag": "0009_sticky_the_hood",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1793480026405,
+      "tag": "0010_heavy_dracula",
+      "breakpoints": true
     }
   ]
 }

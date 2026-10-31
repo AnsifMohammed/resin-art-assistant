@@ -179,6 +179,7 @@ export interface Customer {
   channelId: string;
   name: string | null;
   handleOrPhone: string;
+  profilePicUrl: string | null;
   language: string | null;
   notes: string | null;
   city?: string | null;

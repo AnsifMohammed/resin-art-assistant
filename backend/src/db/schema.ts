@@ -142,6 +142,7 @@ export const customers = pgTable("customers", {
   handleOrPhone: text("handle_or_phone").notNull(),
   language: text("language").default("english"),
   notes: text("notes"),
+  profilePicUrl: text("profile_pic_url"),
   city: text("city"),
   isFavourite: boolean("is_favourite").notNull().default(false),
   isPriority: boolean("is_priority").notNull().default(false),

@@ -204,7 +204,18 @@ export function ChatView({ conversation, onBack, backOnlyOnMobile = false, onRes
                 <ArrowLeft className="h-4 w-4" />
               </button>
             )}
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-primary/20 bg-primary/10 font-outfit text-13 font-bold text-primary-text">
+            {conversation.customer.profilePicUrl ? (
+              <img
+                src={conversation.customer.profilePicUrl}
+                alt={name}
+                className="h-9 w-9 shrink-0 rounded-full object-cover border border-border"
+                onError={(e) => { e.currentTarget.style.display = "none"; e.currentTarget.nextElementSibling?.removeAttribute("style"); }}
+              />
+            ) : null}
+            <div
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-primary/20 bg-primary/10 font-outfit text-13 font-bold text-primary-text"
+              style={conversation.customer.profilePicUrl ? { display: "none" } : undefined}
+            >
               {name.charAt(0).toUpperCase() || "?"}
             </div>
             <div className="min-w-0">
