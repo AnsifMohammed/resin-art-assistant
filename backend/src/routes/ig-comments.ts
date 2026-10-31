@@ -226,18 +226,22 @@ export const igCommentsRoutes: FastifyPluginAsync = async (app: FastifyInstance)
 
       const counts = {
         all: 0,
+        pending: 0,
         needs_attention: 0,
         replied: 0,
         skipped: 0,
+        dismissed: 0,
         failed: 0,
       };
 
       for (const row of countRows) {
         const c = Number(row.count);
         counts.all += c;
-        if (row.action === "needs_attention") counts.needs_attention += c;
+        if (row.action === "pending") counts.pending += c;
+        else if (row.action === "needs_attention") counts.needs_attention += c;
         else if (["replied_public", "dm_sent", "replied_both"].includes(row.action)) counts.replied += c;
         else if (row.action === "skipped") counts.skipped += c;
+        else if (row.action === "dismissed") counts.dismissed += c;
         else if (row.action === "failed") counts.failed += c;
       }
 
@@ -323,54 +327,57 @@ export const igCommentsRoutes: FastifyPluginAsync = async (app: FastifyInstance)
     },
   );
 
-  // GET /ig-comments/media-summary & /ig/comments/media-summary - Grouped comments per post & reel
-  const handleMediaSummary = async (request: any) => {
-    const businessId = request.user.businessId;
+  // GET /ig-comments/media-summary - Grouped comments per post & reel
+  app.get(
+    "/ig-comments/media-summary",
+    { preHandler: [authenticate, requireAdmin] },
+    async (request) => {
+      const businessId = request.user.businessId;
 
-    const rows = await db
-      .select({
-        mediaId: igComments.mediaId,
-        mediaType: igComments.mediaType,
-        mediaCaption: igComments.mediaCaption,
-        mediaThumbnailUrl: igComments.mediaThumbnailUrl,
-        mediaPermalink: igComments.mediaPermalink,
-        total: count(),
-        needsAttention: sql<number>`count(case when ${igComments.action} = 'needs_attention' then 1 end)`,
-        replied: sql<number>`count(case when ${igComments.action} in ('replied_public', 'dm_sent', 'replied_both') then 1 end)`,
-        skipped: sql<number>`count(case when ${igComments.action} = 'skipped' then 1 end)`,
-        failed: sql<number>`count(case when ${igComments.action} = 'failed' then 1 end)`,
-      })
-      .from(igComments)
-      .where(eq(igComments.businessId, businessId))
-      .groupBy(
-        igComments.mediaId,
-        igComments.mediaType,
-        igComments.mediaCaption,
-        igComments.mediaThumbnailUrl,
-        igComments.mediaPermalink,
-      )
-      .orderBy(desc(sql`max(${igComments.commentedAt})`));
+      const rows = await db
+        .select({
+          mediaId: igComments.mediaId,
+          mediaType: igComments.mediaType,
+          mediaCaption: igComments.mediaCaption,
+          mediaThumbnailUrl: igComments.mediaThumbnailUrl,
+          mediaPermalink: igComments.mediaPermalink,
+          total: count(),
+          needsAttention: sql<number>`count(case when ${igComments.action} = 'needs_attention' then 1 end)`,
+          replied: sql<number>`count(case when ${igComments.action} in ('replied_public', 'dm_sent', 'replied_both') then 1 end)`,
+          skipped: sql<number>`count(case when ${igComments.action} = 'skipped' then 1 end)`,
+          dismissed: sql<number>`count(case when ${igComments.action} = 'dismissed' then 1 end)`,
+          failed: sql<number>`count(case when ${igComments.action} = 'failed' then 1 end)`,
+        })
+        .from(igComments)
+        .where(eq(igComments.businessId, businessId))
+        .groupBy(
+          igComments.mediaId,
+          igComments.mediaType,
+          igComments.mediaCaption,
+          igComments.mediaThumbnailUrl,
+          igComments.mediaPermalink,
+        )
+        .orderBy(desc(sql`max(${igComments.commentedAt})`));
 
-    const media = rows.map((r) => ({
-      mediaId: r.mediaId,
-      mediaType: (r.mediaType === "reel" ? "reel" : "post") as "post" | "reel",
-      mediaCaption: r.mediaCaption,
-      mediaThumbnailUrl: r.mediaThumbnailUrl,
-      mediaPermalink: r.mediaPermalink,
-      counts: {
-        total: Number(r.total || 0),
-        needs_attention: Number(r.needsAttention || 0),
-        replied: Number(r.replied || 0),
-        skipped: Number(r.skipped || 0),
-        failed: Number(r.failed || 0),
-      },
-    }));
+      const media = rows.map((r) => ({
+        mediaId: r.mediaId,
+        mediaType: (r.mediaType === "reel" ? "reel" : "post") as "post" | "reel",
+        mediaCaption: r.mediaCaption,
+        mediaThumbnailUrl: r.mediaThumbnailUrl,
+        mediaPermalink: r.mediaPermalink,
+        counts: {
+          total: Number(r.total || 0),
+          needs_attention: Number(r.needsAttention || 0),
+          replied: Number(r.replied || 0),
+          skipped: Number(r.skipped || 0),
+          dismissed: Number(r.dismissed || 0),
+          failed: Number(r.failed || 0),
+        },
+      }));
 
-    return { media };
-  };
-
-  app.get("/ig-comments/media-summary", { preHandler: [authenticate, requireAdmin] }, handleMediaSummary);
-  app.get("/ig/comments/media-summary", { preHandler: [authenticate, requireAdmin] }, handleMediaSummary);
+      return { media };
+    },
+  );
 
   // GET /ig/comments/:id - Get single comment detail
   app.get<{ Params: { id: string } }>(
@@ -415,175 +422,248 @@ export const igCommentsRoutes: FastifyPluginAsync = async (app: FastifyInstance)
       let publicReplyId: string | null = null;
       let dmMessageId: string | null = null;
 
-      if ((body.mode === "public" || body.mode === "both") && body.publicText) {
-        const replyRes = await replyToComment(comment.metaCommentId, body.publicText, businessId);
-        publicReplyId = replyRes.id;
-      }
-
-      if ((body.mode === "dm" || body.mode === "both") && body.dmText) {
-        const dmRes = await sendPrivateReply(comment.metaCommentId, body.dmText, businessId);
-        dmMessageId = dmRes.messageId;
-      }
-
-      let custId: string | null = comment.customerId;
-      let convId: string | null = comment.conversationId;
-
-      if (dmMessageId && body.dmText) {
-        const [existingChan] = await db
-          .select()
-          .from(channels)
-          .where(and(eq(channels.businessId, businessId), eq(channels.type, "instagram")));
-
-        let chanId = existingChan?.id;
-        if (!chanId) {
-          const [newChan] = await db
-            .insert(channels)
-            .values({
-              businessId,
-              type: "instagram",
-              identifier: config.INSTAGRAM_ACCOUNT_ID || "instagram-main",
-              status: "active",
-            })
-            .onConflictDoNothing()
-            .returning();
-          chanId = newChan?.id;
-          if (!chanId) {
-            const [refetched] = await db
-              .select()
-              .from(channels)
-              .where(and(eq(channels.businessId, businessId), eq(channels.type, "instagram")));
-            chanId = refetched?.id;
-          }
-        }
-
-        if (chanId) {
-          const [existingCust] = await db
-            .select()
-            .from(customers)
-            .where(
-              and(
-                eq(customers.businessId, businessId),
-                eq(customers.channelId, chanId),
-                eq(customers.handleOrPhone, comment.commenterIgId),
-              ),
-            );
-
-          let customer = existingCust;
-          if (!customer) {
-            const [createdCust] = await db
-              .insert(customers)
-              .values({
-                businessId,
-                channelId: chanId,
-                handleOrPhone: comment.commenterIgId,
-                name: comment.commenterUsername
-                  ? `@${comment.commenterUsername.replace(/^@/, "")}`
-                  : comment.commenterIgId,
-              })
-              .returning();
-            customer = createdCust;
-          }
-
-          if (customer) {
-            custId = customer.id;
-            const [existingConv] = await db
-              .select()
-              .from(conversations)
-              .where(
-                and(
-                  eq(conversations.businessId, businessId),
-                  eq(conversations.customerId, customer.id),
-                ),
-              );
-
-            let conv = existingConv;
-            if (!conv) {
-              const [createdConv] = await db
-                .insert(conversations)
-                .values({
-                  businessId,
-                  customerId: customer.id,
-                  channelId: chanId,
-                  state: "ai_active",
-                  lastMessageAt: new Date(),
-                })
-                .returning();
-              conv = createdConv;
-            }
-
-            if (conv) {
-              convId = conv.id;
-              const [insertedMsg] = await db
-                .insert(messages)
-                .values({
-                  conversationId: conv.id,
-                  businessId,
-                  direction: "outbound",
-                  senderType: "system",
-                  content: body.dmText,
-                  metaMessageId: dmMessageId,
-                  deliveryStatus: "sent",
-                  metadata: {
-                    kind: "ig_comment_dm",
-                    igCommentId: comment.id,
-                    mediaId: comment.mediaId,
-                  },
-                })
-                .returning();
-
-              await db
-                .update(conversations)
-                .set({ lastMessageAt: new Date() })
-                .where(eq(conversations.id, conv.id));
-
-              if (insertedMsg) emitMessageNew(insertedMsg);
-              emitConversationUpdated(businessId, {
-                conversationId: conv.id,
-                state: conv.state,
-                tag: conv.tag,
-              });
-            }
-          }
-        }
-      }
-
       let newAction: "replied_public" | "dm_sent" | "replied_both" = "replied_both";
       if (body.mode === "public") newAction = "replied_public";
       else if (body.mode === "dm") newAction = "dm_sent";
 
-      const [updated] = await db
-        .update(igComments)
-        .set({
-          action: newAction,
-          publicReplyText: body.publicText ?? comment.publicReplyText,
-          publicReplyId: publicReplyId ?? comment.publicReplyId,
-          dmText: body.dmText ?? comment.dmText,
-          dmMessageId: dmMessageId ?? comment.dmMessageId,
-          handledByUserId: request.user.sub,
-          customerId: custId,
+      try {
+        if ((body.mode === "public" || body.mode === "both") && body.publicText) {
+          const replyRes = await replyToComment(comment.metaCommentId, body.publicText, businessId);
+          publicReplyId = replyRes.id;
+        }
+
+        if ((body.mode === "dm" || body.mode === "both") && body.dmText) {
+          const dmRes = await sendPrivateReply(comment.metaCommentId, body.dmText, businessId);
+          dmMessageId = dmRes.messageId;
+        }
+
+        let custId: string | null = comment.customerId;
+        let convId: string | null = comment.conversationId;
+
+        if (dmMessageId && body.dmText) {
+          const [existingChan] = await db
+            .select()
+            .from(channels)
+            .where(and(eq(channels.businessId, businessId), eq(channels.type, "instagram")));
+
+          let chanId = existingChan?.id;
+          if (!chanId) {
+            const [newChan] = await db
+              .insert(channels)
+              .values({
+                businessId,
+                type: "instagram",
+                identifier: config.INSTAGRAM_ACCOUNT_ID || "instagram-main",
+                status: "active",
+              })
+              .onConflictDoNothing()
+              .returning();
+            chanId = newChan?.id;
+            if (!chanId) {
+              const [refetched] = await db
+                .select()
+                .from(channels)
+                .where(and(eq(channels.businessId, businessId), eq(channels.type, "instagram")));
+              chanId = refetched?.id;
+            }
+          }
+
+          if (chanId) {
+            const [existingCust] = await db
+              .select()
+              .from(customers)
+              .where(
+                and(
+                  eq(customers.businessId, businessId),
+                  eq(customers.channelId, chanId),
+                  eq(customers.handleOrPhone, comment.commenterIgId),
+                ),
+              );
+
+            let customer = existingCust;
+            if (!customer) {
+              const [createdCust] = await db
+                .insert(customers)
+                .values({
+                  businessId,
+                  channelId: chanId,
+                  handleOrPhone: comment.commenterIgId,
+                  name: comment.commenterUsername
+                    ? `@${comment.commenterUsername.replace(/^@/, "")}`
+                    : comment.commenterIgId,
+                })
+                .returning();
+              customer = createdCust;
+            }
+
+            if (customer) {
+              custId = customer.id;
+              const [existingConv] = await db
+                .select()
+                .from(conversations)
+                .where(
+                  and(
+                    eq(conversations.businessId, businessId),
+                    eq(conversations.customerId, customer.id),
+                  ),
+                );
+
+              let conv = existingConv;
+              if (!conv) {
+                const [createdConv] = await db
+                  .insert(conversations)
+                  .values({
+                    businessId,
+                    customerId: customer.id,
+                    channelId: chanId,
+                    state: "ai_active",
+                    lastMessageAt: new Date(),
+                  })
+                  .returning();
+                conv = createdConv;
+              }
+
+              if (conv) {
+                convId = conv.id;
+                const [insertedMsg] = await db
+                  .insert(messages)
+                  .values({
+                    conversationId: conv.id,
+                    businessId,
+                    direction: "outbound",
+                    senderType: "system",
+                    content: body.dmText,
+                    metaMessageId: dmMessageId,
+                    deliveryStatus: "sent",
+                    metadata: {
+                      kind: "ig_comment_dm",
+                      igCommentId: comment.id,
+                      mediaId: comment.mediaId,
+                    },
+                  })
+                  .returning();
+
+                await db
+                  .update(conversations)
+                  .set({ lastMessageAt: new Date() })
+                  .where(eq(conversations.id, conv.id));
+
+                if (insertedMsg) emitMessageNew(insertedMsg);
+                emitConversationUpdated(businessId, {
+                  conversationId: conv.id,
+                  state: conv.state,
+                  tag: conv.tag,
+                });
+              }
+            }
+          }
+        }
+
+        const [updated] = await db
+          .update(igComments)
+          .set({
+            action: newAction,
+            publicReplyText: body.publicText ?? comment.publicReplyText,
+            publicReplyId: publicReplyId ?? comment.publicReplyId,
+            dmText: body.dmText ?? comment.dmText,
+            dmMessageId: dmMessageId ?? comment.dmMessageId,
+            handledByUserId: request.user.sub,
+            customerId: custId,
+            conversationId: convId,
+            processedAt: new Date(),
+          })
+          .where(eq(igComments.id, comment.id))
+          .returning();
+
+        await db.insert(auditLog).values({
+          businessId,
+          actorId: request.user.sub,
+          actorType: request.user.role,
+          action: "ig_comment_manual_reply",
           conversationId: convId,
-          processedAt: new Date(),
-        })
-        .where(eq(igComments.id, comment.id))
-        .returning();
+          details: {
+            commentId: comment.id,
+            mode: body.mode,
+            publicText: body.publicText,
+            dmText: body.dmText,
+          },
+        });
 
-      await db.insert(auditLog).values({
-        businessId,
-        actorId: request.user.sub,
-        actorType: request.user.role,
-        action: "ig_comment_manual_reply",
-        conversationId: convId,
-        details: {
-          commentId: comment.id,
-          mode: body.mode,
-          publicText: body.publicText,
-          dmText: body.dmText,
-        },
-      });
+        emitIgCommentUpdated(businessId, { commentId: comment.id, action: newAction });
 
-      emitIgCommentUpdated(businessId, { commentId: comment.id, action: newAction });
+        return { comment: updated };
+      } catch (err: any) {
+        if (publicReplyId) {
+          // Public reply succeeded, but DM or subsequent operations threw
+          await db
+            .update(igComments)
+            .set({
+              action: "replied_public",
+              publicReplyText: body.publicText ?? comment.publicReplyText,
+              publicReplyId,
+              error: err?.message || String(err),
+              handledByUserId: request.user.sub,
+              processedAt: new Date(),
+            })
+            .where(eq(igComments.id, comment.id));
 
-      return { comment: updated };
+          await db.insert(auditLog).values({
+            businessId,
+            actorId: request.user.sub,
+            actorType: request.user.role,
+            action: "ig_comment_manual_reply_partial_failure",
+            conversationId: comment.conversationId,
+            details: {
+              commentId: comment.id,
+              mode: body.mode,
+              publicReplyId,
+              publicText: body.publicText,
+              error: err?.message || String(err),
+            },
+          });
+
+          emitIgCommentUpdated(businessId, { commentId: comment.id, action: "replied_public" });
+        } else {
+          await db
+            .update(igComments)
+            .set({
+              action: "failed",
+              error: err?.message || String(err),
+              handledByUserId: request.user.sub,
+              processedAt: new Date(),
+            })
+            .where(eq(igComments.id, comment.id));
+
+          await db.insert(auditLog).values({
+            businessId,
+            actorId: request.user.sub,
+            actorType: request.user.role,
+            action: "ig_comment_manual_reply_failed",
+            conversationId: comment.conversationId,
+            details: {
+              commentId: comment.id,
+              mode: body.mode,
+              error: err?.message || String(err),
+            },
+          });
+
+          emitIgCommentUpdated(businessId, { commentId: comment.id, action: "failed" });
+        }
+
+        const statusCode = err instanceof AppError ? err.statusCode : 502;
+        const errorCode = err instanceof AppError ? err.code : "REPLY_FAILED";
+        throw new AppError(
+          statusCode,
+          publicReplyId
+            ? `Public comment was posted, but private DM failed: ${err?.message || "Unknown error"}`
+            : `Failed to send reply: ${err?.message || "Unknown error"}`,
+          errorCode,
+          {
+            publicReplyId,
+            error: err?.message || String(err),
+          },
+        );
+      }
     },
   );
 
@@ -606,7 +686,7 @@ export const igCommentsRoutes: FastifyPluginAsync = async (app: FastifyInstance)
       const [updated] = await db
         .update(igComments)
         .set({
-          action: "skipped",
+          action: "dismissed",
           skipReason: "dismissed",
           handledByUserId: request.user.sub,
           processedAt: new Date(),
@@ -623,7 +703,7 @@ export const igCommentsRoutes: FastifyPluginAsync = async (app: FastifyInstance)
         details: { commentId: comment.id },
       });
 
-      emitIgCommentUpdated(businessId, { commentId: comment.id, action: "skipped" });
+      emitIgCommentUpdated(businessId, { commentId: comment.id, action: "dismissed" });
 
       return { comment: updated };
     },
@@ -782,14 +862,16 @@ export const igCommentsRoutes: FastifyPluginAsync = async (app: FastifyInstance)
       const body = parseOrThrow(reorderSchema, request.body, "Invalid reorder payload");
       const businessId = request.user.businessId;
 
-      let priority = 10;
-      for (const id of body.ids) {
-        await db
-          .update(igCommentRules)
-          .set({ priority, updatedAt: new Date() })
-          .where(and(eq(igCommentRules.id, id), eq(igCommentRules.businessId, businessId)));
-        priority += 10;
-      }
+      await db.transaction(async (tx) => {
+        let priority = 10;
+        for (const id of body.ids) {
+          await tx
+            .update(igCommentRules)
+            .set({ priority, updatedAt: new Date() })
+            .where(and(eq(igCommentRules.id, id), eq(igCommentRules.businessId, businessId)));
+          priority += 10;
+        }
+      });
 
       const rules = await db
         .select()

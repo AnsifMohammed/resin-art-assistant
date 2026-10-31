@@ -468,9 +468,11 @@ export default function IGCommentsPage() {
   // Counts from backend
   const counts = commentsData?.counts || {
     all: 0,
+    pending: 0,
     needs_attention: 0,
     replied: 0,
     skipped: 0,
+    dismissed: 0,
     failed: 0,
   };
 
@@ -712,6 +714,28 @@ export default function IGCommentsPage() {
                 }`}
               >
                 Skipped ({counts.skipped})
+              </button>
+              <button
+                type="button"
+                onClick={() => setFilterParam("action", "dismissed")}
+                className={`px-3 py-1 rounded-lg font-medium transition-colors cursor-pointer ${
+                  actionFilter === "dismissed"
+                    ? "bg-primary text-primary-foreground font-semibold"
+                    : "bg-surface-muted text-text-muted hover:text-text"
+                }`}
+              >
+                Dismissed ({counts.dismissed})
+              </button>
+              <button
+                type="button"
+                onClick={() => setFilterParam("action", "pending")}
+                className={`px-3 py-1 rounded-lg font-medium transition-colors cursor-pointer ${
+                  actionFilter === "pending"
+                    ? "bg-primary text-primary-foreground font-semibold"
+                    : "bg-surface-muted text-text-muted hover:text-text"
+                }`}
+              >
+                Pending ({counts.pending})
               </button>
               <button
                 type="button"
@@ -1018,7 +1042,9 @@ export default function IGCommentsPage() {
                                           ? "bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/30"
                                           : c.action === "skipped"
                                             ? "bg-surface-muted text-text-muted border border-border"
-                                            : "bg-amber-500/10 text-amber-600 border border-amber-500/30"
+                                            : c.action === "dismissed"
+                                              ? "bg-zinc-500/10 text-zinc-600 dark:text-zinc-400 border border-zinc-500/30"
+                                              : "bg-amber-500/10 text-amber-600 border border-amber-500/30"
                               }`}
                             >
                               {isNeedsAttention && <AlertTriangle className="w-3 h-3 shrink-0" />}
@@ -1030,6 +1056,7 @@ export default function IGCommentsPage() {
                                 {c.action === "replied_both" && "Public + DM"}
                                 {c.action === "needs_attention" && "Needs attention"}
                                 {c.action === "skipped" && `Skipped (${c.skipReason || "paused"})`}
+                                {c.action === "dismissed" && "Dismissed"}
                                 {c.action === "failed" && "Send failed"}
                                 {c.action === "pending" && "Pending"}
                               </span>
@@ -1198,6 +1225,11 @@ export default function IGCommentsPage() {
                                 {item.counts.skipped} skipped
                               </span>
                             )}
+                            {item.counts.dismissed && item.counts.dismissed > 0 ? (
+                              <span className="px-2 py-0.5 rounded-md text-zinc-600 dark:text-zinc-400 bg-zinc-500/10 border border-zinc-500/30">
+                                {item.counts.dismissed} dismissed
+                              </span>
+                            ) : null}
                             {item.counts.failed > 0 && (
                               <span className="px-2 py-0.5 rounded-md font-semibold bg-red-500/10 text-danger border border-red-500/30">
                                 {item.counts.failed} failed
@@ -1303,6 +1335,11 @@ export default function IGCommentsPage() {
                                 {item.counts.skipped} skipped
                               </span>
                             )}
+                            {item.counts.dismissed && item.counts.dismissed > 0 ? (
+                              <span className="px-2 py-0.5 rounded-md text-zinc-600 dark:text-zinc-400 bg-zinc-500/10 border border-zinc-500/30">
+                                {item.counts.dismissed} dismissed
+                              </span>
+                            ) : null}
                             {item.counts.failed > 0 && (
                               <span className="px-2 py-0.5 rounded-md font-semibold bg-red-500/10 text-danger border border-red-500/30">
                                 {item.counts.failed} failed
@@ -1621,7 +1658,9 @@ export default function IGCommentsPage() {
                         ? "bg-rose-500/10 text-rose-600 border border-rose-500/20"
                         : selectedComment.action === "failed"
                           ? "bg-red-500/10 text-danger border border-red-500/20"
-                          : "bg-surface-muted text-text-muted border border-border"
+                          : selectedComment.action === "dismissed"
+                            ? "bg-zinc-500/10 text-zinc-600 dark:text-zinc-400 border border-zinc-500/20"
+                            : "bg-surface-muted text-text-muted border border-border"
                     }`}
                   >
                     Action: {selectedComment.action}

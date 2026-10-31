@@ -86,7 +86,7 @@ export const igCommentCategoryEnum = pgEnum("ig_comment_category", [
 ]);
 
 export const igCommentActionEnum = pgEnum("ig_comment_action", [
-  "pending", "replied_public", "dm_sent", "replied_both", "skipped", "needs_attention", "failed"
+  "pending", "replied_public", "dm_sent", "replied_both", "skipped", "dismissed", "needs_attention", "failed"
 ]);
 
 // ─── Tables ───────────────────────────────────────────────────────────────────

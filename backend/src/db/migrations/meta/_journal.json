@@ -57,6 +57,13 @@
       "when": 1793215936356,
       "tag": "0007_ig_comments",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1793472226379,
+      "tag": "0008_ig_comment_dismissed",
+      "breakpoints": true
     }
   ]
 }

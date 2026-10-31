@@ -86,6 +86,7 @@ function answer(q: FakeQuery): any[] | undefined {
           needsAttention: 0,
           replied: 0,
           skipped: 0,
+          dismissed: 0,
           failed: 0,
         });
       }
@@ -94,6 +95,7 @@ function answer(q: FakeQuery): any[] | undefined {
       if (r.action === "needs_attention") entry.needsAttention++;
       else if (["replied_public", "dm_sent", "replied_both"].includes(r.action)) entry.replied++;
       else if (r.action === "skipped") entry.skipped++;
+      else if (r.action === "dismissed") entry.dismissed++;
       else if (r.action === "failed") entry.failed++;
     }
     return [...groups.values()];
@@ -406,6 +408,29 @@ describe("Instagram Comments & Rules API", () => {
     beforeAll(async () => {
       const mod = await import("../src/queue/jobs/processIgComment.ts");
       processIgCommentJob = mod.processIgCommentJob;
+    });
+
+    it("skips sub-comments immediately with skipReason 'sub_comment'", async () => {
+      fake.tables.ig_comments = [
+        {
+          id: "c_sub",
+          businessId: "biz-1",
+          metaCommentId: "cmt_sub",
+          parentCommentId: "parent_123",
+          commenterIgId: "user_sub",
+          text: "Thanks for the info",
+          action: "pending",
+          mediaId: "m1",
+        },
+      ];
+
+      await processIgCommentJob({ commentId: "c_sub", businessId: "biz-1" });
+
+      const updated = fake.rows("ig_comments").find((c) => c.id === "c_sub");
+      expect(updated?.action).toBe("skipped");
+      expect(updated?.skipReason).toBe("sub_comment");
+      expect(metaInstagram.replyToComment).not.toHaveBeenCalled();
+      expect(metaInstagram.sendPrivateReply).not.toHaveBeenCalled();
     });
 
     it("skips when auto-replies are paused", async () => {
@@ -744,6 +769,44 @@ describe("Instagram Comments & Rules API", () => {
       expect(metaInstagram.sendPrivateReply).toHaveBeenCalled();
     });
 
+    it("POST /ig/comments/:id/reply handles partial failure when DM fails", async () => {
+      metaInstagram.replyToComment.mockResolvedValueOnce({ id: "public_reply_ok" });
+      metaInstagram.sendPrivateReply.mockRejectedValueOnce(new Error("Graph API DM error"));
+
+      fake.tables.ig_comments = [
+        {
+          id: "c_partial",
+          businessId: "biz-1",
+          metaCommentId: "cmt_partial",
+          mediaId: "m1",
+          commenterIgId: "user_part",
+          text: "Can I get this?",
+          action: "needs_attention",
+          commentedAt: new Date(),
+        },
+      ];
+
+      const res = await app.inject({
+        method: "POST",
+        url: "/ig/comments/c_partial/reply",
+        headers: { authorization: `Bearer ${adminToken}` },
+        payload: {
+          mode: "both",
+          publicText: "Details sent!",
+          dmText: "Price is 500",
+        },
+      });
+
+      expect(res.statusCode).toBe(502);
+      const row = fake.rows("ig_comments").find((c) => c.id === "c_partial");
+      expect(row?.action).toBe("replied_public");
+      expect(row?.publicReplyId).toBe("public_reply_ok");
+      expect(row?.error).toContain("Graph API DM error");
+
+      const audit = fake.rows("audit_log").find((a) => a.action === "ig_comment_manual_reply_partial_failure");
+      expect(audit).toBeDefined();
+    });
+
     it("POST /ig/comments/:id/dismiss dismisses comment", async () => {
       fake.tables.ig_comments = [
         {
@@ -766,7 +829,7 @@ describe("Instagram Comments & Rules API", () => {
 
       expect(res.statusCode).toBe(200);
       const c = res.json().comment;
-      expect(c.action).toBe("skipped");
+      expect(c.action).toBe("dismissed");
       expect(c.skipReason).toBe("dismissed");
     });
   });

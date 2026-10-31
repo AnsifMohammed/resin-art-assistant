@@ -849,6 +849,7 @@ export const IG_COMMENT_ACTIONS = [
   "dm_sent",
   "replied_both",
   "skipped",
+  "dismissed",
   "needs_attention",
   "failed",
 ] as const;
@@ -871,6 +872,7 @@ export const IG_COMMENT_ACTION_LABELS: Record<IgCommentAction, string> = {
   dm_sent: "DM sent",
   replied_both: "Replied + DM",
   skipped: "Skipped",
+  dismissed: "Dismissed",
   needs_attention: "Needs attention",
   failed: "Failed",
 };
@@ -968,9 +970,11 @@ export interface IgTestResult {
 
 export interface IgCommentsCounts {
   all: number;
+  pending: number;
   needs_attention: number;
   replied: number;
   skipped: number;
+  dismissed: number;
   failed: number;
 }
 

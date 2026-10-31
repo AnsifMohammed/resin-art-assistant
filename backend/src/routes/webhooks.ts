@@ -11,6 +11,7 @@ import { applyWhatsAppStatus } from "../services/deliveryReceipts.ts";
 import { handleOptKeyword } from "../services/optOut.ts";
 import {
   fetchInstagramDisplayName,
+  type IgMedia,
   INSTAGRAM_MAX_TEXT_BYTES,
   listRecentMedia,
   splitInstagramText,
@@ -459,6 +460,36 @@ async function processInstagram(body: any): Promise<void> {
     }
 
     // Process comments from entry.changes where field === "comments"
+    const commentChanges = (entry?.changes ?? []).filter(
+      (change: any) => change?.field === "comments" && change?.value?.id,
+    );
+    const uniqueMediaIds: string[] = Array.from(
+      new Set(
+        commentChanges
+          .map((change: any) => change?.value?.media?.id)
+          .filter((id: any): id is string => typeof id === "string" && id.length > 0),
+      ),
+    );
+
+    const mediaMap = new Map<string, IgMedia | null>();
+    if (uniqueMediaIds.length > 0) {
+      const mediaResults = await Promise.all(
+        uniqueMediaIds.map(async (mediaId) => {
+          try {
+            const recent = await listRecentMedia(30, config.BUSINESS_ID);
+            const found = recent.find((m) => m.id === mediaId) ?? null;
+            return [mediaId, found] as const;
+          } catch (mediaErr) {
+            logger.warn({ mediaErr, mediaId }, "Could not fetch media details for comment (continuing)");
+            return [mediaId, null] as const;
+          }
+        }),
+      );
+      for (const [mId, mData] of mediaResults) {
+        mediaMap.set(mId, mData);
+      }
+    }
+
     for (const change of entry?.changes ?? []) {
       if (change?.field !== "comments") continue;
       const value = change?.value;
@@ -483,7 +514,7 @@ async function processInstagram(body: any): Promise<void> {
           continue;
         }
 
-        // Fill media details from listRecentMedia() when available (best effort, don't fail)
+        // Fill media details from prefetched media map when available (best effort, don't fail)
         let mediaType: "reel" | "post" | "carousel" | null = null;
         let mediaPermalink: string | null = null;
         let mediaThumbnailUrl: string | null = null;
@@ -494,17 +525,12 @@ async function processInstagram(body: any): Promise<void> {
           mediaType = "reel";
         }
 
-        try {
-          const recent = await listRecentMedia(30, config.BUSINESS_ID);
-          const found = recent.find((m) => m.id === mediaId);
-          if (found) {
-            mediaType = found.mediaType;
-            mediaPermalink = found.permalink;
-            mediaThumbnailUrl = found.thumbnailUrl;
-            mediaCaption = found.caption;
-          }
-        } catch (mediaErr) {
-          logger.warn({ mediaErr, mediaId }, "Could not fetch media details for comment (continuing)");
+        const found = mediaId ? mediaMap.get(mediaId) : null;
+        if (found) {
+          mediaType = found.mediaType;
+          mediaPermalink = found.permalink;
+          mediaThumbnailUrl = found.thumbnailUrl;
+          mediaCaption = found.caption;
         }
 
         const [inserted] = await db

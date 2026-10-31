@@ -55,6 +55,16 @@ export async function processIgCommentJob(params: ProcessIgCommentParams): Promi
 
   if (!comment || comment.action !== "pending") return;
 
+  // Sub-comment replies inside a thread must not trigger auto-replies
+  if (comment.parentCommentId) {
+    await db
+      .update(igComments)
+      .set({ action: "skipped", skipReason: "sub_comment", processedAt: new Date() })
+      .where(eq(igComments.id, comment.id));
+    emitIgCommentUpdated(params.businessId, { commentId: comment.id, action: "skipped" });
+    return;
+  }
+
   // 2. Settings check: settings.igComments.enabled === false -> skipped (paused).
   const [biz] = await db
     .select({ settings: businesses.settings })
@@ -152,12 +162,8 @@ export async function processIgCommentJob(params: ProcessIgCommentParams): Promi
     }
   }
 
-  // Otherwise, if aiClassification is on, classify and pick first rule whose categories include category
+  // Otherwise, if aiClassification is on, pick first rule whose categories include category
   if (!matchedRule && aiClassificationOn) {
-    if (!detectedCategory) {
-      const classification = await classifyComment(comment.text);
-      detectedCategory = classification.category;
-    }
     if (detectedCategory) {
       for (const rule of applicableRules) {
         const categories = (rule.categories as string[]) || [];
@@ -167,6 +173,16 @@ export async function processIgCommentJob(params: ProcessIgCommentParams): Promi
           break;
         }
       }
+    }
+  } else if (!aiClassificationOn) {
+    const hasCategoryRules = applicableRules.some(
+      (r) => Array.isArray(r.categories) && r.categories.length > 0,
+    );
+    if (hasCategoryRules) {
+      logger.warn(
+        { commentId: comment.id, businessId: params.businessId },
+        "AI classification is disabled; category-based comment rules will not match",
+      );
     }
   }
 

@@ -33,6 +33,7 @@ export interface IgMediaSummaryItem {
     needs_attention: number;
     replied: number;
     skipped: number;
+    dismissed?: number;
     failed: number;
   };
 }
