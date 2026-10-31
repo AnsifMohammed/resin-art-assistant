@@ -26,6 +26,7 @@ export async function buildServer() {
   await app.register(cors, {
     origin: config.NODE_ENV === "production" ? config.DASHBOARD_URL : true,
     credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     exposedHeaders: ["Retry-After"],
   });
 

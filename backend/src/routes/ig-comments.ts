@@ -279,7 +279,7 @@ export const igCommentsRoutes: FastifyPluginAsync = async (app: FastifyInstance)
           .where(
             and(
               eq(igComments.businessId, businessId),
-              sql`${igComments.commentedAt} >= ${startOfToday}`,
+              sql`${igComments.commentedAt} >= ${startOfToday.toISOString()}`,
             ),
           )
           .groupBy(igComments.action, igComments.handledByUserId),
@@ -293,7 +293,7 @@ export const igCommentsRoutes: FastifyPluginAsync = async (app: FastifyInstance)
           .where(
             and(
               eq(igComments.businessId, businessId),
-              sql`${igComments.commentedAt} >= ${last7Days}`,
+              sql`${igComments.commentedAt} >= ${last7Days.toISOString()}`,
             ),
           )
           .groupBy(igComments.action, igComments.handledByUserId),
