@@ -636,6 +636,8 @@ queries every 5 s (polling fallback), and it refetches once after a reconnect.
 | `settings:updated` | admins | `{ paused: boolean }` | `POST /settings/pause`, `PATCH /settings` |
 | `customer:updated` | admins | `{ customerId }` | `PATCH /customers/:id` (when something changed), STOP/START keyword opt-out/in |
 | `broadcast:updated` | admins | `{ broadcastId, status: BroadcastStatus, stats: BroadcastStats }` | every status change (create, schedule, send, dispatch, cancel, finish, fail) and sending/receipt progress (progress throttled to ≤ 1 per 2 s per broadcast, with a trailing emit) |
+| `ig_comment:new` | admins | `{ commentId: string }` | when an Instagram comment arrives and is stored |
+| `ig_comment:updated` | admins | `{ commentId: string, action: string }` | when an Instagram comment action changes (replied, needs_attention, skipped, failed) |
 | `subscription:revoked` | the affected staff member | `{ event: "message:new:<id>", conversationId }` | their access ended (resolved, reassigned to someone else); the subscription is dropped |
 
 `reason` is one of the `escalation_reason` enum values: `intent_complaint`, `intent_refund`, `intent_unknown`,

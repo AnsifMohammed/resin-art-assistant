@@ -11,6 +11,7 @@ export const QUEUES = {
   refreshTokens: "refresh-tokens",
   dispatchBroadcasts: "dispatch-broadcasts",
   sendBroadcast: "send-broadcast",
+  processIgComment: "process-ig-comment",
 } as const;
 
 /** Seconds to wait after the first message of a burst before running the AI (message batching). */
@@ -25,7 +26,7 @@ export const PROCESS_MESSAGE_RETRY_DELAY_SECONDS = 5;
 // DATABASE_URL would silently replace our CA-verified `ssl` object (same issue
 // as drizzle.config.ts). Pass the individual fields instead.
 function connectionOptions() {
-  const parsed = new URL(config.DATABASE_URL);
+  const parsed = new URL(config.QUEUE_DATABASE_URL ?? config.DATABASE_URL);
   const ssl = DATABASE_CA_CERT_PATH
     ? { ca: readFileSync(DATABASE_CA_CERT_PATH, "utf8"), rejectUnauthorized: true }
     : parsed.searchParams.get("sslmode") === "disable"
@@ -88,6 +89,13 @@ export async function initQueue(): Promise<PgBoss | null> {
       retryDelay: 30,
       retryBackoff: true,
       expireInSeconds: 30 * 60,
+    });
+    await boss.createQueue(QUEUES.processIgComment, {
+      policy: "stately",
+      retryLimit: 2,
+      retryDelay: 10,
+      retryBackoff: true,
+      expireInSeconds: 120,
     });
 
     running = true;

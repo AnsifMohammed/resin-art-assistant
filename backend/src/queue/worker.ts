@@ -12,6 +12,7 @@ import { escalateAfterFailure, processMessageJob, type ProcessMessageParams } fr
 import { checkAndRefreshInstagramTokens } from "./jobs/refreshTokens.ts";
 import { sendBroadcastJob, type SendBroadcastParams } from "./jobs/sendBroadcast.ts";
 import { checkAndSendReminders } from "./jobs/sendReminder.ts";
+import { processIgCommentJob, type ProcessIgCommentParams } from "./jobs/processIgComment.ts";
 
 export async function startWorkers(): Promise<void> {
   const queue = await initQueue();
@@ -75,6 +76,17 @@ export async function startWorkers(): Promise<void> {
       async (jobs: Job<SendBroadcastParams>[]) => {
         for (const job of jobs) {
           await sendBroadcastJob(job.data);
+        }
+      },
+    );
+
+    // 5. Instagram comment auto-reply worker
+    await boss.work<ProcessIgCommentParams>(
+      QUEUES.processIgComment,
+      { localConcurrency: 3 },
+      async (jobs: Job<ProcessIgCommentParams>[]) => {
+        for (const job of jobs) {
+          await processIgCommentJob(job.data);
         }
       },
     );

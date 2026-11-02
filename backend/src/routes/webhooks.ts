@@ -2,14 +2,22 @@ import type { FastifyInstance, FastifyPluginAsync } from "fastify";
 import { and, eq, gte, isNull } from "drizzle-orm";
 import { config, isInstagramLive } from "../config.ts";
 import { db } from "../db/index.ts";
-import { auditLog, channels, conversations, customers, messages } from "../db/schema.ts";
+import { auditLog, channels, conversations, customers, igComments, messages } from "../db/schema.ts";
 import { AppError } from "../lib/errors.ts";
 import { logger } from "../lib/logger.ts";
 import { enqueueProcessMessage } from "../queue/enqueue.ts";
+import { enqueueProcessIgComment } from "../queue/enqueueIgComment.ts";
 import { applyWhatsAppStatus } from "../services/deliveryReceipts.ts";
 import { handleOptKeyword } from "../services/optOut.ts";
-import { fetchInstagramDisplayName, INSTAGRAM_MAX_TEXT_BYTES, splitInstagramText } from "../services/meta/instagram.ts";
-import { emitConversationUpdated, emitMessageNew } from "../realtime/events.ts";
+import {
+  fetchInstagramDisplayName,
+  type IgMedia,
+  INSTAGRAM_MAX_TEXT_BYTES,
+  fetchCommenterProfilePic,
+  listRecentMedia,
+  splitInstagramText,
+} from "../services/meta/instagram.ts";
+import { emitConversationUpdated, emitIgCommentNew, emitMessageNew } from "../realtime/events.ts";
 import {
   digitsOnly,
   isWebhookRequestAuthorized,
@@ -95,7 +103,7 @@ async function handleCustomerMessage(m: InboundCustomerMessage): Promise<void> {
 
   let customer = await findCustomer(chan.id, m.handleOrPhone);
   if (!customer) {
-    [customer] = await db
+    const [inserted] = await db
       .insert(customers)
       .values({
         businessId: config.BUSINESS_ID,
@@ -103,26 +111,36 @@ async function handleCustomerMessage(m: InboundCustomerMessage): Promise<void> {
         name: m.customerName,
         handleOrPhone: m.handleOrPhone,
       })
+      .onConflictDoNothing()
       .returning();
+    customer = inserted ?? (await findCustomer(chan.id, m.handleOrPhone));
   }
   if (!customer) throw new Error("Could not resolve customer");
 
-  // Instagram webhooks only carry the sender's id; look up their name/@username once
-  // (new customers, and older ones still named by their id). The id stays in
-  // handleOrPhone because replies are sent to it.
-  if (
-    m.channelType === "instagram" &&
-    isInstagramLive(config) &&
-    (!customer.name || customer.name === customer.handleOrPhone)
-  ) {
-    const displayName = await fetchInstagramDisplayName(m.handleOrPhone);
-    if (displayName) {
-      const [renamed] = await db
-        .update(customers)
-        .set({ name: displayName })
-        .where(eq(customers.id, customer.id))
-        .returning();
-      if (renamed) customer = renamed;
+  // Instagram webhooks only carry the sender's id; look up their name/@username and
+  // profile picture once. The id stays in handleOrPhone because replies are sent to it.
+  if (m.channelType === "instagram" && isInstagramLive(config)) {
+    const needsName = !customer.name || customer.name === customer.handleOrPhone;
+    const needsPic = !customer.profilePicUrl;
+
+    if (needsName || needsPic) {
+      const [displayName, profilePicUrl] = await Promise.all([
+        needsName ? fetchInstagramDisplayName(m.handleOrPhone).catch(() => null) : Promise.resolve(null),
+        needsPic ? fetchCommenterProfilePic(m.handleOrPhone, config.BUSINESS_ID).catch(() => null) : Promise.resolve(null),
+      ]);
+
+      const updates: Record<string, unknown> = {};
+      if (displayName) updates.name = displayName;
+      if (profilePicUrl) updates.profilePicUrl = profilePicUrl;
+
+      if (Object.keys(updates).length > 0) {
+        const [updated] = await db
+          .update(customers)
+          .set(updates)
+          .where(eq(customers.id, customer.id))
+          .returning();
+        if (updated) customer = updated;
+      }
     }
   }
 
@@ -132,7 +150,7 @@ async function handleCustomerMessage(m: InboundCustomerMessage): Promise<void> {
   let conv = await findConversation(customer.id);
   const isNewConv = !conv;
   if (!conv) {
-    [conv] = await db
+    const [insertedConv] = await db
       .insert(conversations)
       .values({
         businessId: config.BUSINESS_ID,
@@ -143,7 +161,9 @@ async function handleCustomerMessage(m: InboundCustomerMessage): Promise<void> {
         lastMessageAt: now,
         windowClosesAt,
       })
+      .onConflictDoNothing()
       .returning();
+    conv = insertedConv ?? (await findConversation(customer.id));
   }
   if (!conv) throw new Error("Could not resolve conversation");
 
@@ -449,6 +469,116 @@ async function processInstagram(body: any): Promise<void> {
         });
       } catch (err) {
         logger.error({ err, metaMessageId }, "Failed to process Instagram message");
+      }
+    }
+
+    // Process comments from entry.changes where field === "comments"
+    const commentChanges = (entry?.changes ?? []).filter(
+      (change: any) => change?.field === "comments" && change?.value?.id,
+    );
+    const uniqueMediaIds: string[] = Array.from(
+      new Set(
+        commentChanges
+          .map((change: any) => change?.value?.media?.id)
+          .filter((id: any): id is string => typeof id === "string" && id.length > 0),
+      ),
+    );
+
+    const mediaMap = new Map<string, IgMedia | null>();
+    if (uniqueMediaIds.length > 0) {
+      const mediaResults = await Promise.all(
+        uniqueMediaIds.map(async (mediaId) => {
+          try {
+            const recent = await listRecentMedia(30, config.BUSINESS_ID);
+            const found = recent.find((m) => m.id === mediaId) ?? null;
+            return [mediaId, found] as const;
+          } catch (mediaErr) {
+            logger.warn({ mediaErr, mediaId }, "Could not fetch media details for comment (continuing)");
+            return [mediaId, null] as const;
+          }
+        }),
+      );
+      for (const [mId, mData] of mediaResults) {
+        mediaMap.set(mId, mData);
+      }
+    }
+
+    for (const change of entry?.changes ?? []) {
+      if (change?.field !== "comments") continue;
+      const value = change?.value;
+      if (!value) continue;
+      const commentId: string | undefined = value?.id;
+      if (!commentId) continue;
+
+      try {
+        const fromId = value?.from?.id;
+        const fromUsername = value?.from?.username;
+        const text = typeof value?.text === "string" ? value.text : "";
+        const mediaId = value?.media?.id || "";
+        const parentId = value?.parent_id || null;
+        const rawTime = value?.timestamp;
+        const timestamp = rawTime
+          ? new Date(typeof rawTime === "number" ? rawTime * 1000 : rawTime)
+          : new Date();
+
+        // Ignore comments where from.id === INSTAGRAM_ACCOUNT_ID (our own replies)
+        if (config.INSTAGRAM_ACCOUNT_ID && fromId === config.INSTAGRAM_ACCOUNT_ID) {
+          logger.info({ commentId, fromId }, "Ignoring own Instagram comment");
+          continue;
+        }
+
+        // Fill media details from prefetched media map when available (best effort, don't fail)
+        let mediaType: "reel" | "post" | "carousel" | null = null;
+        let mediaPermalink: string | null = null;
+        let mediaThumbnailUrl: string | null = null;
+        let mediaCaption: string | null = null;
+
+        const prodType = value?.media?.media_product_type;
+        if (prodType === "REELS") {
+          mediaType = "reel";
+        }
+
+        const found = mediaId ? mediaMap.get(mediaId) : null;
+        if (found) {
+          mediaType = found.mediaType;
+          mediaPermalink = found.permalink;
+          mediaThumbnailUrl = found.thumbnailUrl;
+          mediaCaption = found.caption;
+        }
+
+        const commenterIgId = fromId || "unknown";
+        const commenterProfilePicUrl = await fetchCommenterProfilePic(commenterIgId, config.BUSINESS_ID).catch(() => null);
+
+        const [inserted] = await db
+          .insert(igComments)
+          .values({
+            businessId: config.BUSINESS_ID,
+            metaCommentId: commentId,
+            parentCommentId: parentId,
+            mediaId,
+            mediaType,
+            mediaPermalink,
+            mediaThumbnailUrl,
+            mediaCaption,
+            commenterIgId,
+            commenterUsername: fromUsername || null,
+            commenterProfilePicUrl,
+            text,
+            commentedAt: timestamp,
+            action: "pending",
+          })
+          .onConflictDoNothing()
+          .returning();
+
+        if (inserted) {
+          emitIgCommentNew(config.BUSINESS_ID, { commentId: inserted.id });
+          await enqueueProcessIgComment({
+            commentId: inserted.id,
+            businessId: config.BUSINESS_ID,
+          });
+        }
+      } catch (err) {
+        logger.error({ err, commentId }, "Failed to process Instagram comment webhook");
       }
     }
   }

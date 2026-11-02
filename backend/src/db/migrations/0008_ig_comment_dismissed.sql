@@ -1,0 +1,1 @@
+ALTER TYPE "public"."ig_comment_action" ADD VALUE 'dismissed' BEFORE 'needs_attention';

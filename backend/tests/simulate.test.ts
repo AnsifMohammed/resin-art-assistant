@@ -128,7 +128,9 @@ const enqueueProcessMessage = vi.fn(async () => ({ mode: "queued", jobId: "job-1
 vi.mock("../src/queue/enqueue.ts", () => ({ enqueueProcessMessage }));
 
 const emitMessageNew = vi.hoisted(() => vi.fn());
-vi.mock("../src/realtime/events.ts", () => ({ emitMessageNew }));
+const emitIgCommentNew = vi.hoisted(() => vi.fn());
+const emitIgCommentUpdated = vi.hoisted(() => vi.fn());
+vi.mock("../src/realtime/events.ts", () => ({ emitMessageNew, emitIgCommentNew, emitIgCommentUpdated }));
 
 let buildServer: typeof import("../src/index.ts").buildServer;
 let processAiDecision: typeof import("../src/ai/pipeline.ts").processAiDecision;

@@ -16,6 +16,7 @@
     "db:migrate-products": "tsx src/db/migrate-kb-products.ts",
     "db:seed": "tsx src/db/seed.ts",
     "db:seed-demo": "tsx src/db/seed-demo.ts",
+    "db:seed-analytics": "tsx src/db/seed-analytics.ts",
     "db:clear-demo": "tsx src/db/clear-demo.ts",
     "test": "vitest run",
     "test:watch": "vitest",

@@ -1,1 +1,18 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="22" fill="#10b981"/><path fill="#fff" d="M50 20 L67.32 50.00 A20 20 0 1 1 32.68 50.00 Z"/><ellipse cx="43" cy="60" rx="5" ry="9" fill="#10b981"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="none">
+  <!-- Saba Art Staggered Tile Logo -->
+  <!-- Top-Left: S (Charcoal Gray) -->
+  <rect x="16" y="5" width="82" height="82" rx="4" fill="#606060" />
+  <text x="57" y="66" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Outfit', 'Inter', sans-serif" font-size="58" font-weight="700" fill="#FFFFFF" text-anchor="middle">S</text>
+
+  <!-- Top-Right: B (Vibrant Cyan) -->
+  <rect x="102" y="28" width="82" height="82" rx="4" fill="#38C7D8" />
+  <text x="143" y="89" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Outfit', 'Inter', sans-serif" font-size="58" font-weight="700" fill="#FFFFFF" text-anchor="middle">B</text>
+
+  <!-- Bottom-Left: A (Vibrant Cyan) -->
+  <rect x="16" y="90" width="82" height="82" rx="4" fill="#38C7D8" />
+  <text x="57" y="151" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Outfit', 'Inter', sans-serif" font-size="58" font-weight="700" fill="#FFFFFF" text-anchor="middle">A</text>
+
+  <!-- Bottom-Right: A (Charcoal Gray) -->
+  <rect x="102" y="113" width="82" height="82" rx="4" fill="#606060" />
+  <text x="143" y="174" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Outfit', 'Inter', sans-serif" font-size="58" font-weight="700" fill="#FFFFFF" text-anchor="middle">A</text>
+</svg>

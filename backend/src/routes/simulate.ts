@@ -3,13 +3,16 @@ import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { config } from "../config.ts";
 import { db } from "../db/index.ts";
-import { channels, conversations, customers, messages } from "../db/schema.ts";
+import { channels, conversations, customers, igComments, messages } from "../db/schema.ts";
 import { AppError } from "../lib/errors.ts";
 import { authenticate } from "../middleware/authenticate.ts";
 import { requireAdmin } from "../middleware/requireAdmin.ts";
-import { emitMessageNew } from "../realtime/events.ts";
+import { emitIgCommentNew, emitMessageNew } from "../realtime/events.ts";
 import { enqueueProcessMessage } from "../queue/enqueue.ts";
+import { enqueueProcessIgComment } from "../queue/enqueueIgComment.ts";
+import { listRecentMedia } from "../services/meta/instagram.ts";
 import { handleOptKeyword } from "../services/optOut.ts";
+import { nanoid } from "nanoid";
 
 const simulateSchema = z.object({
   customerName: z.string().min(1),
@@ -185,6 +188,71 @@ export const simulateRoutes: FastifyPluginAsync = async (app: FastifyInstance) =
       queued: queued.mode,
       optAction: null,
       decision: null,
+    });
+  });
+
+  const simulateIgCommentSchema = z.object({
+    username: z.string().min(1),
+    text: z.string().min(1),
+    mediaId: z.string().optional(),
+  });
+
+  app.post("/simulate/ig-comment", { preHandler: [authenticate, requireAdmin] }, async (request, reply) => {
+    if (!config.DEMO_MODE) {
+      throw new AppError(403, "Simulation endpoint is only available in DEMO_MODE", "FORBIDDEN");
+    }
+
+    const parseResult = simulateIgCommentSchema.safeParse(request.body);
+    if (!parseResult.success) {
+      throw new AppError(400, "Invalid simulate payload", "VALIDATION_ERROR");
+    }
+
+    const { username, text, mediaId: requestedMediaId } = parseResult.data;
+    const businessId = request.user.businessId;
+
+    const mediaList = await listRecentMedia(30, businessId);
+    const media = requestedMediaId
+      ? mediaList.find((m) => m.id === requestedMediaId)
+      : mediaList[0];
+    const mediaId = requestedMediaId || media?.id || "demo_media_ocean_clock";
+
+    const cleanUsername = username.replace(/^@/, "").trim().toLowerCase();
+    const commenterIgId = `ig_${cleanUsername}`;
+    const metaCommentId = `demo_cmt_${nanoid()}`;
+
+    const [inserted] = await db
+      .insert(igComments)
+      .values({
+        businessId,
+        metaCommentId,
+        mediaId,
+        mediaType: media?.mediaType ?? "reel",
+        mediaPermalink: media?.permalink ?? `https://instagram.com/p/${mediaId}`,
+        mediaThumbnailUrl: media?.thumbnailUrl ?? "",
+        mediaCaption: media?.caption ?? "",
+        commenterIgId,
+        commenterUsername: cleanUsername,
+        text,
+        commentedAt: new Date(),
+        action: "pending",
+      })
+      .onConflictDoNothing()
+      .returning();
+
+    if (!inserted) {
+      throw new AppError(500, "Failed to create simulated Instagram comment", "INTERNAL_ERROR");
+    }
+
+    emitIgCommentNew(businessId, { commentId: inserted.id });
+
+    await enqueueProcessIgComment({
+      commentId: inserted.id,
+      businessId,
+    });
+
+    return reply.status(202).send({
+      ok: true,
+      comment: inserted,
     });
   });
 };

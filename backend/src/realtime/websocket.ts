@@ -60,6 +60,15 @@ export interface BroadcastUpdatedPayload {
   stats: BroadcastStats;
 }
 
+export interface IgCommentNewPayload {
+  commentId: string;
+}
+
+export interface IgCommentUpdatedPayload {
+  commentId: string;
+  action: string;
+}
+
 /** Internal, transport-neutral description of something that happened. */
 export type RealtimeEnvelope =
   | { kind: "message:new"; businessId: string; conversationId: string; message: MessageRow }
@@ -75,6 +84,8 @@ export type RealtimeEnvelope =
   | { kind: "settings:updated"; businessId: string; payload: SettingsUpdatedPayload }
   | { kind: "customer:updated"; businessId: string; payload: CustomerUpdatedPayload }
   | { kind: "broadcast:updated"; businessId: string; payload: BroadcastUpdatedPayload }
+  | { kind: "ig_comment:new"; businessId: string; payload: IgCommentNewPayload }
+  | { kind: "ig_comment:updated"; businessId: string; payload: IgCommentUpdatedPayload }
   /** Escalation resolved/reassigned: re-check staff message subscriptions for this conversation. */
   | { kind: "access:changed"; businessId: string; conversationId: string }
   | { kind: "user:disconnect"; businessId: string; userId: string };
@@ -193,6 +204,8 @@ export async function deliverLocal(env: RealtimeEnvelope): Promise<void> {
     case "settings:updated":
     case "customer:updated":
     case "broadcast:updated":
+    case "ig_comment:new":
+    case "ig_comment:updated":
       // Admin only: customers and broadcasts are admin pages.
       for (const c of clientsOf(env.businessId, isAdmin)) send(c, env.kind, env.payload);
       return;
