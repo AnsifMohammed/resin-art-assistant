@@ -156,6 +156,52 @@ export async function apiRequest<T>(path: string, opts: RequestOptions = {}): Pr
   return data as T;
 }
 
+export async function apiUpload<T>(path: string, formData: FormData, signal?: AbortSignal): Promise<T> {
+  const headers: Record<string, string> = { Accept: "application/json" };
+  const token = getToken();
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  const init: RequestInit = {
+    method: "POST",
+    headers,
+    body: formData,
+  };
+  if (signal) init.signal = signal;
+
+  let res: Response;
+  try {
+    res = await fetch(buildUrl(path), init);
+  } catch (err) {
+    if (err instanceof DOMException && err.name === "AbortError") throw err;
+    throw new ApiError({ status: 0, message: "Network error. Check your connection.", code: "NETWORK_ERROR" });
+  }
+
+  const text = await res.text();
+  let data: unknown = null;
+  if (text) {
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = null;
+    }
+  }
+
+  if (!res.ok) {
+    const body = (data ?? {}) as Partial<ApiErrorBody>;
+    const error = new ApiError({
+      status: res.status,
+      message: body.error ?? (res.statusText || `Request failed (${res.status})`),
+      code: body.code ?? `HTTP_${res.status}`,
+      details: body.details,
+      retryAfterSeconds: parseRetryAfter(res.headers.get("Retry-After")),
+    });
+    if (res.status === 401) onUnauthorized();
+    throw error;
+  }
+
+  return data as T;
+}
+
 export const api = {
   get: <T>(path: string, query?: RequestOptions["query"], signal?: AbortSignal) =>
     apiRequest<T>(path, { method: "GET", query, signal }),
@@ -164,4 +210,5 @@ export const api = {
   put: <T>(path: string, body?: unknown) => apiRequest<T>(path, { method: "PUT", body }),
   patch: <T>(path: string, body?: unknown) => apiRequest<T>(path, { method: "PATCH", body }),
   delete: <T>(path: string) => apiRequest<T>(path, { method: "DELETE" }),
+  upload: <T>(path: string, formData: FormData, signal?: AbortSignal) => apiUpload<T>(path, formData, signal),
 };

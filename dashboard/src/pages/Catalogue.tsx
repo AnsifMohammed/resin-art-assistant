@@ -582,7 +582,7 @@ export default function Catalogue() {
               value={sortBy}
               aria-label="Sort catalogue products"
               onChange={(e) => setSortBy(e.target.value as "name" | "price-asc" | "price-desc" | "lead-time")}
-              className="bg-surface-muted border border-border text-text text-12 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary/40 cursor-pointer"
+              className="bg-surface-muted border border-border text-text text-12 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary/40 cursor-pointer appearance-none"
             >
               <option value="name">Sort: Name (A-Z)</option>
               <option value="price-asc">Price: Low to High</option>

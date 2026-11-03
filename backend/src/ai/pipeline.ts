@@ -85,6 +85,54 @@ export function parseErrorDecision(): AiDecision {
 function mockDemoDecision(text: string): AiDecision {
   const lower = text.toLowerCase();
 
+  if (
+    lower.includes("catalogue") ||
+    lower.includes("catalog") ||
+    lower.includes("show me your designs") ||
+    lower.includes("what products do you have")
+  ) {
+    return {
+      intent: "product_info",
+      reply: "Here is our handcrafted resin collection! Let me know which one you like 😊",
+      send_catalogue: true,
+      catalogue_product_slugs: [],
+      facts_used: ["products.collection"],
+      missing_facts: [],
+      escalate: false,
+      escalate_reason: null,
+      suggested_tag: "new_lead",
+      language_detected: "english",
+    };
+  }
+
+  if (lower.includes("customization options") || lower.includes("customisation options")) {
+    return {
+      intent: "custom_order",
+      reply:
+        "Yes! We offer customization like color shades, name/initials engraving, gold/silver foil, and flower preservation. Which design are you interested in customizing? 💕",
+      facts_used: ["products.custom_options"],
+      missing_facts: [],
+      escalate: false,
+      escalate_reason: null,
+      suggested_tag: "custom_order",
+      language_detected: "english",
+    };
+  }
+
+  if (lower.includes("sizes and prices") || lower.includes("size and price")) {
+    return {
+      intent: "price",
+      reply:
+        "Here are our available sizes and prices! We have 10cm round (₹1,200), 12 inch (₹2,800), and custom sizes upon request.",
+      facts_used: ["products.sizes"],
+      missing_facts: [],
+      escalate: false,
+      escalate_reason: null,
+      suggested_tag: "new_lead",
+      language_detected: "english",
+    };
+  }
+
   if (lower.includes("refund")) {
     return {
       intent: "refund",

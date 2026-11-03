@@ -1,5 +1,5 @@
 import { useId, useState } from "react";
-import { AlertCircle, Bot, ChevronDown, ExternalLink, Sparkles } from "lucide-react";
+import { AlertCircle, Bot, ChevronDown, Download, Package, ShoppingBag, Sparkles, Tag } from "lucide-react";
 import { cn } from "../../lib/cn.ts";
 import { escalationReasonLabel } from "../../lib/escalationReasons.ts";
 import { formatTime, humanize } from "../../lib/format.ts";
@@ -24,6 +24,7 @@ const metaTone: Record<SenderType, string> = {
 
 export interface MessageBubbleProps {
   message: Pick<Message, "id" | "senderType" | "content" | "mediaUrls" | "createdAt" | "deliveryStatus"> & {
+    metadata?: Record<string, unknown> | null | undefined;
     aiDecision?: AiDecisionSummary | undefined;
   };
   /** Label above the text for outbound messages: "AI", staff/owner name, "You". */
@@ -139,9 +140,35 @@ function getDocumentBadge(ext: string): { label: string; bg: string } {
   return { label: ext.toUpperCase().slice(0, 4) || "FILE", bg: "bg-stone-500/20 text-stone-600 dark:text-stone-400" };
 }
 
+function getDownloadUrl(url: string): string {
+  if (url.includes("/upload/") && !url.includes("fl_attachment")) {
+    return url.replace("/upload/", "/upload/fl_attachment/");
+  }
+  return url;
+}
+
 export function MessageBubble({ message, senderLabel, pending = false }: MessageBubbleProps) {
   const { senderType } = message;
   const media = Array.isArray(message.mediaUrls) ? message.mediaUrls.filter((u) => typeof u === "string" && u) : [];
+  const metadata = message.metadata as Record<string, unknown> | undefined;
+  const isEnquiry = metadata?.kind === "product_enquiry";
+  const isCatalogue = metadata?.kind === "catalogue_share";
+  const sharedProducts = Array.isArray(metadata?.products)
+    ? (metadata.products as Array<{
+        id?: string;
+        slug?: string;
+        name?: string;
+        price?: string;
+        imageUrl?: string;
+        leadTime?: number;
+        description?: string;
+      }>)
+    : [];
+
+  // Suppress phantom empty messages (e.g. blank echoes from media dispatches)
+  if (!message.content?.trim() && media.length === 0 && !isCatalogue && !isEnquiry) {
+    return null;
+  }
 
   if (senderType === "system") {
     return (
@@ -172,20 +199,118 @@ export function MessageBubble({ message, senderLabel, pending = false }: Message
         </p>
       )}
 
-      {media.length > 0 && (
+      {isEnquiry && (
+        <div className="mb-2 inline-flex items-center gap-1.5 rounded-lg border border-primary/30 bg-primary/10 px-2.5 py-1 text-11 font-semibold text-primary">
+          <Tag className="h-3.5 w-3.5" />
+          <span>Product Enquiry: {String(metadata?.productName || metadata?.slug || "Product")}</span>
+        </div>
+      )}
+
+      {isCatalogue && sharedProducts.length > 0 && (
+        <div className="mb-2.5 space-y-2.5">
+          {typeof metadata?.customNote === "string" && metadata.customNote.trim() && (
+            <p className="whitespace-pre-wrap break-words text-12 font-medium opacity-90 border-b border-current/15 pb-2">
+              {metadata.customNote.trim()}
+            </p>
+          )}
+
+          {sharedProducts.length > 1 && (
+            <div className="flex items-center justify-between text-11 opacity-80 px-0.5">
+              <span className="font-semibold">🛍️ Shared Catalogue ({sharedProducts.length} items)</span>
+              <span className="text-10">Scroll down to view all</span>
+            </div>
+          )}
+
+          <div className="max-h-[460px] overflow-y-auto pr-1.5 space-y-3 custom-scrollbar overscroll-contain">
+            {sharedProducts.map((p, idx) => (
+              <div
+                key={p.id || idx}
+                className="overflow-hidden rounded-2xl border border-border/80 bg-surface shadow-xs transition text-text"
+              >
+                {/* Hero Image at TOP of card */}
+                {p.imageUrl ? (
+                  <div className="relative h-36 sm:h-40 w-full overflow-hidden bg-black/5">
+                    <img
+                      src={p.imageUrl}
+                      alt={p.name || "Product"}
+                      className="h-full w-full object-cover rounded-t-xl"
+                    />
+                    {p.leadTime !== undefined && (
+                      <div className="absolute top-2 right-2">
+                        <span className="rounded-md bg-black/60 px-2 py-0.5 text-10 font-medium text-white backdrop-blur-xs">
+                          ⏱️ ~{p.leadTime}d lead time
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex h-32 w-full items-center justify-center bg-surface-muted text-text-muted">
+                    <Package className="h-8 w-8 opacity-40" />
+                  </div>
+                )}
+
+                {/* Product Info in Middle */}
+                <div className="p-3">
+                  <p className="text-14 font-bold text-text leading-tight">{p.name}</p>
+                  <div className="mt-1 flex items-baseline gap-2">
+                    <span className="text-13 font-bold text-primary">{p.price}</span>
+                  </div>
+                  {p.description && (
+                    <p className="mt-1 text-11 text-text-muted leading-relaxed line-clamp-2">
+                      {p.description}
+                    </p>
+                  )}
+
+                  {/* 3 Intent Action Buttons at BOTTOM of card */}
+                  <div className="mt-3 space-y-1.5 border-t border-border/60 pt-2.5">
+                    <div className="flex items-center justify-center gap-1.5 rounded-lg border border-primary/30 bg-primary/10 py-1.5 text-11 font-semibold text-primary">
+                      <Tag className="h-3.5 w-3.5" />
+                      <span>🏷️ Sizes & Price</span>
+                    </div>
+                    <div className="flex items-center justify-center gap-1.5 rounded-lg border border-primary/30 bg-primary/10 py-1.5 text-11 font-semibold text-primary">
+                      <Sparkles className="h-3.5 w-3.5" />
+                      <span>🎨 Customize</span>
+                    </div>
+                    <div className="flex items-center justify-center gap-1.5 rounded-lg border border-primary/30 bg-primary/10 py-1.5 text-11 font-semibold text-primary">
+                      <ShoppingBag className="h-3.5 w-3.5" />
+                      <span>🛍️ Book / Order</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {media.length > 0 && !isCatalogue && (
         <div className="mb-2 space-y-1.5">
           {media.map((url, i) => {
             const { category, ext, filename } = getFileCategory(url);
+            const downloadUrl = getDownloadUrl(url);
 
             if (category === "video") {
               return (
-                <div key={`${url}-${i}`} className="overflow-hidden rounded-xl bg-black/10 dark:bg-black/40">
+                <div key={`${url}-${i}`} className="group relative overflow-hidden rounded-xl bg-black/10 dark:bg-black/40">
                   <video
                     src={url}
                     controls
                     preload="metadata"
                     className="max-h-64 w-full rounded-xl bg-black"
                   />
+                  <div className="flex justify-end p-1">
+                    <a
+                      href={downloadUrl}
+                      download={filename}
+                      target="_blank"
+                      rel="noreferrer noopener"
+                      className="inline-flex items-center gap-1 rounded bg-black/60 px-2 py-0.5 text-10 font-medium text-white hover:bg-black cursor-pointer"
+                      title="Download video"
+                    >
+                      <Download className="h-3 w-3" />
+                      <span>Download</span>
+                    </a>
+                  </div>
                 </div>
               );
             }
@@ -193,18 +318,14 @@ export function MessageBubble({ message, senderLabel, pending = false }: Message
             if (category === "document") {
               const docBadge = getDocumentBadge(ext);
               return (
-                <a
+                <div
                   key={`${url}-${i}`}
-                  href={url}
-                  target="_blank"
-                  rel="noreferrer noopener"
                   className={cn(
-                    "flex items-center gap-2.5 rounded-xl border border-current/15 p-2.5 transition-colors cursor-pointer",
+                    "flex items-center gap-2.5 rounded-xl border border-current/15 p-2.5 transition-colors",
                     senderType === "customer"
-                      ? "bg-surface-muted/60 hover:bg-surface-muted text-text"
-                      : "bg-black/10 hover:bg-black/20 text-current",
+                      ? "bg-surface-muted/60 text-text"
+                      : "bg-black/10 text-current",
                   )}
-                  title={`Open ${filename}`}
                 >
                   <div
                     className={cn(
@@ -214,36 +335,67 @@ export function MessageBubble({ message, senderLabel, pending = false }: Message
                   >
                     {docBadge.label}
                   </div>
-                  <div className="min-w-0 flex-1">
+                  <a
+                    href={url}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className="min-w-0 flex-1 hover:underline cursor-pointer"
+                    title={`Open ${filename}`}
+                  >
                     <p className="truncate text-12 font-medium leading-snug">{filename}</p>
                     <span className="text-10 opacity-75">Click to view document</span>
-                  </div>
-                  <ExternalLink className="h-4 w-4 shrink-0 opacity-70" />
-                </a>
+                  </a>
+                  <a
+                    href={downloadUrl}
+                    download={filename}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className="inline-flex items-center gap-1 rounded-md p-1.5 opacity-80 hover:bg-black/10 hover:opacity-100 transition cursor-pointer"
+                    title="Download document"
+                  >
+                    <Download className="h-4 w-4" />
+                  </a>
+                </div>
               );
             }
 
             return (
-              <a
-                key={`${url}-${i}`}
-                href={url}
-                target="_blank"
-                rel="noreferrer noopener"
-                className="block overflow-hidden rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-              >
-                <img
-                  src={url}
-                  alt={`Attachment ${i + 1}`}
-                  loading="lazy"
-                  className="max-h-60 w-full max-w-[18rem] rounded-xl bg-black/5 object-cover"
-                />
-              </a>
+              <div key={`${url}-${i}`} className="group relative overflow-hidden rounded-xl">
+                <a
+                  href={url}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="block overflow-hidden rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  title="Click to view full image"
+                >
+                  <img
+                    src={url}
+                    alt={`Attachment ${i + 1}`}
+                    loading="lazy"
+                    className="max-h-60 w-full max-w-[18rem] rounded-xl bg-black/5 object-cover transition-transform group-hover:scale-[1.02]"
+                  />
+                </a>
+                <a
+                  href={downloadUrl}
+                  download={filename || `image-${i + 1}`}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded-md bg-black/70 px-2 py-1 text-10 font-medium text-white opacity-85 backdrop-blur-xs transition hover:bg-black hover:opacity-100 cursor-pointer shadow-sm"
+                  title="Download image"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <Download className="h-3 w-3" />
+                  <span>Download</span>
+                </a>
+              </div>
             );
           })}
         </div>
       )}
 
-      {message.content && <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{message.content}</p>}
+      {message.content && !isCatalogue && (
+        <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{message.content}</p>
+      )}
 
       <p className={cn("mt-1 flex items-center justify-end gap-1 text-11", metaTone[senderType])}>
         {failed && (

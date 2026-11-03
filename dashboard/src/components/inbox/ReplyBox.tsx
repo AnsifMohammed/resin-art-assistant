@@ -1,10 +1,11 @@
 import { useId, useRef, useState, type FormEvent, type KeyboardEvent, type ChangeEvent } from "react";
-import { AlertTriangle, FileText, Film, Loader2, Paperclip, Send, X } from "lucide-react";
+import { AlertTriangle, FileText, Film, Loader2, Package, Paperclip, Send, X } from "lucide-react";
 import { toast } from "sonner";
-import { uploadToCloudinary } from "../../api/products.ts";
+import { uploadMedia } from "../../api/media.ts";
 import { cn } from "../../lib/cn.ts";
 import type { ChannelType } from "../../types/index.ts";
 import { TemplatePicker } from "./TemplatePicker.tsx";
+import { CataloguePicker } from "./CataloguePicker.tsx";
 
 const MAX_LENGTH = 4096;
 
@@ -42,6 +43,8 @@ export interface ReplyBoxProps {
   onSend: (payload: { text?: string | undefined; mediaUrls?: string[] | undefined }) => Promise<unknown>;
   /** Send a template directly: { templateId, variables }. Reject with the ApiError on failure. */
   onSendTemplate: (templateId: string, variables: Record<string, string>) => Promise<unknown>;
+  /** Send a catalogue directly: { productIds, customNote }. */
+  onSendCatalogue?: ((productIds: string[], customNote?: string) => Promise<unknown>) | undefined;
   sending: boolean;
   /** Disables the composer (e.g. while resolving). */
   disabled?: boolean;
@@ -57,6 +60,7 @@ export interface ReplyBoxProps {
 export function ReplyBox({
   onSend,
   onSendTemplate,
+  onSendCatalogue,
   sending,
   disabled = false,
   windowClosed,
@@ -66,6 +70,7 @@ export function ReplyBox({
   const [text, setText] = useState("");
   const [attachments, setAttachments] = useState<DraftAttachment[]>([]);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [catalogueOpen, setCatalogueOpen] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const inputId = useId();
@@ -103,10 +108,11 @@ export function ReplyBox({
 
     setAttachments((prev) => [...prev, ...newAttachments]);
 
-    // Upload each file to Cloudinary (/auto/upload handles photos, videos, and documents)
+    // Upload each file to Cloudinary via backend /upload/media
     for (const item of newAttachments) {
       try {
-        const uploadedUrl = await uploadToCloudinary(item.file);
+        const res = await uploadMedia(item.file);
+        const uploadedUrl = res.secureUrl || res.url;
         setAttachments((prev) =>
           prev.map((att) => (att.id === item.id ? { ...att, uploadedUrl, isUploading: false } : att)),
         );
@@ -161,6 +167,35 @@ export function ReplyBox({
 
   const insert = (rendered: string) => {
     setText(rendered);
+    requestAnimationFrame(() => {
+      const el = textareaRef.current;
+      if (!el) return;
+      el.focus();
+      el.setSelectionRange(rendered.length, rendered.length);
+    });
+  };
+
+  const insertCatalogue = (rendered: string, imageUrls?: string[]) => {
+    setText(rendered);
+    if (imageUrls && imageUrls.length > 0) {
+      const mockAttachments: DraftAttachment[] = imageUrls.map((url) => {
+        const name = url.split("/").pop() || "product.jpg";
+        const ext = name.split(".").pop() || "jpg";
+        return {
+          id: `cat-${url}-${Math.random().toString(36).slice(2, 7)}`,
+          file: new File([], name),
+          name,
+          size: 1024,
+          ext,
+          isImage: true,
+          isVideo: false,
+          previewUrl: url,
+          uploadedUrl: url,
+          isUploading: false,
+        };
+      });
+      setAttachments((prev) => [...prev, ...mockAttachments]);
+    }
     requestAnimationFrame(() => {
       const el = textareaRef.current;
       if (!el) return;
@@ -285,6 +320,18 @@ export function ReplyBox({
               <span className="sm:hidden">Template</span>
             </button>
 
+            <button
+              type="button"
+              onClick={() => setCatalogueOpen(true)}
+              disabled={disabled}
+              className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-border/80 bg-surface px-2 py-1 text-11 font-medium text-text transition-colors hover:bg-surface-muted cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 sm:px-2.5 sm:text-12"
+              title="Share product catalogue"
+            >
+              <Package className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden />
+              <span className="hidden sm:inline">Catalogue</span>
+              <span className="sm:hidden">Products</span>
+            </button>
+
             {/* Hidden native device file input supporting photos, videos, PDFs, Word, PPT, Excel, TXT */}
             <input
               ref={fileInputRef}
@@ -331,6 +378,14 @@ export function ReplyBox({
         windowClosed={windowClosed}
         onInsert={insert}
         onSend={onSendTemplate}
+      />
+
+      <CataloguePicker
+        open={catalogueOpen}
+        onClose={() => setCatalogueOpen(false)}
+        windowClosed={windowClosed}
+        onInsert={insertCatalogue}
+        onSend={onSendCatalogue ?? (() => Promise.resolve())}
       />
     </form>
   );

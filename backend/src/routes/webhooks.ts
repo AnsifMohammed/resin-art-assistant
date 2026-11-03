@@ -94,6 +94,7 @@ interface InboundCustomerMessage {
   customerName: string;
   text: string;
   metaMessageId: string | undefined;
+  metadata?: Record<string, unknown> | undefined;
 }
 
 /** A normal customer message: store it, bump the 24h window and queue AI processing. */
@@ -178,6 +179,7 @@ async function handleCustomerMessage(m: InboundCustomerMessage): Promise<void> {
       content: m.text,
       metaMessageId: m.metaMessageId,
       deliveryStatus: "delivered",
+      metadata: m.metadata ?? {},
     })
     .onConflictDoNothing()
     .returning();
@@ -241,13 +243,14 @@ const isUniqueViolation = (err: unknown): boolean => {
  * (no owner message, no owner_handling).
  */
 async function claimOwnOutboundEcho(conversationId: string, text: string, metaMessageId: string | undefined): Promise<boolean> {
-  if (!text) return false;
   const since = new Date(Date.now() - OWN_ECHO_LOOKBACK_MS);
   const rows = await db
     .select({
       id: messages.id,
       direction: messages.direction,
       content: messages.content,
+      mediaUrls: messages.mediaUrls,
+      metadata: messages.metadata,
       metaMessageId: messages.metaMessageId,
       deliveryStatus: messages.deliveryStatus,
       createdAt: messages.createdAt,
@@ -260,34 +263,113 @@ async function claimOwnOutboundEcho(conversationId: string, text: string, metaMe
         gte(messages.createdAt, since),
       ),
     );
-  const isOwn = (r: (typeof rows)[number]): boolean => {
-    if (r.direction !== "outbound" || typeof r.content !== "string") return false;
-    if (!(r.createdAt instanceof Date) || r.createdAt < since) return false;
-    // Still in flight: the send has not returned (and stored its id) yet.
-    if (r.content === text && r.deliveryStatus === "queued" && !r.metaMessageId) return true;
-    // One part of a long reply that was split into several Instagram messages.
-    return (
-      Buffer.byteLength(r.content, "utf8") > INSTAGRAM_MAX_TEXT_BYTES &&
-      splitInstagramText(r.content).includes(text)
-    );
-  };
-  const own = rows
-    .filter(isOwn)
-    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];
-  if (!own) return false;
 
-  if (!own.metaMessageId && metaMessageId) {
-    try {
-      await db
-        .update(messages)
-        .set({ metaMessageId })
-        .where(and(eq(messages.id, own.id), isNull(messages.metaMessageId)));
-    } catch (err) {
-      if (!isUniqueViolation(err)) throw err;
+  // 1. If this exact metaMessageId was already recorded on an outbound message,
+  // it is unequivocally our own send. Ignore the echo.
+  if (metaMessageId && rows.some((r) => r.metaMessageId === metaMessageId)) {
+    logger.info({ metaMessageId, conversationId }, "Echo of our own outbound message already recorded; ignored");
+    return true;
+  }
+
+  const cleanText = text.trim();
+
+  // 2. Text-based match for an in-flight send that hasn't saved metaMessageId yet
+  if (cleanText) {
+    const isOwnText = (r: (typeof rows)[number]): boolean => {
+      if (r.direction !== "outbound") return false;
+      if (!(r.createdAt instanceof Date) || r.createdAt < since) return false;
+      // Still in flight: the send has not returned (and stored its id) yet.
+      if (typeof r.content === "string" && r.content === text && r.deliveryStatus === "queued" && !r.metaMessageId) {
+        return true;
+      }
+      // One part of a long reply that was split into several Instagram messages.
+      return (
+        typeof r.content === "string" &&
+        Buffer.byteLength(r.content, "utf8") > INSTAGRAM_MAX_TEXT_BYTES &&
+        splitInstagramText(r.content).includes(text)
+      );
+    };
+
+    const own = rows
+      .filter(isOwnText)
+      .sort((a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0))[0];
+
+    if (own) {
+      if (!own.metaMessageId && metaMessageId) {
+        try {
+          await db
+            .update(messages)
+            .set({ metaMessageId, deliveryStatus: "sent" })
+            .where(and(eq(messages.id, own.id), isNull(messages.metaMessageId)));
+        } catch (err) {
+          if (!isUniqueViolation(err)) throw err;
+        }
+      }
+      logger.info({ metaMessageId, messageId: own.id, conversationId }, "Echo of our own outbound text message claimed");
+      return true;
     }
   }
-  logger.info({ metaMessageId, messageId: own.id, conversationId }, "Echo of our own outbound message ignored");
-  return true;
+
+  // 3. Media / Catalogue echo: echo has no text, or text is empty
+  if (!cleanText) {
+    // 3a. Check if there is an in-flight queued outbound message with media or catalogue share
+    const isOwnMediaQueued = (r: (typeof rows)[number]): boolean => {
+      if (r.direction !== "outbound") return false;
+      if (!(r.createdAt instanceof Date) || r.createdAt < since) return false;
+      if (r.deliveryStatus !== "queued" || r.metaMessageId) return false;
+      const hasMedia = Array.isArray(r.mediaUrls) && r.mediaUrls.length > 0;
+      const isCatalogue = Boolean(
+        r.metadata && typeof r.metadata === "object" && (r.metadata as Record<string, unknown>).kind === "catalogue_share",
+      );
+      return hasMedia || isCatalogue;
+    };
+
+    const queuedMediaMsg = rows
+      .filter(isOwnMediaQueued)
+      .sort((a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0))[0];
+
+    if (queuedMediaMsg) {
+      if (!queuedMediaMsg.metaMessageId && metaMessageId) {
+        try {
+          await db
+            .update(messages)
+            .set({ metaMessageId, deliveryStatus: "sent" })
+            .where(and(eq(messages.id, queuedMediaMsg.id), isNull(messages.metaMessageId)));
+        } catch (err) {
+          if (!isUniqueViolation(err)) throw err;
+        }
+      }
+      logger.info(
+        { metaMessageId, messageId: queuedMediaMsg.id, conversationId },
+        "Echo of our own outbound media message claimed",
+      );
+      return true;
+    }
+
+    // 3b. Secondary media echo check:
+    // If our system sent an outbound media message or catalogue card in the last 60 seconds,
+    // any text-less echo arriving in this window is Meta's secondary attachment echo.
+    const recentMediaOutbound = rows.find((r) => {
+      if (!(r.createdAt instanceof Date)) return false;
+      const ageMs = Date.now() - r.createdAt.getTime();
+      if (ageMs > 60_000) return false;
+      const hasMedia = Array.isArray(r.mediaUrls) && r.mediaUrls.length > 0;
+      const isCatalogue = Boolean(
+        r.metadata && typeof r.metadata === "object" && (r.metadata as Record<string, unknown>).kind === "catalogue_share",
+      );
+      return hasMedia || isCatalogue;
+    });
+
+    if (recentMediaOutbound) {
+      logger.info(
+        { metaMessageId, recentMessageId: recentMediaOutbound.id, conversationId },
+        "Secondary media echo of our own recent outbound send ignored",
+      );
+      return true;
+    }
+  }
+
+  return false;
 }
 
 interface EchoMessage {
@@ -295,6 +377,7 @@ interface EchoMessage {
   recipientHandle: string | undefined;
   text: string;
   metaMessageId: string | undefined;
+  metadata?: Record<string, unknown> | undefined;
 }
 
 /**
@@ -319,6 +402,12 @@ async function handleEcho(m: EchoMessage): Promise<void> {
 
   // Our own API send coming back: never an owner takeover.
   if (await claimOwnOutboundEcho(conv.id, m.text, m.metaMessageId)) return;
+
+  // Never insert an empty text echo as an owner message
+  if (!m.text || !m.text.trim()) {
+    logger.info(logCtx, "Echo with empty text ignored (not an owner reply)");
+    return;
+  }
 
   const [inserted] = await db
     .insert(messages)
@@ -367,6 +456,64 @@ async function handleEcho(m: EchoMessage): Promise<void> {
   );
 }
 
+function resolveProductName(slug: string, rawTitle?: string): string {
+  // If rawTitle is present and does not match standard action button titles, use it.
+  const isButtonTitle =
+    Boolean(rawTitle) &&
+    (/sizes?\s*&?\s*price/i.test(rawTitle!) ||
+      /customiz/i.test(rawTitle!) ||
+      /book\s*\/?\s*order/i.test(rawTitle!));
+
+  if (rawTitle && !isButtonTitle && rawTitle.trim().length > 0) {
+    return rawTitle.trim();
+  }
+
+  // Convert slug (e.g. "ocean-resin-wall-clock" or "resin-clock-12in") to clean Title Case
+  return slug
+    .split(/[-_]+/)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ");
+}
+
+function parseProductAction(
+  actionId: string,
+  rawTitle?: string,
+): { text: string; metadata: Record<string, unknown> } | null {
+  if (actionId.startsWith("action:sizes:")) {
+    const slug = actionId.slice("action:sizes:".length);
+    const prodName = resolveProductName(slug, rawTitle);
+    return {
+      text: `What are the sizes and prices available for the ${prodName}?`,
+      metadata: { kind: "product_enquiry", intent: "price", slug, productName: prodName },
+    };
+  }
+  if (actionId.startsWith("action:custom:")) {
+    const slug = actionId.slice("action:custom:".length);
+    const prodName = resolveProductName(slug, rawTitle);
+    return {
+      text: `What are the customization options available for the ${prodName}?`,
+      metadata: { kind: "product_enquiry", intent: "custom_order", slug, productName: prodName },
+    };
+  }
+  if (actionId.startsWith("action:order:")) {
+    const slug = actionId.slice("action:order:".length);
+    const prodName = resolveProductName(slug, rawTitle);
+    return {
+      text: `I'd like to book/place an order for the ${prodName}. How do I proceed?`,
+      metadata: { kind: "product_enquiry", intent: "order", slug, productName: prodName },
+    };
+  }
+  if (actionId.startsWith("enquire:")) {
+    const slug = actionId.slice("enquire:".length);
+    const prodName = resolveProductName(slug, rawTitle);
+    return {
+      text: `Hi! Could you share more details about the ${prodName}?`,
+      metadata: { kind: "product_enquiry", slug, productName: prodName },
+    };
+  }
+  return null;
+}
+
 async function processWhatsApp(body: any): Promise<void> {
   for (const entry of body.entry ?? []) {
     for (const change of entry?.changes ?? []) {
@@ -399,7 +546,30 @@ async function processWhatsApp(body: any): Promise<void> {
         const metaMessageId: string | undefined = msg?.id;
         try {
           const from: string = typeof msg?.from === "string" ? msg.from : "";
-          const text: string = msg?.text?.body || msg?.caption || msg?.image?.caption || "";
+          let text: string = msg?.text?.body || msg?.caption || msg?.image?.caption || "";
+          let metadata: Record<string, unknown> | undefined = undefined;
+
+          // Interactive WhatsApp reply (buttons, lists, etc.)
+          if (msg?.type === "interactive" && msg?.interactive) {
+            const interactive = msg.interactive;
+            let replyId = "";
+            let replyTitle = "";
+            if (interactive.type === "button_reply" && interactive.button_reply) {
+              replyId = String(interactive.button_reply.id || "");
+              replyTitle = String(interactive.button_reply.title || "");
+            } else if (interactive.type === "list_reply" && interactive.list_reply) {
+              replyId = String(interactive.list_reply.id || "");
+              replyTitle = String(interactive.list_reply.title || "");
+            }
+
+            const parsedAction = parseProductAction(replyId, replyTitle);
+            if (parsedAction) {
+              text = parsedAction.text;
+              metadata = parsedAction.metadata;
+            } else if (replyTitle) {
+              text = replyTitle;
+            }
+          }
 
           const isEcho =
             forcedEcho ||
@@ -426,6 +596,7 @@ async function processWhatsApp(body: any): Promise<void> {
             customerName: contact?.profile?.name || from,
             text,
             metaMessageId,
+            metadata,
           });
         } catch (err) {
           logger.error({ err, metaMessageId }, "Failed to process WhatsApp message");
@@ -440,14 +611,35 @@ async function processInstagram(body: any): Promise<void> {
     const accountId: string | undefined = config.INSTAGRAM_ACCOUNT_ID || entry?.id;
     for (const event of entry?.messaging ?? []) {
       const message = event?.message;
-      if (!message) continue; // reads, deliveries, reactions etc.
-      const metaMessageId: string | undefined = message.mid;
+      const postback = event?.postback;
+      if (!message && !postback) continue; // reads, deliveries, reactions etc.
+      const metaMessageId: string | undefined = message?.mid || postback?.mid;
       try {
         const senderId: string | undefined = event?.sender?.id;
         const recipientId: string | undefined = event?.recipient?.id;
-        const text: string = typeof message.text === "string" ? message.text : "";
+        let text: string = typeof message?.text === "string" ? message.text : "";
+        let metadata: Record<string, unknown> | undefined = undefined;
 
-        const isEcho = message.is_echo === true || (!!accountId && senderId === accountId);
+        if (postback) {
+          const payload = typeof postback.payload === "string" ? postback.payload : "";
+          const title = typeof postback.title === "string" ? postback.title : "";
+          const parsedAction = parseProductAction(payload, title);
+          if (parsedAction) {
+            text = parsedAction.text;
+            metadata = parsedAction.metadata;
+          } else {
+            text = title || payload || "Enquiry";
+          }
+        } else if (message?.quick_reply) {
+          const payload = typeof message.quick_reply.payload === "string" ? message.quick_reply.payload : "";
+          const parsedAction = parseProductAction(payload, text);
+          if (parsedAction) {
+            text = parsedAction.text;
+            metadata = parsedAction.metadata;
+          }
+        }
+
+        const isEcho = message?.is_echo === true || (!!accountId && senderId === accountId);
 
         if (isEcho) {
           await handleEcho({ channelType: "instagram", recipientHandle: recipientId, text, metaMessageId });
@@ -466,6 +658,7 @@ async function processInstagram(body: any): Promise<void> {
           customerName: senderId,
           text,
           metaMessageId,
+          metadata,
         });
       } catch (err) {
         logger.error({ err, metaMessageId }, "Failed to process Instagram message");

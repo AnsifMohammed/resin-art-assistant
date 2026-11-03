@@ -14,6 +14,7 @@ import { startWorkers, stopWorkers } from "./queue/worker.ts";
 import { startRealtimeBus, stopRealtimeBus } from "./realtime/bus.ts";
 
 import fws from "@fastify/websocket";
+import multipart from "@fastify/multipart";
 
 export async function buildServer() {
   // loggerOptions carries serializers that redact tokens from logged URLs.
@@ -31,6 +32,11 @@ export async function buildServer() {
   });
 
   await app.register(fws);
+  await app.register(multipart, {
+    limits: {
+      fileSize: 30 * 1024 * 1024, // 30 MB max
+    },
+  });
 
   await app.register(fjwt, {
     secret: config.JWT_SECRET,

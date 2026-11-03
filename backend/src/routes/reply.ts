@@ -1,5 +1,5 @@
 import type { FastifyInstance, FastifyPluginAsync } from "fastify";
-import { and, eq, isNull, or } from "drizzle-orm";
+import { and, eq, inArray, isNull, or } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../db/index.ts";
 import {
@@ -10,6 +10,7 @@ import {
   escalations,
   messages,
   messageTemplates,
+  products,
 } from "../db/schema.ts";
 import { markMessageSent } from "../lib/conversation.ts";
 import { AppError } from "../lib/errors.ts";
@@ -39,6 +40,14 @@ const replySchema = z.union([
     variables: z.record(z.string(), z.string().max(1000)).optional(),
   }),
 ]);
+
+const catalogueSchema = z.strictObject({
+  productIds: z
+    .array(z.string().min(1))
+    .min(1, "Select at least 1 product")
+    .max(10, "Maximum 10 products can be shared at once"),
+  customNote: z.string().max(1000).optional(),
+});
 
 /**
  * Render a template for a conversation. customerName is pre-filled by the
@@ -276,6 +285,249 @@ export const replyRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
       });
 
       // 8. Emit real-time WebSocket events
+      emitMessageNew(newMsg);
+      emitConversationUpdated(businessId, {
+        conversationId: id,
+        state: "owner_handling",
+        tag: conv.tag,
+      });
+
+      return reply.status(201).send({
+        message: newMsg,
+        conversation: {
+          id: conv.id,
+          state: "owner_handling",
+        },
+      });
+    },
+  );
+
+  // POST /conversations/:id/catalogue - share interactive product catalogue
+  app.post<{ Params: { id: string } }>(
+    "/conversations/:id/catalogue",
+    { preHandler: [authenticate, requireStaffOrAdmin] },
+    async (request, reply) => {
+      const { id } = request.params;
+      const businessId = request.user.businessId;
+
+      const parsed = catalogueSchema.safeParse(request.body);
+      if (!parsed.success) {
+        throw new AppError(400, "Invalid catalogue payload", "VALIDATION_ERROR");
+      }
+
+      const body = parsed.data;
+
+      // 1. Fetch conversation with its customer and channel
+      const [row] = await db
+        .select({
+          conversation: conversations,
+          customer: customers,
+          channel: channels,
+        })
+        .from(conversations)
+        .leftJoin(customers, eq(conversations.customerId, customers.id))
+        .leftJoin(channels, eq(conversations.channelId, channels.id))
+        .where(
+          and(
+            eq(conversations.id, id),
+            eq(conversations.businessId, businessId),
+          ),
+        );
+
+      const conv = row?.conversation;
+      if (!conv) {
+        throw new AppError(404, "Conversation not found", "NOT_FOUND");
+      }
+
+      // 2. Staff authorization check
+      if (request.user.role === "staff") {
+        const [openEscalation] = await db
+          .select()
+          .from(escalations)
+          .where(
+            and(
+              eq(escalations.conversationId, id),
+              eq(escalations.businessId, businessId),
+              isNull(escalations.resolvedAt),
+              or(
+                eq(escalations.assignedToUserId, request.user.sub),
+                isNull(escalations.assignedToUserId),
+              ),
+            ),
+          );
+
+        if (!openEscalation) {
+          throw new AppError(403, "Not assigned to you", "FORBIDDEN");
+        }
+      }
+
+      const channel = row.channel;
+      const customer = row.customer;
+
+      if (!channel || !customer?.handleOrPhone) {
+        throw new AppError(409, "Conversation channel or customer not found", "CHANNEL_NOT_FOUND");
+      }
+
+      // 3. Check 24-hour messaging window
+      if (conv.windowClosesAt && new Date(conv.windowClosesAt) < new Date()) {
+        throw new AppError(409, "Customer 24h messaging window is closed", "WINDOW_CLOSED");
+      }
+
+      // 4. Fetch selected active products
+      const selectedProducts = await db
+        .select()
+        .from(products)
+        .where(
+          and(
+            inArray(products.id, body.productIds),
+            eq(products.businessId, businessId),
+            eq(products.isActive, true),
+          ),
+        );
+
+      if (selectedProducts.length === 0) {
+        throw new AppError(404, "None of the selected products were found or active", "PRODUCTS_NOT_FOUND");
+      }
+
+      // Preserve selection order
+      const orderedProducts = body.productIds
+        .map((pid) => selectedProducts.find((p) => p.id === pid))
+        .filter((p): p is typeof selectedProducts[number] => Boolean(p));
+
+      // Build interactive product items
+      const interactiveProducts = orderedProducts.map((p) => {
+        const sizes = Array.isArray(p.sizes) ? p.sizes : [];
+        const prices = sizes
+          .map((s: any) => (typeof s?.price === "number" ? s.price : null))
+          .filter((price): price is number => price !== null);
+        const minPrice = prices.length > 0 ? Math.min(...prices) : 0;
+        const maxPrice = prices.length > 0 ? Math.max(...prices) : 0;
+        const priceStr =
+          prices.length > 1 && minPrice !== maxPrice
+            ? `₹${minPrice.toLocaleString("en-IN")} – ₹${maxPrice.toLocaleString("en-IN")}`
+            : `₹${minPrice.toLocaleString("en-IN")}`;
+
+        const images = Array.isArray(p.images) ? p.images : [];
+        const firstImg = typeof images[0] === "string" ? images[0] : undefined;
+
+        return {
+          id: p.id,
+          slug: p.slug,
+          name: p.name,
+          price: priceStr,
+          imageUrl: firstImg,
+          leadTime: p.leadTimeDays,
+          description: p.description ?? undefined,
+        };
+      });
+
+      // Format caption text
+      const notePrefix = body.customNote?.trim() ? `${body.customNote.trim()}\n\n` : "";
+      let text = "";
+      if (orderedProducts.length === 1) {
+        const p = interactiveProducts[0]!;
+        text = `${notePrefix}✨ *${p.name}*\n💰 Price: ${p.price}\n⏱️ Lead time: ~${p.leadTime} days${p.description ? `\n\n${p.description}` : ""}`.trim();
+      } else {
+        const lines = interactiveProducts
+          .map((p, idx) => `${idx + 1}. *${p.name}* (${p.price})`)
+          .join("\n");
+        text = `${notePrefix}✨ *Our Handcrafted Resin Collection*\n\n${lines}`.trim();
+      }
+
+      // 5. Update conversation state to owner_handling
+      await db
+        .update(conversations)
+        .set({ state: "owner_handling", lastMessageAt: new Date() })
+        .where(eq(conversations.id, id));
+
+      // 6. Insert message as queued (mediaUrls is empty because product images are within metadata.products)
+      const [queuedMsg] = await db
+        .insert(messages)
+        .values({
+          conversationId: id,
+          businessId,
+          direction: "outbound",
+          senderType: request.user.role === "admin" ? "owner" : "staff",
+          senderId: request.user.sub,
+          content: text,
+          mediaUrls: [],
+          deliveryStatus: "queued",
+          metadata: {
+            kind: "catalogue_share",
+            productIds: body.productIds,
+            products: interactiveProducts,
+            ...(body.customNote ? { customNote: body.customNote } : {}),
+          },
+        })
+        .returning();
+
+      // 7. Dispatch via sendMessage (interactive message carries its own product images)
+      let metaMessageId: string | null = null;
+      try {
+        const result = await sendMessage({
+          channelType: channel.type,
+          recipient: customer.handleOrPhone,
+          text,
+          mediaUrls: undefined,
+          interactive: {
+            type: orderedProducts.length === 1 ? "catalogue_card" : "catalogue_list",
+            products: interactiveProducts,
+          },
+          businessId,
+          conversationId: id,
+        });
+        metaMessageId = result?.metaMessageId ?? null;
+      } catch (err) {
+        if (queuedMsg) {
+          await db.update(messages).set({ deliveryStatus: "failed" }).where(eq(messages.id, queuedMsg.id));
+        }
+
+        await db.insert(auditLog).values({
+          businessId,
+          actorId: request.user.sub,
+          actorType: request.user.role,
+          action: "catalogue_share_failed",
+          conversationId: id,
+          details: {
+            messageId: queuedMsg?.id,
+            error: err instanceof Error ? err.message : String(err),
+          },
+        });
+
+        if (queuedMsg) emitMessageNew({ ...queuedMsg, deliveryStatus: "failed" });
+        emitConversationUpdated(businessId, {
+          conversationId: id,
+          state: "owner_handling",
+          tag: conv.tag,
+        });
+
+        if (err instanceof AppError) throw err;
+        request.log.error({ err, conversationId: id }, "Failed to deliver catalogue");
+        throw new AppError(502, "Failed to deliver catalogue", "SEND_FAILED");
+      }
+
+      if (queuedMsg) {
+        await markMessageSent(db, queuedMsg.id, metaMessageId);
+      }
+      const newMsg = queuedMsg
+        ? { ...queuedMsg, deliveryStatus: "sent" as const, ...(metaMessageId ? { metaMessageId } : {}) }
+        : queuedMsg;
+
+      // 8. Record in audit trail
+      await db.insert(auditLog).values({
+        businessId,
+        actorId: request.user.sub,
+        actorType: request.user.role,
+        action: "catalogue_shared",
+        conversationId: id,
+        details: {
+          messageId: newMsg?.id,
+          productCount: orderedProducts.length,
+          productIds: body.productIds,
+        },
+      });
+
+      // 9. Real-time emit
       emitMessageNew(newMsg);
       emitConversationUpdated(businessId, {
         conversationId: id,
