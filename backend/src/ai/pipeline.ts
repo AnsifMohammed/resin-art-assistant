@@ -237,6 +237,7 @@ export async function processAiDecision(params: {
       config: {
         systemInstruction: buildSystemPrompt(kb, {
           customerFirstName: customerFirstName(params.customerName, params.customerHandle),
+          customerText: params.incomingText,
         }),
         responseMimeType: "application/json",
         responseJsonSchema: aiDecisionJsonSchema,
@@ -276,7 +277,11 @@ export async function processAiDecision(params: {
       );
       return parseErrorDecision();
     }
-    rawDecision = validated.data;
+    rawDecision = {
+      ...validated.data,
+      // Collapse tabs and excessive whitespace from AI reply (can appear when AI mirrors KB JSON indentation)
+      reply: validated.data.reply.replace(/[ \t]+/g, " ").replace(/\n{3,}/g, "\n\n").trim(),
+    };
   } catch (err) {
     logger.error({ err }, "Gemini API call or JSON parse failed, escalating (parse_error)");
     return parseErrorDecision();
