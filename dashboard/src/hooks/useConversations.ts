@@ -13,6 +13,7 @@ import {
   markConversationRead,
   pauseConversation,
   replyToConversation,
+  sendCatalogue,
   resolveConversation,
   resumeConversation,
 } from "../api/conversations.ts";
@@ -26,6 +27,7 @@ import type {
   ConversationListResponse,
   Message,
   ReplyRequest,
+  SendCatalogueRequest,
 } from "../types/index.ts";
 
 /** Admin only: GET /conversations. Keeps the previous page visible while paging/filtering. */
@@ -116,6 +118,33 @@ export function useReply(conversationId: string) {
     },
     onSettled: () => {
       // Human reply moves the conversation to owner_handling: lists and the queue change too.
+      void qc.invalidateQueries({ queryKey: queryKeys.conversations.all });
+      void qc.invalidateQueries({ queryKey: queryKeys.escalations.all });
+    },
+  });
+}
+
+/** POST /conversations/:id/catalogue ({ productIds, customNote? }). Appends the sent message, then refetches. */
+export function useSendCatalogue(conversationId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: SendCatalogueRequest) => sendCatalogue(conversationId, body),
+    onSuccess: (res) => {
+      qc.setQueryData<ConversationDetailResponse>(queryKeys.conversations.detail(conversationId), (prev) =>
+        prev
+          ? {
+              conversation: {
+                ...prev.conversation,
+                state: res.conversation.state,
+                messages: prev.conversation.messages.some((m) => m.id === res.message.id)
+                  ? prev.conversation.messages
+                  : [...prev.conversation.messages, res.message],
+              },
+            }
+          : prev,
+      );
+    },
+    onSettled: () => {
       void qc.invalidateQueries({ queryKey: queryKeys.conversations.all });
       void qc.invalidateQueries({ queryKey: queryKeys.escalations.all });
     },

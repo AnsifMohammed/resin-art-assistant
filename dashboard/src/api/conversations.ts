@@ -5,6 +5,7 @@ import type {
   ConversationListResponse,
   ReplyRequest,
   ReplyResponse,
+  SendCatalogueRequest,
   ResolveResponse,
   ConversationOrdersResponse,
 } from "../types/index.ts";
@@ -27,6 +28,10 @@ export const getConversationOrders = (id: string, signal?: AbortSignal) =>
 /** POST /conversations/:id/reply — body is { text } or { templateId, variables? } */
 export const replyToConversation = (id: string, body: ReplyRequest) =>
   api.post<ReplyResponse>(`/conversations/${enc(id)}/reply`, body);
+
+/** POST /conversations/:id/catalogue - share interactive product catalogue */
+export const sendCatalogue = (id: string, body: SendCatalogueRequest) =>
+  api.post<ReplyResponse>(`/conversations/${enc(id)}/catalogue`, body);
 
 /** POST /conversations/:id/read (admin only) → 204 */
 export const markConversationRead = (id: string) => api.post<void>(`/conversations/${enc(id)}/read`);

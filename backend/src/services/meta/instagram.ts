@@ -319,6 +319,106 @@ export async function sendInstagramMedia(opts: SendInstagramMediaOptions): Promi
   return { metaMessageId: mid };
 }
 
+export interface InstagramProductCardItem {
+  id: string;
+  slug: string;
+  name: string;
+  price: string;
+  imageUrl?: string | undefined;
+  leadTime: number;
+  description?: string | undefined;
+}
+
+export interface SendInstagramProductCardsOptions {
+  recipientId: string;
+  products: InstagramProductCardItem[];
+  businessId?: string | undefined;
+  accessToken?: string | undefined;
+}
+
+const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Send interactive Generic Template product cards to an Instagram user.
+ * Dispatches each product as an individual Generic Template card sequentially,
+ * stacking them vertically in the customer's DM feed rather than forcing
+ * Meta's horizontal swipe carousel.
+ * POST https://graph.instagram.com/{version}/me/messages
+ */
+export async function sendInstagramProductCards(
+  opts: SendInstagramProductCardsOptions,
+): Promise<{ metaMessageId: string }> {
+  if (!opts.recipientId) throw new AppError(400, "Instagram recipient id is required", "VALIDATION_ERROR");
+  if (!opts.products || opts.products.length === 0) {
+    throw new AppError(400, "At least one product is required", "VALIDATION_ERROR");
+  }
+
+  const token = opts.accessToken ?? (await resolveInstagramToken(opts.businessId));
+  const url = `${INSTAGRAM_GRAPH_HOST}/${INSTAGRAM_GRAPH_VERSION}/me/messages`;
+
+  const productsToSend = opts.products.slice(0, 10);
+  let firstMetaMessageId: string | null = null;
+
+  for (let i = 0; i < productsToSend.length; i++) {
+    const p = productsToSend[i]!;
+    const element = {
+      title: p.name.slice(0, 80),
+      ...(p.imageUrl ? { image_url: p.imageUrl } : {}),
+      subtitle: `${p.price} • ${p.leadTime}d lead time`.slice(0, 80),
+      buttons: [
+        {
+          type: "postback",
+          title: "🏷️ Sizes & Price",
+          payload: `action:sizes:${p.slug}`,
+        },
+        {
+          type: "postback",
+          title: "🎨 Customize",
+          payload: `action:custom:${p.slug}`,
+        },
+        {
+          type: "postback",
+          title: "🛍️ Book / Order",
+          payload: `action:order:${p.slug}`,
+        },
+      ],
+    };
+
+    const body = await graphRequest(url, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        recipient: { id: opts.recipientId },
+        message: {
+          attachment: {
+            type: "template",
+            payload: {
+              template_type: "generic",
+              elements: [element],
+            },
+          },
+        },
+      }),
+    });
+
+    const mid = str(body.message_id);
+    if (!mid) {
+      throw new AppError(502, "Instagram API response had no message_id", "META_ERROR");
+    }
+
+    if (!firstMetaMessageId) {
+      firstMetaMessageId = mid;
+    }
+
+    // Small delay between cards to ensure sequential delivery ordering in Instagram thread
+    if (i < productsToSend.length - 1) {
+      await delay(100);
+    }
+  }
+
+  return { metaMessageId: firstMetaMessageId || "" };
+}
+
 export interface RefreshedInstagramToken {
   accessToken: string;
   expiresIn: number;

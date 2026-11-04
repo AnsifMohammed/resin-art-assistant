@@ -36,7 +36,7 @@ import { AnalyticsSkeleton } from "../components/analytics/AnalyticsSkeleton.tsx
 
 // ─── Date Ranges ─────────────────────────────────────────────────────────────
 
-type RangePreset = "7d" | "30d" | "custom";
+type RangePreset = "1d" | "7d" | "30d" | "custom";
 
 interface DateRange {
   preset: RangePreset;
@@ -44,9 +44,9 @@ interface DateRange {
   to: string;
 }
 
-function presetRange(preset: "7d" | "30d"): DateRange {
+function presetRange(preset: "1d" | "7d" | "30d"): DateRange {
   const now = dayjs();
-  const days = preset === "7d" ? 7 : 30;
+  const days = preset === "1d" ? 1 : preset === "7d" ? 7 : 30;
   return {
     preset,
     from: now.subtract(days - 1, "day").startOf("day").toISOString(),
@@ -145,8 +145,21 @@ export default function Analytics() {
 
   // Trends compare against the previous period of the same length.
   const trendLabel =
-    range.preset === "30d" ? "previous 30 days" : range.preset === "7d" ? "previous 7 days" : "previous period";
-  const trendShort = range.preset === "30d" ? "prev 30d" : range.preset === "7d" ? "prev 7d" : "prev period";
+    range.preset === "30d"
+      ? "previous 30 days"
+      : range.preset === "7d"
+        ? "previous 7 days"
+        : range.preset === "1d"
+          ? "previous day"
+          : "previous period";
+  const trendShort =
+    range.preset === "30d"
+      ? "prev 30d"
+      : range.preset === "7d"
+        ? "prev 7d"
+        : range.preset === "1d"
+          ? "prev 1d"
+          : "prev period";
 
   const formattedDate = new Intl.DateTimeFormat("en-IN", {
     weekday: "long",
@@ -357,6 +370,7 @@ export default function Analytics() {
             <SegmentedControl<RangePreset>
               size="sm"
               options={[
+                { value: "1d", label: "1d" },
                 { value: "7d", label: "7d" },
                 { value: "30d", label: "30d" },
                 { value: "custom", label: "Custom" },

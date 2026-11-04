@@ -1,5 +1,5 @@
 import type { FastifyInstance, FastifyPluginAsync } from "fastify";
-import { and, asc, desc, eq, isNotNull, isNull, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, isNotNull, isNull, lte, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../db/index.ts";
 import {
@@ -22,6 +22,8 @@ const escalationsQuerySchema = z.object({
     .enum(["true", "false"])
     .optional()
     .transform((v) => v === "true"),
+  from: z.string().optional(),
+  to: z.string().optional(),
 });
 
 const assignSchema = z.object({
@@ -35,27 +37,50 @@ export const escalationRoutes: FastifyPluginAsync = async (app: FastifyInstance)
     { preHandler: [authenticate, requireStaffOrAdmin] },
     async (request) => {
       const parsed = escalationsQuerySchema.safeParse(request.query);
-      const isResolved = parsed.success && parsed.data.resolved ? true : false;
+      if (!parsed.success) {
+        throw new AppError(400, "Invalid query parameters", "VALIDATION_ERROR");
+      }
+
+      const isResolved = parsed.data.resolved ? true : false;
+      const { from, to } = parsed.data;
       const businessId = request.user.businessId;
 
-      let whereClause;
+      const conditions = [eq(escalations.businessId, businessId)];
 
       if (request.user.role === "admin") {
-        whereClause = and(
-          eq(escalations.businessId, businessId),
-          isResolved ? isNotNull(escalations.resolvedAt) : isNull(escalations.resolvedAt),
-        );
+        conditions.push(isResolved ? isNotNull(escalations.resolvedAt) : isNull(escalations.resolvedAt));
       } else {
         // Staff can only see unresolved escalations (assigned to them or unassigned)
-        whereClause = and(
-          eq(escalations.businessId, businessId),
+        conditions.push(
           isNull(escalations.resolvedAt),
           or(
             eq(escalations.assignedToUserId, request.user.sub),
             isNull(escalations.assignedToUserId),
-          ),
+          )!,
         );
       }
+
+      if (from) {
+        const fromDate = new Date(from);
+        if (!isNaN(fromDate.getTime())) {
+          if (from.length === 10) {
+            fromDate.setHours(0, 0, 0, 0);
+          }
+          conditions.push(gte(escalations.createdAt, fromDate));
+        }
+      }
+
+      if (to) {
+        const toDate = new Date(to);
+        if (!isNaN(toDate.getTime())) {
+          if (to.length === 10) {
+            toDate.setHours(23, 59, 59, 999);
+          }
+          conditions.push(lte(escalations.createdAt, toDate));
+        }
+      }
+
+      const whereClause = and(...conditions);
 
       // Latest message per conversation, fetched in the same query (no per-row queries).
       const lastMessage = db

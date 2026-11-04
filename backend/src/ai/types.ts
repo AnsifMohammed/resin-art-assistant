@@ -28,6 +28,8 @@ export const languageEnum = z.enum(["english", "malayalam", "manglish"]);
 export const aiDecisionSchema = z.object({
   intent: intentEnum,
   reply: z.string().min(1).max(2000),
+  send_catalogue: z.boolean().optional(),
+  catalogue_product_slugs: z.array(z.string()).optional(),
   facts_used: z.array(z.string()),
   missing_facts: z.array(z.string()),
   escalate: z.boolean(),
