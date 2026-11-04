@@ -165,8 +165,8 @@ export function MessageBubble({ message, senderLabel, pending = false }: Message
       }>)
     : [];
 
-  // Suppress phantom empty messages (e.g. blank echoes from media dispatches)
-  if (!message.content?.trim() && media.length === 0 && !isCatalogue && !isEnquiry) {
+  // Suppress phantom empty messages (e.g. blank echoes from media dispatches, or corrupted catalogue metadata)
+  if (!message.content?.trim() && media.length === 0 && (!isCatalogue || sharedProducts.length === 0) && !isEnquiry) {
     return null;
   }
 

@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect } from "react";
+import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import {
   Plus,
   Search,
@@ -191,7 +191,29 @@ export default function Catalogue() {
 
   const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
   const [page, setPage] = useState(1);
-  const ITEMS_PER_PAGE = 12;
+  const ITEMS_PER_PAGE = 24;
+
+  // Virtual scroll for table view
+  const tableScrollRef = useRef<HTMLDivElement>(null);
+  const ROW_HEIGHT = 64;
+  const [tableScrollTop, setTableScrollTop] = useState(0);
+  const [tableContainerHeight, setTableContainerHeight] = useState(500);
+
+  const handleTableScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    setTableScrollTop((e.currentTarget).scrollTop);
+  }, []);
+
+  useEffect(() => {
+    if (viewMode !== "table") return;
+    const el = tableScrollRef.current;
+    if (!el) return;
+    const obs = new ResizeObserver(([entry]) => {
+      if (entry) setTableContainerHeight(entry.contentRect.height);
+    });
+    obs.observe(el);
+    setTableContainerHeight(el.clientHeight);
+    return () => obs.disconnect();
+  }, [viewMode]);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [customizableOnly, setCustomizableOnly] = useState(false);
@@ -482,154 +504,158 @@ export default function Catalogue() {
     }
   };
 
+  // Virtual scroll derived values for table view
+  const vsOverscan = 2;
+  const vsStartIdx = Math.max(0, Math.floor(tableScrollTop / ROW_HEIGHT) - vsOverscan);
+  const vsEndIdx = Math.min(
+    filteredProducts.length,
+    Math.ceil((tableScrollTop + tableContainerHeight) / ROW_HEIGHT) + vsOverscan,
+  );
+  const vsPaddingTop = vsStartIdx * ROW_HEIGHT;
+  const vsPaddingBottom = Math.max(0, (filteredProducts.length - vsEndIdx) * ROW_HEIGHT);
+  const vsVisibleRows = filteredProducts.slice(vsStartIdx, vsEndIdx);
+
   return (
-    <div className="space-y-3.5 sm:space-y-4 lg:space-y-4 pb-6 sm:pb-8 w-full">
-      {/* ─── Page Header ──────────────────────────────────────────────────────── */}
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
-        <div>
-          <h1 className="text-22 sm:text-24 lg:text-26 font-bold font-outfit text-text tracking-tight">
-            Catalogue
-          </h1>
-          <p className="text-12 sm:text-13 text-text-muted mt-0.5 sm:mt-1 max-w-xl">
-            Your products. The assistant quotes prices and lead times directly from this live catalogue.
-          </p>
-        </div>
-
-        {/* Action Controls */}
-        <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
-          {/* View Toggle */}
-          <div className="flex items-center rounded-lg border border-border bg-surface p-0.5 shadow-2xs">
-            <button
-              type="button"
-              onClick={() => setViewMode("grid")}
-              className={`p-1.5 rounded-md transition-colors cursor-pointer ${
-                viewMode === "grid"
-                  ? "bg-surface-muted text-text font-bold"
-                  : "text-text-muted hover:text-text"
-              }`}
-              title="Grid view (6 per row on desktop)"
-              aria-label="Switch to grid view"
-            >
-              <LayoutGrid className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode("table")}
-              className={`p-1.5 rounded-md transition-colors cursor-pointer ${
-                viewMode === "table"
-                  ? "bg-surface-muted text-text font-bold"
-                  : "text-text-muted hover:text-text"
-              }`}
-              title="Table view"
-              aria-label="Switch to table view"
-            >
-              <TableIcon className="w-4 h-4" />
-            </button>
-          </div>
-
-          <button
-            type="button"
-            onClick={handleStartAdd}
-            className="inline-flex items-center gap-1.5 px-3.5 sm:px-4 py-2 rounded-lg bg-primary text-primary-foreground font-semibold text-13 shadow-xs hover:brightness-105 active:scale-98 transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Add product</span>
-          </button>
-        </div>
-      </div>
-
-      {/* ─── Filter & Search Bar ────────────────────────────────────────────── */}
-      <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-2.5 sm:gap-3 p-2.5 sm:p-3 rounded-xl border border-border bg-surface shadow-xs">
-        {/* Search */}
-        <div className="relative flex-1 min-w-[220px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search products by name, sizes, options..."
-            className="w-full pl-9 pr-3 py-1.5 text-13 rounded-lg bg-surface-muted border border-border text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-all"
-          />
-          {searchQuery && (
-            <button
-              onClick={() => setSearchQuery("")}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-11 text-text-muted hover:text-text cursor-pointer"
-            >
-              Clear
-            </button>
-          )}
-        </div>
-
-        <div className="flex items-center gap-2 sm:gap-2.5 flex-wrap">
-          {/* Customizable Only Chip */}
-          <button
-            type="button"
-            onClick={() => setCustomizableOnly(!customizableOnly)}
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-12 font-medium border transition-colors cursor-pointer ${
-              customizableOnly
-                ? "bg-primary-soft text-primary-text border-primary/30"
-                : "bg-surface-muted text-text-muted border-border hover:text-text"
-            }`}
-          >
-            <Sparkles className="w-3.5 h-3.5 text-primary" />
-            <span>Customizable only</span>
-          </button>
-
-          {/* Sort Dropdown */}
-          <div className="flex items-center gap-1.5 text-12 text-text-muted pl-1">
-            <SlidersHorizontal className="w-3.5 h-3.5" />
-            <select
-              value={sortBy}
-              aria-label="Sort catalogue products"
-              onChange={(e) => setSortBy(e.target.value as "name" | "price-asc" | "price-desc" | "lead-time")}
-              className="bg-surface-muted border border-border text-text text-12 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary/40 cursor-pointer appearance-none"
-            >
-              <option value="name">Sort: Name (A-Z)</option>
-              <option value="price-asc">Price: Low to High</option>
-              <option value="price-desc">Price: High to Low</option>
-              <option value="lead-time">Lead time (Fastest)</option>
-            </select>
-          </div>
-        </div>
-      </div>
-
-      {/* ─── Loading Skeletons ──────────────────────────────────────────────── */}
-      {isLoading ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-2 sm:gap-2.5 lg:gap-3">
-          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((i) => (
-            <div
-              key={i}
-              className="rounded-xl border border-border bg-surface overflow-hidden shadow-xs animate-pulse"
-            >
-              <div className="aspect-[4/3] bg-surface-muted w-full" />
-              <div className="p-2 sm:p-2.5 space-y-1.5">
-                <div className="h-3.5 w-3/5 bg-surface-muted rounded-md" />
-                <div className="h-3 w-4/5 bg-surface-muted rounded-md" />
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : isError ? (
-        <div className="rounded-xl border border-border bg-surface p-12 text-center space-y-4">
-          <div className="w-12 h-12 rounded-full bg-danger/10 text-danger flex items-center justify-center mx-auto">
-            <X className="w-6 h-6" />
-          </div>
+    <div className="h-full flex flex-col overflow-hidden">
+      {/* ─── Pinned Header ────────────────────────────────────────────────────── */}
+      <div className="shrink-0 px-4 sm:px-6 pt-4 sm:pt-5 pb-3 sm:pb-4 space-y-3 border-b border-border bg-bg">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
           <div>
-            <h3 className="text-16 font-semibold font-outfit text-text">Failed to load catalogue</h3>
-            <p className="text-13 text-text-muted mt-1 max-w-md mx-auto">
-              There was an issue fetching the products catalogue.
+            <h1 className="text-22 sm:text-24 lg:text-26 font-bold font-outfit text-text tracking-tight">
+              Catalogue
+            </h1>
+            <p className="text-12 sm:text-13 text-text-muted mt-0.5 sm:mt-1 max-w-xl">
+              Your products. The assistant quotes prices and lead times directly from this live catalogue.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => refetch()}
-            className="px-4 py-2 rounded-lg bg-surface-muted border border-border text-text font-semibold text-13 hover:bg-surface cursor-pointer"
-          >
-            Try Again
-          </button>
+
+          {/* Action Controls */}
+          <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
+            <div className="flex items-center rounded-lg border border-border bg-surface p-0.5 shadow-2xs">
+              <button
+                type="button"
+                onClick={() => setViewMode("grid")}
+                className={`p-1.5 rounded-md transition-colors cursor-pointer ${
+                  viewMode === "grid"
+                    ? "bg-surface-muted text-text font-bold"
+                    : "text-text-muted hover:text-text"
+                }`}
+                title="Grid view"
+                aria-label="Switch to grid view"
+              >
+                <LayoutGrid className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode("table")}
+                className={`p-1.5 rounded-md transition-colors cursor-pointer ${
+                  viewMode === "table"
+                    ? "bg-surface-muted text-text font-bold"
+                    : "text-text-muted hover:text-text"
+                }`}
+                title="Table view (virtual scroll)"
+                aria-label="Switch to table view"
+              >
+                <TableIcon className="w-4 h-4" />
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleStartAdd}
+              className="inline-flex items-center gap-1.5 px-3.5 sm:px-4 py-2 rounded-lg bg-primary text-primary-foreground font-semibold text-13 shadow-xs hover:brightness-105 active:scale-98 transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Add product</span>
+            </button>
+          </div>
+        </div>
+
+        {/* ─── Filter & Search Bar ─────────────────────────────────────────── */}
+        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-2.5 sm:gap-3 p-2.5 sm:p-3 rounded-xl border border-border bg-surface shadow-xs">
+          <div className="relative flex-1 min-w-[220px]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search products by name, sizes, options..."
+              className="w-full pl-9 pr-3 py-1.5 text-13 rounded-lg bg-surface-muted border border-border text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-all"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-11 text-text-muted hover:text-text cursor-pointer"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2 sm:gap-2.5 flex-wrap">
+            <button
+              type="button"
+              onClick={() => setCustomizableOnly(!customizableOnly)}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-12 font-medium border transition-colors cursor-pointer ${
+                customizableOnly
+                  ? "bg-primary-soft text-primary-text border-primary/30"
+                  : "bg-surface-muted text-text-muted border-border hover:text-text"
+              }`}
+            >
+              <Sparkles className="w-3.5 h-3.5 text-primary" />
+              <span>Customizable only</span>
+            </button>
+
+            <div className="flex items-center gap-1.5 text-12 text-text-muted pl-1">
+              <SlidersHorizontal className="w-3.5 h-3.5" />
+              <select
+                value={sortBy}
+                aria-label="Sort catalogue products"
+                onChange={(e) => setSortBy(e.target.value as "name" | "price-asc" | "price-desc" | "lead-time")}
+                className="bg-surface-muted border border-border text-text text-12 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary/40 cursor-pointer appearance-none"
+              >
+                <option value="name">Sort: Name (A-Z)</option>
+                <option value="price-asc">Price: Low to High</option>
+                <option value="price-desc">Price: High to Low</option>
+                <option value="lead-time">Lead time (Fastest)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ─── Scrollable Content ───────────────────────────────────────────────── */}
+      {isLoading ? (
+        <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 custom-scrollbar">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-2 sm:gap-2.5 lg:gap-3">
+            {Array.from({ length: 24 }).map((_, i) => (
+              <div key={i} className="rounded-xl border border-border bg-surface overflow-hidden shadow-xs animate-pulse">
+                <div className="aspect-[4/3] bg-surface-muted w-full" />
+                <div className="p-2 sm:p-2.5 space-y-1.5">
+                  <div className="h-3.5 w-3/5 bg-surface-muted rounded-md" />
+                  <div className="h-3 w-4/5 bg-surface-muted rounded-md" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : isError ? (
+        <div className="flex-1 flex items-center justify-center p-12">
+          <div className="text-center space-y-4">
+            <div className="w-12 h-12 rounded-full bg-danger/10 text-danger flex items-center justify-center mx-auto">
+              <X className="w-6 h-6" />
+            </div>
+            <div>
+              <h3 className="text-16 font-semibold font-outfit text-text">Failed to load catalogue</h3>
+              <p className="text-13 text-text-muted mt-1">There was an issue fetching the products catalogue.</p>
+            </div>
+            <button type="button" onClick={() => refetch()} className="px-4 py-2 rounded-lg bg-surface-muted border border-border text-text font-semibold text-13 hover:bg-surface cursor-pointer">
+              Try Again
+            </button>
+          </div>
         </div>
       ) : filteredProducts.length === 0 ? (
-        <div className="rounded-xl border border-border bg-surface p-6 sm:p-10">
+        <div className="flex-1 flex items-center justify-center p-6">
           <EmptyState
             title={searchQuery || customizableOnly ? "No products match" : "No products yet"}
             description={
@@ -639,146 +665,24 @@ export default function Catalogue() {
             }
             action={
               searchQuery || customizableOnly
-                ? {
-                    label: "Clear filters",
-                    onClick: () => {
-                      setSearchQuery("");
-                      setCustomizableOnly(false);
-                    },
-                    variant: "outline",
-                  }
-                : {
-                    label: "Add product",
-                    onClick: handleStartAdd,
-                  }
+                ? { label: "Clear filters", onClick: () => { setSearchQuery(""); setCustomizableOnly(false); }, variant: "outline" }
+                : { label: "Add product", onClick: handleStartAdd }
             }
           />
         </div>
-      ) : (
-        <>
-          {viewMode === "grid" ? (
-            /* ─── 6-Column Responsive Product Grid (Fits single screen on desktop) ─── */
+      ) : viewMode === "grid" ? (
+        /* ─── Grid view: paginated ───────────────────────────────────────────── */
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 custom-scrollbar">
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-2 sm:gap-2.5 lg:gap-3">
               {paginatedProducts.map((p) => (
-                <CatalogueProductCard
-                  key={p.id}
-                  product={p}
-                  onOpenDetail={handleOpenDetail}
-                />
+                <CatalogueProductCard key={p.id} product={p} onOpenDetail={handleOpenDetail} />
               ))}
             </div>
-          ) : (
-            /* ─── Table View (Orders Pattern) ────────────────────────── */
-            <div className="rounded-xl border border-border bg-surface overflow-hidden shadow-xs">
-              <div className="overflow-x-auto custom-scrollbar">
-                <table className="w-full text-left text-13 border-collapse">
-                  <thead className="bg-surface-muted border-b border-border text-11 uppercase font-semibold text-text-muted">
-                    <tr>
-                      <th className="p-3 w-14">Photo</th>
-                      <th className="p-3">Product Name</th>
-                      <th className="p-3">Price</th>
-                      <th className="p-3">Sizes</th>
-                      <th className="p-3">Lead Time</th>
-                      <th className="p-3">Customizable</th>
-                      <th className="p-3 text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border/40">
-                    {paginatedProducts.map((p) => {
-                      const minPrice = Math.min(...(p.sizes.map((s) => s.price) || [0]));
-                      const maxPrice = Math.max(...(p.sizes.map((s) => s.price) || [0]));
-                      const priceLabel =
-                        p.sizes.length > 1 && minPrice !== maxPrice
-                          ? `₹${minPrice.toLocaleString("en-IN")} – ₹${maxPrice.toLocaleString("en-IN")}`
-                          : `₹${minPrice.toLocaleString("en-IN")}`;
-                      const mainPhoto = p.images?.[0];
+          </div>
 
-                      return (
-                        <tr
-                          key={p.id}
-                          onClick={() => handleOpenDetail(p)}
-                          className="hover:bg-surface-muted transition-colors cursor-pointer group"
-                        >
-                          <td className="p-3">
-                            <div className="w-10 h-10 rounded-lg overflow-hidden bg-surface-muted border border-border/50 shrink-0">
-                              {mainPhoto ? (
-                                <img
-                                  src={getCloudinaryThumb(mainPhoto, 80, 80)}
-                                  alt={p.name}
-                                  className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                                  loading="lazy"
-                                />
-                              ) : (
-                                <div className="w-full h-full flex items-center justify-center text-text-muted">
-                                  <Package className="w-4 h-4" />
-                                </div>
-                              )}
-                            </div>
-                          </td>
-                          <td className="p-3">
-                            <div className="font-semibold text-text group-hover:text-primary-text transition-colors">
-                              {p.name}
-                            </div>
-                            {p.description && (
-                              <div className="text-11 text-text-muted line-clamp-1 max-w-xs">
-                                {p.description}
-                              </div>
-                            )}
-                          </td>
-                          <td className="p-3 font-bold font-outfit text-text tabular-nums whitespace-nowrap">
-                            {priceLabel}
-                          </td>
-                          <td className="p-3 text-text-muted text-12 max-w-xs truncate">
-                            {p.sizes?.map((s) => s.name).join(" · ") || "—"}
-                          </td>
-                          <td className="p-3 whitespace-nowrap text-12">
-                            <span className="inline-flex items-center gap-1 text-text-muted">
-                              <Clock className="w-3.5 h-3.5" />
-                              {p.leadTimeDays} days
-                            </span>
-                          </td>
-                          <td className="p-3 whitespace-nowrap">
-                            {p.customizable ? (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-11 font-semibold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
-                                <Sparkles className="w-3 h-3" />
-                                Yes
-                              </span>
-                            ) : (
-                              <span className="text-12 text-text-muted">No</span>
-                            )}
-                          </td>
-                          <td className="p-3 text-right" onClick={(e) => e.stopPropagation()}>
-                            <div className="flex items-center justify-end gap-1">
-                              <button
-                                type="button"
-                                onClick={() => handleStartEdit(p)}
-                                className="p-1.5 rounded-md hover:bg-surface-muted text-text-muted hover:text-text cursor-pointer transition"
-                                title="Edit product"
-                              >
-                                <Pencil className="w-4 h-4" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setProductToDelete(p)}
-                                className="p-1.5 rounded-md hover:bg-rose-500/10 text-text-muted hover:text-rose-600 cursor-pointer transition"
-                                title="Delete product"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-          {/* ─── Pagination Bar ─────────────────────────────────────────────── */}
-          {filteredProducts.length > 0 && (
-            <div className="shrink-0 flex flex-col sm:flex-row items-center justify-between gap-2.5 sm:gap-3 p-2.5 sm:p-3 rounded-xl border border-border bg-surface text-xs text-text-muted shadow-xs mt-3 sm:mt-4">
+          {totalPages > 1 && (
+            <div className="shrink-0 flex flex-col sm:flex-row items-center justify-between gap-2.5 sm:gap-3 px-4 sm:px-6 py-2.5 border-t border-border bg-surface text-xs text-text-muted">
               <span>
                 Showing{" "}
                 <span className="font-semibold text-text">
@@ -787,35 +691,120 @@ export default function Catalogue() {
                 </span>{" "}
                 of <span className="font-semibold text-text">{filteredProducts.length}</span> products
               </span>
-
               <div className="flex items-center gap-1.5">
-                <button
-                  type="button"
-                  disabled={page <= 1}
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-border bg-surface-muted text-text hover:bg-surface text-xs font-semibold cursor-pointer disabled:opacity-40 transition"
-                >
-                  <ChevronLeft className="w-3.5 h-3.5" />
-                  <span>Previous</span>
+                <button type="button" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-border bg-surface-muted text-text hover:bg-surface text-xs font-semibold cursor-pointer disabled:opacity-40 transition">
+                  <ChevronLeft className="w-3.5 h-3.5" /><span>Previous</span>
                 </button>
-
-                <span className="px-2 font-medium text-text">
-                  Page {page} of {totalPages}
-                </span>
-
-                <button
-                  type="button"
-                  disabled={page >= totalPages}
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-border bg-surface-muted text-text hover:bg-surface text-xs font-semibold cursor-pointer disabled:opacity-40 transition"
-                >
-                  <span>Next</span>
-                  <ChevronRight className="w-3.5 h-3.5" />
+                <span className="px-2 font-medium text-text">Page {page} of {totalPages}</span>
+                <button type="button" disabled={page >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-border bg-surface-muted text-text hover:bg-surface text-xs font-semibold cursor-pointer disabled:opacity-40 transition">
+                  <span>Next</span><ChevronRight className="w-3.5 h-3.5" />
                 </button>
               </div>
             </div>
           )}
-        </>
+        </div>
+      ) : (
+        /* ─── Table view: virtual scroll, all rows, no pagination ───────────── */
+        <div className="flex-1 overflow-hidden px-4 sm:px-6 py-4 min-h-0">
+          <div className="h-full rounded-xl border border-border bg-surface shadow-xs overflow-hidden flex flex-col">
+            <div
+              ref={tableScrollRef}
+              className="flex-1 overflow-auto custom-scrollbar"
+              onScroll={handleTableScroll}
+            >
+              <table className="w-full text-left text-13 border-collapse min-w-[700px]">
+                <thead className="sticky top-0 z-10 bg-surface-muted border-b border-border text-11 uppercase font-semibold text-text-muted shadow-xs">
+                  <tr>
+                    <th className="p-3 w-14">Photo</th>
+                    <th className="p-3">Product Name</th>
+                    <th className="p-3">Price</th>
+                    <th className="p-3">Sizes</th>
+                    <th className="p-3">Lead Time</th>
+                    <th className="p-3">Customizable</th>
+                    <th className="p-3 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/40">
+                  {vsPaddingTop > 0 && (
+                    <tr aria-hidden><td colSpan={7} style={{ height: vsPaddingTop, padding: 0, border: 0 }} /></tr>
+                  )}
+
+                  {vsVisibleRows.map((p) => {
+                    const minPrice = Math.min(...(p.sizes.map((s) => s.price) || [0]));
+                    const maxPrice = Math.max(...(p.sizes.map((s) => s.price) || [0]));
+                    const priceLabel =
+                      p.sizes.length > 1 && minPrice !== maxPrice
+                        ? `₹${minPrice.toLocaleString("en-IN")} – ₹${maxPrice.toLocaleString("en-IN")}`
+                        : `₹${minPrice.toLocaleString("en-IN")}`;
+                    const mainPhoto = p.images?.[0];
+
+                    return (
+                      <tr
+                        key={p.id}
+                        style={{ height: ROW_HEIGHT }}
+                        onClick={() => handleOpenDetail(p)}
+                        className="hover:bg-surface-muted transition-colors cursor-pointer group"
+                      >
+                        <td className="p-3">
+                          <div className="w-10 h-10 rounded-lg overflow-hidden bg-surface-muted border border-border/50 shrink-0">
+                            {mainPhoto ? (
+                              <img src={getCloudinaryThumb(mainPhoto, 80, 80)} alt={p.name}
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform" loading="lazy" />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-text-muted">
+                                <Package className="w-4 h-4" />
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                        <td className="p-3">
+                          <div className="font-semibold text-text group-hover:text-primary-text transition-colors">{p.name}</div>
+                          {p.description && <div className="text-11 text-text-muted line-clamp-1 max-w-xs">{p.description}</div>}
+                        </td>
+                        <td className="p-3 font-bold font-outfit text-text tabular-nums whitespace-nowrap">{priceLabel}</td>
+                        <td className="p-3 text-text-muted text-12 max-w-xs truncate">
+                          {p.sizes?.map((s) => s.name).join(" · ") || "—"}
+                        </td>
+                        <td className="p-3 whitespace-nowrap text-12">
+                          <span className="inline-flex items-center gap-1 text-text-muted">
+                            <Clock className="w-3.5 h-3.5" />{p.leadTimeDays} days
+                          </span>
+                        </td>
+                        <td className="p-3 whitespace-nowrap">
+                          {p.customizable ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-11 font-semibold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                              <Sparkles className="w-3 h-3" />Yes
+                            </span>
+                          ) : (
+                            <span className="text-12 text-text-muted">No</span>
+                          )}
+                        </td>
+                        <td className="p-3 text-right" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex items-center justify-end gap-1">
+                            <button type="button" onClick={() => handleStartEdit(p)}
+                              className="p-1.5 rounded-md hover:bg-surface-muted text-text-muted hover:text-text cursor-pointer transition" title="Edit product">
+                              <Pencil className="w-4 h-4" />
+                            </button>
+                            <button type="button" onClick={() => setProductToDelete(p)}
+                              className="p-1.5 rounded-md hover:bg-rose-500/10 text-text-muted hover:text-rose-600 cursor-pointer transition" title="Delete product">
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+
+                  {vsPaddingBottom > 0 && (
+                    <tr aria-hidden><td colSpan={7} style={{ height: vsPaddingBottom, padding: 0, border: 0 }} /></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* ─── Product Detail & Edit SlideOver ─────────────────────────────────── */}

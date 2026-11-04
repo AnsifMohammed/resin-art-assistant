@@ -403,9 +403,11 @@ export const replyRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
         const minPrice = prices.length > 0 ? Math.min(...prices) : 0;
         const maxPrice = prices.length > 0 ? Math.max(...prices) : 0;
         const priceStr =
-          prices.length > 1 && minPrice !== maxPrice
-            ? `₹${minPrice.toLocaleString("en-IN")} – ₹${maxPrice.toLocaleString("en-IN")}`
-            : `₹${minPrice.toLocaleString("en-IN")}`;
+          prices.length === 0
+            ? "Price on request"
+            : prices.length > 1 && minPrice !== maxPrice
+              ? `₹${minPrice.toLocaleString("en-IN")} – ₹${maxPrice.toLocaleString("en-IN")}`
+              : `₹${minPrice.toLocaleString("en-IN")}`;
 
         const images = Array.isArray(p.images) ? p.images : [];
         const firstImg = typeof images[0] === "string" ? images[0] : undefined;

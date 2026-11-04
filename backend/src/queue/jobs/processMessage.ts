@@ -323,13 +323,22 @@ async function runPipeline(params: ProcessMessageParams): Promise<AiDecision | n
   }
 
   // 4. Call AI pipeline (rules are applied inside)
-  logger.info({ conversationId, batchSize: batch.length }, "Running AI pipeline on message batch");
+  // If the triggering message is a product button click, pass the slug so the AI
+  // focuses its reply on that specific product rather than guessing from the text.
+  const latestMeta = latestInbound.metadata as Record<string, unknown> | null;
+  const focusedProductSlug =
+    latestMeta?.kind === "product_enquiry" && typeof latestMeta.slug === "string"
+      ? latestMeta.slug
+      : undefined;
+
+  logger.info({ conversationId, batchSize: batch.length, focusedProductSlug }, "Running AI pipeline on message batch");
   const decision = await processAiDecision({
     businessId,
     incomingText: rawText,
     history: history.map((m) => ({ senderType: m.senderType, content: m.content })),
     customerName: customer?.name ?? null,
     customerHandle: customer?.handleOrPhone ?? null,
+    ...(focusedProductSlug ? { focusedProductSlug } : {}),
   });
 
   // Re-check the pause switch: it may have been flipped during the LLM call.
@@ -401,9 +410,11 @@ async function runPipeline(params: ProcessMessageParams): Promise<AiDecision | n
       const minPrice = prices.length > 0 ? Math.min(...prices) : 0;
       const maxPrice = prices.length > 0 ? Math.max(...prices) : 0;
       const priceStr =
-        prices.length > 1 && minPrice !== maxPrice
-          ? `₹${minPrice.toLocaleString("en-IN")} – ₹${maxPrice.toLocaleString("en-IN")}`
-          : `₹${minPrice.toLocaleString("en-IN")}`;
+        prices.length === 0
+          ? "Price on request"
+          : prices.length > 1 && minPrice !== maxPrice
+            ? `₹${minPrice.toLocaleString("en-IN")} – ₹${maxPrice.toLocaleString("en-IN")}`
+            : `₹${minPrice.toLocaleString("en-IN")}`;
 
       const images = Array.isArray(p.images) ? p.images : [];
       const firstImg = typeof images[0] === "string" ? images[0] : undefined;

@@ -2,8 +2,9 @@ import type { FastifyInstance, FastifyPluginAsync } from "fastify";
 import { and, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../db/index.ts";
-import { auditLog, customers, orderItems, orders } from "../db/schema.ts";
+import { auditLog, customers, orderItems, orders, payments } from "../db/schema.ts";
 import { AppError } from "../lib/errors.ts";
+import { derivePaymentSummary } from "./payments.ts";
 import { authenticate } from "../middleware/authenticate.ts";
 import { requireAdmin } from "../middleware/requireAdmin.ts";
 
@@ -133,6 +134,22 @@ export const orderRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
         itemsByOrderId.set(item.orderId, list);
       }
 
+      // Fetch payments for all matching orders in one query
+      const allPayments =
+        orderIds.length > 0
+          ? await db
+              .select()
+              .from(payments)
+              .where(inArray(payments.orderId, orderIds))
+          : [];
+
+      const paymentsByOrderId = new Map<string, typeof allPayments>();
+      for (const p of allPayments) {
+        const list = paymentsByOrderId.get(p.orderId) || [];
+        list.push(p);
+        paymentsByOrderId.set(p.orderId, list);
+      }
+
       // Calculate status counts for all orders of this business
       const allBusinessOrders = await db
         .select({
@@ -166,10 +183,14 @@ export const orderRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
       }
       statusCounts.all = totalAll;
 
-      const results = orderList.map((o) => ({
-        ...o,
-        items: itemsByOrderId.get(o.id) || [],
-      }));
+      const results = orderList.map((o) => {
+        const orderPayments = paymentsByOrderId.get(o.id) || [];
+        return {
+          ...o,
+          items: itemsByOrderId.get(o.id) || [],
+          paymentSummary: derivePaymentSummary(orderPayments, Math.round(Number(o.totalAmount))),
+        };
+      });
 
       return {
         orders: results,

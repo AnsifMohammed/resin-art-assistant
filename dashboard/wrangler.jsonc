@@ -1,0 +1,12 @@
+// Cloudflare Workers static-assets deploy for the dashboard (Workers Builds runs
+// `npm ci && npm run build`, then `npx wrangler deploy` from this folder).
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "resin-art-assistant",
+  "compatibility_date": "2026-10-25",
+  "assets": {
+    "directory": "./dist",
+    // React Router app: unknown paths (/inbox, /orders/…) serve index.html.
+    "not_found_handling": "single-page-application"
+  }
+}

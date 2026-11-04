@@ -26,7 +26,7 @@ import { ChannelIcon } from "../components/shared/ChannelIcon.tsx";
 import { Skeleton } from "../components/shared/Skeleton.tsx";
 import { EmptyState } from "../components/shared/EmptyState.tsx";
 import { PaymentsPanel } from "../components/orders/PaymentsPanel.tsx";
-import { useOrderPayments } from "../hooks/usePayments.ts";
+import type { PaymentSummary } from "../types/index.ts";
 import {
   useOrders,
   useCreateOrder,
@@ -64,10 +64,7 @@ interface OrderCardProps {
   isGrid?: boolean;
 }
 
-function OrderPaymentChip({ orderId, orderTotal }: { orderId: string; orderTotal: number }) {
-  const { data } = useOrderPayments(orderId);
-  const summary = data?.summary;
-
+function OrderPaymentChip({ summary, orderTotal }: { summary?: PaymentSummary | undefined; orderTotal: number }) {
   if (!summary || summary.totalPaid === 0) {
     const bal = summary?.balanceDue ?? orderTotal;
     return (
@@ -157,7 +154,7 @@ function OrderCard({
             <span className="text-12 sm:text-13 font-bold font-outfit text-text tabular-nums shrink-0">
               ₹{Number(order.totalAmount).toLocaleString("en-IN")}
             </span>
-            <OrderPaymentChip orderId={order.id} orderTotal={Number(order.totalAmount)} />
+            <OrderPaymentChip summary={order.paymentSummary} orderTotal={Number(order.totalAmount)} />
           </div>
 
           {order.trackingId ? (
@@ -974,7 +971,7 @@ export default function Orders() {
                       <td className="p-3.5 font-bold font-outfit text-text tabular-nums">
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <span>₹{Number(o.totalAmount).toLocaleString("en-IN")}</span>
-                          <OrderPaymentChip orderId={o.id} orderTotal={Number(o.totalAmount)} />
+                          <OrderPaymentChip summary={o.paymentSummary} orderTotal={Number(o.totalAmount)} />
                         </div>
                       </td>
                       <td className="p-3.5">

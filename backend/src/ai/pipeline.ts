@@ -267,6 +267,8 @@ export async function processAiDecision(params: {
   /** Stored customer name and handle, used to address the customer by first name. */
   customerName?: string | null;
   customerHandle?: string | null;
+  /** Product slug when the message originated from a catalogue button click. */
+  focusedProductSlug?: string;
 }): Promise<AiDecision> {
   if (!ai) {
     logger.info(
@@ -285,6 +287,8 @@ export async function processAiDecision(params: {
       config: {
         systemInstruction: buildSystemPrompt(kb, {
           customerFirstName: customerFirstName(params.customerName, params.customerHandle),
+          customerText: params.incomingText,
+          ...(params.focusedProductSlug ? { focusedProductSlug: params.focusedProductSlug } : {}),
         }),
         responseMimeType: "application/json",
         responseJsonSchema: aiDecisionJsonSchema,
@@ -324,7 +328,11 @@ export async function processAiDecision(params: {
       );
       return parseErrorDecision();
     }
-    rawDecision = validated.data;
+    rawDecision = {
+      ...validated.data,
+      // Collapse tabs and excessive whitespace from AI reply (can appear when AI mirrors KB JSON indentation)
+      reply: validated.data.reply.replace(/[ \t]+/g, " ").replace(/\n{3,}/g, "\n\n").trim(),
+    };
   } catch (err) {
     logger.error({ err }, "Gemini API call or JSON parse failed, escalating (parse_error)");
     return parseErrorDecision();

@@ -1187,6 +1187,7 @@ export interface DbOrder {
   createdAt: ISODateString;
   updatedAt: ISODateString;
   items: DbOrderItem[];
+  paymentSummary?: PaymentSummary;
 }
 
 export interface OrderListResponse {

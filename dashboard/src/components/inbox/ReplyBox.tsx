@@ -385,7 +385,7 @@ export function ReplyBox({
         onClose={() => setCatalogueOpen(false)}
         windowClosed={windowClosed}
         onInsert={insertCatalogue}
-        onSend={onSendCatalogue ?? (() => Promise.resolve())}
+        onSend={onSendCatalogue ?? (() => { throw new Error("Catalogue send not configured"); })}
       />
     </form>
   );
