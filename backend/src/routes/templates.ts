@@ -140,12 +140,61 @@ export function copyName(name: string, taken: Set<string>): string {
   return candidate;
 }
 
+export const DEFAULT_PRODUCTION_TEMPLATES = [
+  {
+    name: "Production Progress Update",
+    category: "production_progress" as const,
+    channel: "both" as const,
+    body: "Hi {CustomerName}! Your order #{OrderNumber} is currently in production. Our team is carefully working on your {ProductName}. It has been {ProductionDays} days since production started. We appreciate your patience and will keep you updated!",
+  },
+  {
+    name: "Production Delay Notification",
+    category: "production_progress" as const,
+    channel: "both" as const,
+    body: "Hi {CustomerName}! We wanted to update you regarding your order #{OrderNumber}. Your handmade {ProductName} is taking a little longer than expected due to the production process. We sincerely appreciate your patience. We'll keep you informed about the progress.",
+  },
+  {
+    name: "Production Completion Update",
+    category: "production_progress" as const,
+    channel: "both" as const,
+    body: "Hi {CustomerName}! Great news! Your order #{OrderNumber} has completed production and is now ready. Thank you for patiently waiting for your handmade creation!",
+  },
+];
+
+export async function ensureDefaultProductionTemplates(businessId: string): Promise<void> {
+  try {
+    for (const t of DEFAULT_PRODUCTION_TEMPLATES) {
+      const [existing] = await db
+        .select({ id: messageTemplates.id })
+        .from(messageTemplates)
+        .where(and(eq(messageTemplates.businessId, businessId), eq(messageTemplates.name, t.name)));
+      if (!existing) {
+        await db
+          .insert(messageTemplates)
+          .values({
+            businessId,
+            name: t.name,
+            category: t.category,
+            channel: t.channel,
+            body: t.body,
+            variables: extractVariables(t.body),
+            isActive: true,
+          })
+          .onConflictDoNothing();
+      }
+    }
+  } catch {
+    // If DB has not run migrations yet or table is mocked, don't crash
+  }
+}
+
 export const templateRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
   // GET /templates - Admin sees all; staff only active templates
   app.get(
     "/templates",
     { preHandler: [authenticate, requireStaffOrAdmin] },
     async (request) => {
+      await ensureDefaultProductionTemplates(request.user.businessId);
       const { category, channel, active } = parseOrThrow(listQuerySchema, request.query, "Invalid query parameters");
 
       const conditions: SQL[] = [eq(messageTemplates.businessId, request.user.businessId)];

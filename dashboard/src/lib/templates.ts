@@ -15,6 +15,14 @@ export const AUTO_FILLED_VARIABLES = ["customerName"] as const;
 
 /** Variables offered as quick-insert pills in the template editor. */
 export const COMMON_TEMPLATE_VARIABLES = [
+  "CustomerName",
+  "OrderNumber",
+  "ProductName",
+  "ProductionStartDate",
+  "ExpectedCompletionDate",
+  "ProductionDays",
+  "RemainingDays",
+  "CurrentStatus",
   "customerName",
   "product",
   "amount",
@@ -33,6 +41,7 @@ export const templateCategoryLabels: Record<TemplateCategory, string> = {
   custom_order: "Custom order",
   payment: "Payment",
   general: "General",
+  production_progress: "Production Progress",
 };
 
 export const templateChannelLabels: Record<TemplateChannel, string> = {
@@ -56,8 +65,15 @@ export function extractVariables(body: string): string[] {
  */
 export function renderTemplate(body: string, vars: Record<string, string>): { text: string; missing: string[] } {
   const missing: string[] = [];
+  const lowerLookup: Record<string, string> = {};
+  for (const [k, v] of Object.entries(vars)) {
+    lowerLookup[k.toLowerCase()] = v;
+  }
   const text = body.replace(VARIABLE_RE, (placeholder, name: string) => {
-    const value = Object.hasOwn(vars, name) ? vars[name] : undefined;
+    let value = Object.hasOwn(vars, name) ? vars[name] : undefined;
+    if (value === undefined) {
+      value = lowerLookup[name.toLowerCase()];
+    }
     if (value === undefined || value.trim() === "") {
       if (!missing.includes(name)) missing.push(name);
       return placeholder;

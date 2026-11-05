@@ -70,7 +70,14 @@ export type LanguageDetected = "english" | "malayalam" | "manglish";
 
 export type ActorType = "admin" | "staff" | "ai" | "system";
 
-export const TEMPLATE_CATEGORIES = ["delivery", "festive", "custom_order", "payment", "general"] as const;
+export const TEMPLATE_CATEGORIES = [
+  "delivery",
+  "festive",
+  "custom_order",
+  "payment",
+  "general",
+  "production_progress",
+] as const;
 export type TemplateCategory = (typeof TEMPLATE_CATEGORIES)[number];
 
 export const TEMPLATE_CHANNELS = ["whatsapp", "instagram", "both"] as const;
@@ -1078,11 +1085,68 @@ export interface Payment {
   method?: string | null;
   reference?: string | null;
   note?: string | null;
+  paymentLink?: string | null;
+  upiLink?: string | null;
   paidAt?: ISODateString | null;
   recordedByUserId?: string | null;
   voidedReason?: string | null;
   createdAt: ISODateString;
   updatedAt: ISODateString;
+}
+
+export interface PaymentLinkDetails {
+  paymentId: string;
+  orderId: string;
+  orderNo?: string | number;
+  customerName?: string;
+  customerPhone?: string | null;
+  channel?: string;
+  amount: number;
+  kind: PaymentKind;
+  status: PaymentStatus;
+  paymentUrl: string;
+  upiLink: string;
+  upiId: string;
+  businessName: string;
+  formattedMessage: string;
+}
+
+export interface SendPaymentRequestResponse {
+  ok: boolean;
+  sent: boolean;
+  deliveryStatus: "sent" | "failed";
+  channel: string;
+  messageId?: string;
+  preview?: string;
+  error?: string;
+}
+
+export interface PublicPaymentResponse {
+  payment: {
+    id: string;
+    kind: PaymentKind;
+    amount: number;
+    status: PaymentStatus;
+    method?: string | null;
+    reference?: string | null;
+    note?: string | null;
+    paymentLink?: string | null;
+    paidAt?: ISODateString | null;
+    createdAt: ISODateString;
+  };
+  order: {
+    id?: string;
+    orderNo?: string | number;
+    customerName?: string;
+    totalAmount?: number | string;
+    status?: string;
+  } | null;
+  business: {
+    name: string;
+    upiId: string;
+  };
+  upiLink: string;
+  paymentUrl: string;
 }
 
 export interface PaymentSummary {
@@ -1164,6 +1228,9 @@ export interface DbOrder {
   customerNotes?: string | null;
   internalNotes?: string | null;
   expectedDeliveryDate?: string | null;
+  productionStartedAt?: ISODateString | null;
+  productionDays?: number;
+  urgency?: "normal" | "approaching" | "overdue";
   dispatchedAt?: ISODateString | null;
   deliveredAt?: ISODateString | null;
   isDeleted: boolean;
@@ -1243,6 +1310,38 @@ export interface UpdateOrderStatusRequest {
   trackingId?: string | null | undefined;
   courier?: string | null | undefined;
   sendNotification?: boolean | undefined;
+  customMessage?: string | null | undefined;
+}
+
+export interface OrderMessage {
+  id: string;
+  conversationId: string;
+  businessId: string;
+  direction: Direction;
+  senderType: SenderType;
+  senderId: string | null;
+  content: string | null;
+  mediaUrls: string[];
+  metaMessageId: string | null;
+  deliveryStatus: DeliveryStatus;
+  metadata: {
+    orderId?: string;
+    orderNo?: string;
+    status?: OrderStatus;
+    templateId?: string | null;
+    templateName?: string | null;
+    channel?: string;
+    type?: string;
+    error?: string | null;
+    retriedAt?: string;
+    [key: string]: unknown;
+  };
+  createdAt: ISODateString;
+}
+
+export interface SendProgressUpdateRequest {
+  templateId?: string | null | undefined;
+  text: string;
 }
 
 // ─── Customers (admin only) ──────────────────────────────────────────────────

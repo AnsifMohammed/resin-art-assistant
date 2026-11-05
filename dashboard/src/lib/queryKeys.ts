@@ -53,9 +53,14 @@ export const queryKeys = {
   },
   orders: {
     all: ["orders"] as const,
-    list: (params?: { status?: string | undefined; search?: string | undefined }) =>
-      [...queryKeys.orders.all, "list", params] as const,
+    list: (params?: {
+      status?: string | undefined;
+      search?: string | undefined;
+      dueFrom?: string | undefined;
+      dueTo?: string | undefined;
+    }) => [...queryKeys.orders.all, "list", params] as const,
     detail: (id: string) => [...queryKeys.orders.all, "detail", id] as const,
+    messages: (id: string) => [...queryKeys.orders.all, "messages", id] as const,
   },
   customers: {
     all: ["customers"] as const,

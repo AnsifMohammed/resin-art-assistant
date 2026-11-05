@@ -48,7 +48,7 @@ export function matches(table: string, row: any, cond: any): boolean {
   const col = (name: string) => row[camel(name)];
   const t = table.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-  for (const m of sql.matchAll(new RegExp(`"${t}"\\."(\\w+)" (=|<>|<=|<) \\$(\\d+)`, "g"))) {
+  for (const m of sql.matchAll(new RegExp(`"${t}"\\."(\\w+)" (=|<>|<=|<|>=|>) \\$(\\d+)`, "g"))) {
     const [, name, op, idx] = m;
     const a = toComparable(col(name!));
     const b = toComparable(p(idx!));
@@ -56,6 +56,8 @@ export function matches(table: string, row: any, cond: any): boolean {
     if (op === "<>" && a === b) return false;
     if (op === "<" && !(a !== null && a !== undefined && (a as number) < (b as number))) return false;
     if (op === "<=" && !(a !== null && a !== undefined && (a as number) <= (b as number))) return false;
+    if (op === ">" && !(a !== null && a !== undefined && (a as number) > (b as number))) return false;
+    if (op === ">=" && !(a !== null && a !== undefined && (a as number) >= (b as number))) return false;
   }
   for (const m of sql.matchAll(new RegExp(`"${t}"\\."(\\w+)" in \\(([^)]*)\\)`, "g"))) {
     const [, name, list] = m;

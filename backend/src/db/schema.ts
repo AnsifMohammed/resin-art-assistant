@@ -50,7 +50,7 @@ export const paymentKindEnum = pgEnum("payment_kind", ["advance", "balance", "ot
 export const paymentStatusEnum = pgEnum("payment_status", ["pending", "paid", "void"]);
 
 export const templateCategoryEnum = pgEnum("template_category", [
-  "delivery", "festive", "custom_order", "payment", "general"
+  "delivery", "festive", "custom_order", "payment", "general", "production_progress"
 ]);
 
 export const templateChannelEnum = pgEnum("template_channel", ["whatsapp", "instagram", "both"]);
@@ -368,6 +368,7 @@ export const orders = pgTable("orders", {
   customerNotes: text("customer_notes"),
   internalNotes: text("internal_notes"),
   expectedDeliveryDate: date("expected_delivery_date"),
+  productionStartedAt: timestamp("production_started_at"),
   dispatchedAt: timestamp("dispatched_at"),
   deliveredAt: timestamp("delivered_at"),
   isDeleted: boolean("is_deleted").notNull().default(false),

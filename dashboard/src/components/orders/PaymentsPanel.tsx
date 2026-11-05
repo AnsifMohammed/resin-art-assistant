@@ -5,6 +5,7 @@ import {
   Check,
   CheckCircle2,
   Clock,
+  Link as LinkIcon,
   Plus,
   Receipt,
   X,
@@ -18,16 +19,27 @@ import {
 } from "../../hooks/usePayments.ts";
 import { formatDateTime } from "../../lib/format.ts";
 import { EmptyState } from "../shared/EmptyState.tsx";
+import { PaymentRequestModal } from "./PaymentRequestModal.tsx";
 import type { Payment, PaymentKind } from "../../types/index.ts";
 
 export interface PaymentsPanelProps {
   orderId: string;
   orderTotal: number;
+  order?: {
+    orderNo?: string | number;
+    customerName?: string;
+    channel?: string;
+    customerPhone?: string | null;
+  } | null;
 }
 
 const PAYMENT_METHODS = ["UPI", "GPay", "PhonePe", "Bank Transfer", "Cash"] as const;
 
-export function PaymentsPanel({ orderId, orderTotal: initialOrderTotal }: PaymentsPanelProps) {
+export function PaymentsPanel({
+  orderId,
+  orderTotal: initialOrderTotal,
+  order,
+}: PaymentsPanelProps) {
   const { data, isLoading } = useOrderPayments(orderId);
   const recordPayment = useRecordPayment(orderId);
   const markPaymentPaid = useMarkPaymentPaid(orderId);
@@ -41,6 +53,9 @@ export function PaymentsPanel({ orderId, orderTotal: initialOrderTotal }: Paymen
   const [newReference, setNewReference] = useState<string>("");
   const [newNote, setNewNote] = useState<string>("");
   const [markPaidImmediately, setMarkPaidImmediately] = useState<boolean>(false);
+
+  // Payment Link & Request dialog state
+  const [paymentForLinkModal, setPaymentForLinkModal] = useState<Payment | null>(null);
 
   // Mark Paid dialog state
   const [markingPaidPayment, setMarkingPaidPayment] = useState<Payment | null>(null);
@@ -124,7 +139,7 @@ export function PaymentsPanel({ orderId, orderTotal: initialOrderTotal }: Paymen
     }
 
     try {
-      await recordPayment.mutateAsync({
+      const res = await recordPayment.mutateAsync({
         kind: newKind,
         amount: parsedAmount,
         method: newMethod,
@@ -132,11 +147,18 @@ export function PaymentsPanel({ orderId, orderTotal: initialOrderTotal }: Paymen
         note: newNote.trim() || null,
         markPaidImmediately,
       });
-      toast.success(
-        markPaidImmediately
-          ? `Recorded ₹${parsedAmount.toLocaleString("en-IN")} received`
-          : `Payment request of ₹${parsedAmount.toLocaleString("en-IN")} recorded as pending`,
-      );
+
+      if (markPaidImmediately) {
+        toast.success(`Recorded ₹${parsedAmount.toLocaleString("en-IN")} received`);
+      } else {
+        toast.success(
+          `Payment request of ₹${parsedAmount.toLocaleString("en-IN")} recorded as pending`,
+        );
+        if (res?.payment) {
+          setPaymentForLinkModal(res.payment);
+        }
+      }
+
       setNewAmount("");
       setNewReference("");
       setNewNote("");
@@ -218,6 +240,20 @@ export function PaymentsPanel({ orderId, orderTotal: initialOrderTotal }: Paymen
             >
               ₹{balanceDue.toLocaleString("en-IN")}
             </span>
+            {balanceDue > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  setNewAmount(String(balanceDue));
+                  setNewKind(totalPaid > 0 ? "balance" : "advance");
+                  setIsAddFormOpen(true);
+                }}
+                className="mt-1 text-[11px] font-semibold text-amber-700 dark:text-amber-400 hover:underline inline-flex items-center gap-1 cursor-pointer"
+              >
+                <span>Request Balance</span>
+                <LinkIcon className="w-3 h-3" />
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -481,33 +517,47 @@ export function PaymentsPanel({ orderId, orderTotal: initialOrderTotal }: Paymen
                     </div>
                   </div>
 
-                  {/* Right Side: Actions for pending row */}
-                  {isPending && (
-                    <div className="flex items-center gap-2 shrink-0 pt-1 sm:pt-0">
+                  {/* Right Side: Actions */}
+                  <div className="flex items-center gap-1.5 shrink-0 pt-1 sm:pt-0">
+                    {!isVoid && (
                       <button
                         type="button"
-                        onClick={() => handleOpenMarkPaid(p)}
-                        className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-11 font-semibold inline-flex items-center gap-1 shadow-xs transition-colors cursor-pointer"
-                        title="Confirm and mark payment as received"
+                        onClick={() => setPaymentForLinkModal(p)}
+                        className="px-2.5 py-1 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 text-11 font-semibold inline-flex items-center gap-1 shadow-xs transition-colors cursor-pointer"
+                        title="Generate and view payment link / request"
                       >
-                        <Check className="w-3.5 h-3.5" />
-                        <span>Mark Paid</span>
+                        <LinkIcon className="w-3.5 h-3.5" />
+                        <span>Payment Link</span>
                       </button>
+                    )}
 
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setVoidingPayment(p);
-                          setVoidReason("");
-                        }}
-                        className="px-2 py-1 rounded-lg text-text-muted hover:text-red-600 hover:bg-red-500/10 text-11 font-medium inline-flex items-center gap-1 transition-colors cursor-pointer"
-                        title="Void this payment line"
-                      >
-                        <Ban className="w-3.5 h-3.5" />
-                        <span>Void</span>
-                      </button>
-                    </div>
-                  )}
+                    {isPending && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => handleOpenMarkPaid(p)}
+                          className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-11 font-semibold inline-flex items-center gap-1 shadow-xs transition-colors cursor-pointer"
+                          title="Confirm and mark payment as received"
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                          <span>Mark Paid</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setVoidingPayment(p);
+                            setVoidReason("");
+                          }}
+                          className="px-2 py-1 rounded-lg text-text-muted hover:text-red-600 hover:bg-red-500/10 text-11 font-medium inline-flex items-center gap-1 transition-colors cursor-pointer"
+                          title="Void this payment line"
+                        >
+                          <Ban className="w-3.5 h-3.5" />
+                          <span>Void</span>
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </div>
               );
             })}
@@ -656,6 +706,14 @@ export function PaymentsPanel({ orderId, orderTotal: initialOrderTotal }: Paymen
           </div>
         </div>
       )}
+      {/* ─── Payment Request Link Modal ────────────────────────────────────── */}
+      <PaymentRequestModal
+        isOpen={Boolean(paymentForLinkModal)}
+        onClose={() => setPaymentForLinkModal(null)}
+        orderId={orderId}
+        payment={paymentForLinkModal}
+        order={order}
+      />
     </div>
   );
 }
