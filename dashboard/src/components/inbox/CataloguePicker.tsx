@@ -3,18 +3,19 @@ import { createPortal } from "react-dom";
 import {
   AlertTriangle,
   CheckSquare,
+  ChevronLeft,
+  ChevronRight,
   Clock,
   Layers,
   Loader2,
+  MessageSquare,
   MinusSquare,
   Package,
   Plus,
   Search,
   Send,
-  ShoppingBag,
   Sparkles,
   Square,
-  Tag,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -46,6 +47,90 @@ function formatPriceRange(product: Product): string {
     return `₹${min.toLocaleString("en-IN")}`;
   }
   return `₹${min.toLocaleString("en-IN")} – ₹${max.toLocaleString("en-IN")}`;
+}
+
+function PreviewImageCarousel({
+  images,
+  name,
+  leadTimeDays,
+}: {
+  images?: string[];
+  name: string;
+  leadTimeDays?: number;
+}) {
+  const imgList = Array.isArray(images) && images.length > 0 ? images : [];
+  const [activeIdx, setActiveIdx] = useState(0);
+
+  const prev = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setActiveIdx((i) => (i > 0 ? i - 1 : imgList.length - 1));
+  };
+
+  const next = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setActiveIdx((i) => (i < imgList.length - 1 ? i + 1 : 0));
+  };
+
+  if (imgList.length === 0) {
+    return (
+      <div className="flex h-36 w-full items-center justify-center bg-surface-muted text-text-muted">
+        <Package className="h-10 w-10 opacity-30" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative h-44 w-full overflow-hidden bg-black/5 group">
+      <img
+        src={imgList[activeIdx]}
+        alt={`${name} ${activeIdx + 1}`}
+        className="h-full w-full object-cover transition-all duration-300"
+      />
+      {imgList.length > 1 && (
+        <div className="absolute top-2 left-2 rounded-md bg-black/60 px-2 py-0.5 text-10 font-semibold text-white backdrop-blur-xs">
+          {activeIdx + 1}/{imgList.length}
+        </div>
+      )}
+      {leadTimeDays !== undefined && (
+        <div className="absolute top-2 right-2">
+          <span className="rounded-md bg-black/60 px-2 py-0.5 text-10 font-medium text-white backdrop-blur-xs">
+            ⏱️ ~{leadTimeDays}d lead time
+          </span>
+        </div>
+      )}
+      {imgList.length > 1 && (
+        <>
+          <button
+            type="button"
+            onClick={prev}
+            className="absolute left-1.5 top-1/2 -translate-y-1/2 rounded-full bg-black/60 p-1 text-white opacity-80 group-hover:opacity-100 transition-opacity hover:bg-black/80 cursor-pointer"
+            aria-label="Previous image"
+          >
+            <ChevronLeft className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={next}
+            className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-full bg-black/60 p-1 text-white opacity-80 group-hover:opacity-100 transition-opacity hover:bg-black/80 cursor-pointer"
+            aria-label="Next image"
+          >
+            <ChevronRight className="h-3.5 w-3.5" />
+          </button>
+          <div className="absolute bottom-2 inset-x-0 flex justify-center gap-1">
+            {imgList.map((_, i) => (
+              <span
+                key={i}
+                className={cn(
+                  "h-1.5 rounded-full transition-all",
+                  i === activeIdx ? "w-4 bg-white" : "w-1.5 bg-white/50",
+                )}
+              />
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
 }
 
 export function CataloguePicker({
@@ -477,17 +562,11 @@ export function CataloguePicker({
                 ) : selectedProducts.length === 1 ? (
                   /* Single Product Card Preview */
                   <div className="overflow-hidden rounded-xl border border-border bg-surface-muted/30 shadow-xs max-w-sm mx-auto">
-                    {selectedProducts[0]!.images?.[0] ? (
-                      <img
-                        src={selectedProducts[0]!.images[0]}
-                        alt={selectedProducts[0]!.name}
-                        className="h-44 w-full object-cover"
-                      />
-                    ) : (
-                      <div className="flex h-36 w-full items-center justify-center bg-surface-muted text-text-muted">
-                        <Package className="h-10 w-10 opacity-30" />
-                      </div>
-                    )}
+                    <PreviewImageCarousel
+                      images={selectedProducts[0]!.images}
+                      name={selectedProducts[0]!.name}
+                      leadTimeDays={selectedProducts[0]!.leadTimeDays}
+                    />
                     <div className="p-3">
                       {customNote.trim() && (
                         <p className="mb-2 text-12 text-text font-medium border-b border-border/40 pb-1.5">
@@ -506,167 +585,140 @@ export function CataloguePicker({
                         {selectedProducts[0]!.customizable && <span>· 🎨 Customizable</span>}
                       </div>
 
-                      {/* Mock Interactive 3-Button Suite */}
-                      <div className="mt-3 space-y-1.5 border-t border-border/60 pt-2.5">
-                        <div className="flex items-center justify-center gap-1.5 rounded-lg border border-primary/40 bg-primary/10 py-1.5 text-11 font-semibold text-primary">
-                          <Tag className="h-3.5 w-3.5" />
-                          <span>🏷️ Sizes & Price</span>
+                          {/* Mock Interactive Single Action */}
+                          <div className="mt-3 border-t border-border/60 pt-2.5">
+                            <div className="flex items-center justify-center gap-1.5 rounded-xl border border-primary/40 bg-primary/10 py-2 text-12 font-semibold text-primary shadow-xs">
+                              <MessageSquare className="h-3.5 w-3.5" />
+                              <span>💬 Enquire Now</span>
+                            </div>
+                          </div>
                         </div>
-                        <div className="flex items-center justify-center gap-1.5 rounded-lg border border-primary/40 bg-primary/10 py-1.5 text-11 font-semibold text-primary">
-                          <Sparkles className="h-3.5 w-3.5" />
-                          <span>🎨 Customize</span>
+                      </div>
+                      ) : (
+                      /* Multi-Product Vertical Scroll Preview */
+                      <div className="max-w-sm mx-auto space-y-2">
+                        {customNote.trim() && (
+                          <p className="mb-2 text-12 text-text font-medium border-b border-border/40 pb-1.5">
+                            {customNote.trim()}
+                          </p>
+                        )}
+                        <div className="flex items-center justify-between text-11 text-text-muted px-0.5 pb-0.5">
+                          <span className="font-semibold text-text">🛍️ Shared Catalogue ({selectedProducts.length} items)</span>
+                          <span className="text-10">Scroll down to view all</span>
                         </div>
-                        <div className="flex items-center justify-center gap-1.5 rounded-lg border border-primary/40 bg-primary/10 py-1.5 text-11 font-semibold text-primary">
-                          <ShoppingBag className="h-3.5 w-3.5" />
-                          <span>🛍️ Book / Order</span>
+
+                        <div className="max-h-[380px] overflow-y-auto space-y-3 custom-scrollbar overscroll-contain pr-1">
+                          {selectedProducts.map((p) => (
+                            <div
+                              key={p.id}
+                              className="overflow-hidden rounded-xl border border-border bg-surface-muted/30 shadow-xs"
+                            >
+                              <PreviewImageCarousel
+                                images={p.images}
+                                name={p.name}
+                                leadTimeDays={p.leadTimeDays}
+                              />
+                              <div className="p-3">
+                                <p className="text-13 font-bold text-text">{p.name}</p>
+                                <p className="text-12 font-bold text-primary mt-0.5">
+                                  {formatPriceRange(p)}
+                                </p>
+                                    {p.description && (
+                                      <p className="text-11 text-text-muted mt-1 leading-snug line-clamp-2">
+                                        {p.description}
+                                      </p>
+                                    )}
+                                    <div className="mt-2.5 border-t border-border/60 pt-2">
+                                      <div className="flex items-center justify-center gap-1.5 rounded-xl border border-primary/40 bg-primary/10 py-1.5 text-11 font-semibold text-primary shadow-xs">
+                                        <MessageSquare className="h-3 w-3" />
+                                        <span>💬 Enquire Now</span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                      ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Optional Custom Note Input */}
+                        <div>
+                          <label className="block text-11 font-medium text-text-muted mb-1">
+                            Optional note / greeting to customer:
+                          </label>
+                          <textarea
+                            rows={2}
+                            value={customNote}
+                            onChange={(e) => setCustomNote(e.target.value)}
+                            placeholder="e.g. Hi! Here are the clocks you asked about:"
+                            className="w-full resize-none rounded-xl border border-border bg-surface p-2 text-12 text-text placeholder:text-text-muted focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/30"
+                          />
                         </div>
                       </div>
                     </div>
                   </div>
-                ) : (
-                  /* Multi-Product Vertical Scroll Preview */
-                  <div className="max-w-sm mx-auto space-y-2">
-                    {customNote.trim() && (
-                      <p className="mb-2 text-12 text-text font-medium border-b border-border/40 pb-1.5">
-                        {customNote.trim()}
-                      </p>
-                    )}
-                    <div className="flex items-center justify-between text-11 text-text-muted px-0.5 pb-0.5">
-                      <span className="font-semibold text-text">🛍️ Shared Catalogue ({selectedProducts.length} items)</span>
-                      <span className="text-10">Scroll down to view all</span>
-                    </div>
-
-                    <div className="max-h-[380px] overflow-y-auto space-y-3 custom-scrollbar overscroll-contain pr-1">
-                      {selectedProducts.map((p) => (
-                        <div
-                          key={p.id}
-                          className="overflow-hidden rounded-xl border border-border bg-surface-muted/30 shadow-xs"
-                        >
-                          {p.images?.[0] ? (
-                            <div className="relative h-36 w-full overflow-hidden bg-black/5">
-                              <img
-                                src={p.images[0]}
-                                alt={p.name}
-                                className="h-full w-full object-cover"
-                              />
-                              <div className="absolute top-2 right-2">
-                                <span className="rounded-md bg-black/60 px-2 py-0.5 text-10 font-medium text-white backdrop-blur-xs">
-                                  ⏱️ ~{p.leadTimeDays}d lead time
-                                </span>
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="flex h-28 w-full items-center justify-center bg-surface-muted text-text-muted">
-                              <Package className="h-8 w-8 opacity-30" />
-                            </div>
-                          )}
-                          <div className="p-3">
-                            <p className="text-13 font-bold text-text">{p.name}</p>
-                            <p className="text-12 font-bold text-primary mt-0.5">
-                              {formatPriceRange(p)}
-                            </p>
-                            <p className="text-11 text-text-muted mt-1 leading-snug line-clamp-2">
-                              {p.description || "Handmade premium resin art."}
-                            </p>
-                            <div className="mt-2.5 space-y-1.5 border-t border-border/60 pt-2">
-                              <div className="flex items-center justify-center gap-1.5 rounded-lg border border-primary/40 bg-primary/10 py-1 text-11 font-semibold text-primary">
-                                <Tag className="h-3 w-3" />
-                                <span>🏷️ Sizes & Price</span>
-                              </div>
-                              <div className="flex items-center justify-center gap-1.5 rounded-lg border border-primary/40 bg-primary/10 py-1 text-11 font-semibold text-primary">
-                                <Sparkles className="h-3 w-3" />
-                                <span>🎨 Customize</span>
-                              </div>
-                              <div className="flex items-center justify-center gap-1.5 rounded-lg border border-primary/40 bg-primary/10 py-1 text-11 font-semibold text-primary">
-                                <ShoppingBag className="h-3 w-3" />
-                                <span>🛍️ Book / Order</span>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Optional Custom Note Input */}
-              <div>
-                <label className="block text-11 font-medium text-text-muted mb-1">
-                  Optional note / greeting to customer:
-                </label>
-                <textarea
-                  rows={2}
-                  value={customNote}
-                  onChange={(e) => setCustomNote(e.target.value)}
-                  placeholder="e.g. Hi! Here are the clocks you asked about:"
-                  className="w-full resize-none rounded-xl border border-border bg-surface p-2 text-12 text-text placeholder:text-text-muted focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/30"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
 
         {/* Footer */}
-        <footer className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-border bg-surface px-4 py-3 sm:px-6">
-          <div className="flex items-center gap-2 text-12 text-text-muted">
-            <span className="font-medium text-text">
-              {selectedIds.length} {selectedIds.length === 1 ? "product" : "products"} selected
-            </span>
-            {selectedIds.length > 0 && (
-              <button
-                type="button"
-                onClick={() => setSelectedIds([])}
-                className="text-11 text-text-muted hover:text-text underline cursor-pointer"
-              >
-                Clear all
-              </button>
-            )}
-          </div>
+                <footer className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-border bg-surface px-4 py-3 sm:px-6">
+                  <div className="flex items-center gap-2 text-12 text-text-muted">
+                    <span className="font-medium text-text">
+                      {selectedIds.length} {selectedIds.length === 1 ? "product" : "products"} selected
+                    </span>
+                    {selectedIds.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setSelectedIds([])}
+                        className="text-11 text-text-muted hover:text-text underline cursor-pointer"
+                      >
+                        Clear all
+                      </button>
+                    )}
+                  </div>
 
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={sending}
-              className="rounded-xl border border-border px-3.5 py-2 text-12 font-medium text-text hover:bg-surface-muted transition cursor-pointer disabled:opacity-50"
-            >
-              Cancel
-            </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={onClose}
+                      disabled={sending}
+                      className="rounded-xl border border-border px-3.5 py-2 text-12 font-medium text-text hover:bg-surface-muted transition cursor-pointer disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
 
-            <button
-              type="button"
-              onClick={handleInsert}
-              disabled={selectedIds.length === 0 || sending}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-primary/50 bg-primary/10 px-3.5 py-2 text-12 font-semibold text-primary transition hover:bg-primary/20 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-              title="Populates the reply input for editing before sending"
-            >
-              <Plus className="h-4 w-4" />
-              <span>Insert into Chat</span>
-            </button>
+                    <button
+                      type="button"
+                      onClick={handleInsert}
+                      disabled={selectedIds.length === 0 || sending}
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-primary/50 bg-primary/10 px-3.5 py-2 text-12 font-semibold text-primary transition hover:bg-primary/20 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+                      title="Populates the reply input for editing before sending"
+                    >
+                      <Plus className="h-4 w-4" />
+                      <span>Insert into Chat</span>
+                    </button>
 
-            <button
-              type="button"
-              onClick={handleSend}
-              disabled={selectedIds.length === 0 || sending || windowClosed}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-12 font-semibold text-primary-foreground shadow-xs transition hover:brightness-105 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {sending ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <span>Sending…</span>
-                </>
-              ) : (
-                <>
-                  <Send className="h-3.5 w-3.5" />
-                  <span>Send Catalogue</span>
-                </>
-              )}
-            </button>
-          </div>
-        </footer>
-      </div>
-    </div>,
-    document.body,
-  );
+                    <button
+                      type="button"
+                      onClick={handleSend}
+                      disabled={selectedIds.length === 0 || sending || windowClosed}
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-12 font-semibold text-primary-foreground shadow-xs transition hover:brightness-105 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {sending ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          <span>Sending…</span>
+                        </>
+                      ) : (
+                        <>
+                          <Send className="h-3.5 w-3.5" />
+                          <span>Send Catalogue</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </footer>
+              </div>
+            </div>,
+            document.body,
+            );
 }

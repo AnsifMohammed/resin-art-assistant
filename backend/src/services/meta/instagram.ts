@@ -325,6 +325,7 @@ export interface InstagramProductCardItem {
   name: string;
   price: string;
   imageUrl?: string | undefined;
+  images?: string[] | undefined;
   leadTime: number;
   description?: string | undefined;
 }
@@ -356,30 +357,62 @@ export async function sendInstagramProductCards(
   const token = opts.accessToken ?? (await resolveInstagramToken(opts.businessId));
   const url = `${INSTAGRAM_GRAPH_HOST}/${INSTAGRAM_GRAPH_VERSION}/me/messages`;
 
+  // If single product with multiple images, send as a native swipeable image carousel (up to 10 images)
+  if (opts.products.length === 1 && Array.isArray(opts.products[0]!.images) && opts.products[0]!.images.length > 1) {
+    const p = opts.products[0]!;
+    const imgs = (p.images ?? []).slice(0, 10);
+    const elements = imgs.map((imgUrl, imgIdx) => ({
+      title: `${p.name} (${imgIdx + 1}/${imgs.length})`.slice(0, 80),
+      image_url: imgUrl,
+      subtitle: `${p.price} • ~${p.leadTime}d lead time`.slice(0, 80),
+      buttons: [
+        {
+          type: "postback",
+          title: "💬 Enquire Now",
+          payload: `action:enquire:${p.slug}:${imgIdx}`,
+        },
+      ],
+    }));
+
+    const body = await graphRequest(url, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        recipient: { id: opts.recipientId },
+        message: {
+          attachment: {
+            type: "template",
+            payload: {
+              template_type: "generic",
+              elements,
+            },
+          },
+        },
+      }),
+    });
+
+    const mid = str(body.message_id);
+    if (!mid) {
+      throw new AppError(502, "Instagram API response had no message_id", "META_ERROR");
+    }
+    return { metaMessageId: mid };
+  }
+
   const productsToSend = opts.products.slice(0, 10);
   let firstMetaMessageId: string | null = null;
 
   for (let i = 0; i < productsToSend.length; i++) {
     const p = productsToSend[i]!;
+    const heroImage = p.imageUrl || (Array.isArray(p.images) && p.images[0]) || undefined;
     const element = {
       title: p.name.slice(0, 80),
-      ...(p.imageUrl ? { image_url: p.imageUrl } : {}),
-      subtitle: `${p.price} • ${p.leadTime}d lead time`.slice(0, 80),
+      ...(heroImage ? { image_url: heroImage } : {}),
+      subtitle: `${p.price} • ~${p.leadTime}d lead time`.slice(0, 80),
       buttons: [
         {
           type: "postback",
-          title: "🏷️ Sizes & Price",
-          payload: `action:sizes:${p.slug}`,
-        },
-        {
-          type: "postback",
-          title: "🎨 Customize",
-          payload: `action:custom:${p.slug}`,
-        },
-        {
-          type: "postback",
-          title: "🛍️ Book / Order",
-          payload: `action:order:${p.slug}`,
+          title: "💬 Enquire Now",
+          payload: `action:enquire:${p.slug}`,
         },
       ],
     };

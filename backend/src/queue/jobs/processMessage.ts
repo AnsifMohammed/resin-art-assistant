@@ -13,13 +13,14 @@ import {
   escalations,
   messages,
   products,
+  type ActiveEnquiryData,
 } from "../../db/schema.ts";
 import { Sentry } from "../../instrument.ts";
 import { markMessageSent } from "../../lib/conversation.ts";
 import { logger } from "../../lib/logger.ts";
 import { emitConversationUpdated, emitEscalationNew, emitMessageNew } from "../../realtime/events.ts";
 import { notifyEscalation } from "../../services/notify.ts";
-import { sendMessage } from "../../services/send.ts";
+import { sendMessage, type InteractiveProduct } from "../../services/send.ts";
 
 export interface ProcessMessageParams {
   conversationId: string;
@@ -323,19 +324,53 @@ async function runPipeline(params: ProcessMessageParams): Promise<AiDecision | n
   }
 
   // 4. Call AI pipeline (rules are applied inside)
-  logger.info({ conversationId, batchSize: batch.length }, "Running AI pipeline on message batch");
+  const batchMediaUrls: string[] = [];
+  for (const msg of batch) {
+    if (Array.isArray(msg.mediaUrls)) {
+      for (const url of msg.mediaUrls) {
+        if (typeof url === "string" && url.trim().length > 0) {
+          batchMediaUrls.push(url.trim());
+        }
+      }
+    }
+  }
+
+  logger.info({ conversationId, batchSize: batch.length, mediaCount: batchMediaUrls.length }, "Running AI pipeline on message batch");
   const decision = await processAiDecision({
     businessId,
     incomingText: rawText,
     history: history.map((m) => ({ senderType: m.senderType, content: m.content })),
     customerName: customer?.name ?? null,
     customerHandle: customer?.handleOrPhone ?? null,
+    activeProductSlug: conv.activeProductSlug ?? null,
+    activeEnquiry: (conv.activeEnquiry as Record<string, unknown>) ?? null,
+    mediaUrls: batchMediaUrls.length > 0 ? batchMediaUrls : null,
   });
 
   // Re-check the pause switch: it may have been flipped during the LLM call.
   if (await isAutomationPaused(businessId)) {
     logger.info({ conversationId }, "Automation paused during AI call; not sending or escalating");
     return null;
+  }
+
+  // If structured enquiry details were extracted, update conversation state
+  if (decision.extracted_enquiry) {
+    const existing = ((conv.activeEnquiry as ActiveEnquiryData) || {}) as ActiveEnquiryData;
+    const isComplete = Boolean(decision.extracted_enquiry.is_complete);
+    const updated: ActiveEnquiryData = {
+      ...existing,
+      ...(decision.extracted_enquiry.quantity !== undefined ? { quantity: decision.extracted_enquiry.quantity } : {}),
+      ...(decision.extracted_enquiry.size ? { size: decision.extracted_enquiry.size } : {}),
+      ...(decision.extracted_enquiry.color ? { color: decision.extracted_enquiry.color } : {}),
+      ...(decision.extracted_enquiry.personalization ? { personalization: decision.extracted_enquiry.personalization } : {}),
+      ...(decision.extracted_enquiry.custom_notes ? { customNotes: decision.extracted_enquiry.custom_notes } : {}),
+      status: isComplete ? "ready_for_quote" : (existing.status ?? "collecting"),
+      updatedAt: new Date().toISOString(),
+    };
+    await db
+      .update(conversations)
+      .set({ activeEnquiry: updated })
+      .where(eq(conversations.id, conversationId));
   }
 
   // 5. Escalate
@@ -354,16 +389,28 @@ async function runPipeline(params: ProcessMessageParams): Promise<AiDecision | n
     return escalated ? decision : null;
   }
 
+  // If in Copilot mode, record the draft decision but do NOT auto-send
+  if (conv.aiMode === "copilot") {
+    logger.info({ conversationId }, "AI in Copilot mode: draft recorded, skipping auto-send");
+    await db.insert(aiDecisions).values({
+      messageId: latestInbound.id,
+      conversationId,
+      businessId,
+      intent: decision.intent,
+      replyDraft: decision.reply,
+      factsUsed: decision.facts_used,
+      missingFacts: decision.missing_facts,
+      escalate: false,
+      escalateReason: null,
+      suggestedTag: decision.suggested_tag,
+      languageDetected: decision.language_detected,
+      sent: false,
+    });
+    return decision;
+  }
+
   // 6. Fetch interactive products if AI decided to share catalogue
-  let interactiveProducts: Array<{
-    id: string;
-    slug: string;
-    name: string;
-    price: string;
-    imageUrl?: string | undefined;
-    leadTime: number;
-    description?: string | undefined;
-  }> = [];
+  let interactiveProducts: InteractiveProduct[] = [];
 
   if (decision.send_catalogue) {
     let matchedProducts: Array<typeof products.$inferSelect> = [];
@@ -405,7 +452,7 @@ async function runPipeline(params: ProcessMessageParams): Promise<AiDecision | n
           ? `₹${minPrice.toLocaleString("en-IN")} – ₹${maxPrice.toLocaleString("en-IN")}`
           : `₹${minPrice.toLocaleString("en-IN")}`;
 
-      const images = Array.isArray(p.images) ? p.images : [];
+      const images = Array.isArray(p.images) ? (p.images as string[]) : [];
       const firstImg = typeof images[0] === "string" ? images[0] : undefined;
 
       return {
@@ -414,8 +461,11 @@ async function runPipeline(params: ProcessMessageParams): Promise<AiDecision | n
         name: p.name,
         price: priceStr,
         imageUrl: firstImg,
+        images,
         leadTime: p.leadTimeDays,
         description: p.description ?? undefined,
+        customizable: p.customizable,
+        customOptions: Array.isArray(p.customOptions) ? (p.customOptions as string[]) : [],
       };
     });
   }
@@ -442,10 +492,10 @@ async function runPipeline(params: ProcessMessageParams): Promise<AiDecision | n
 
     const msgMetadata: Record<string, unknown> = interactiveProducts.length > 0
       ? {
-          kind: "catalogue_share",
-          productIds: interactiveProducts.map((p) => p.id),
-          products: interactiveProducts,
-        }
+        kind: "catalogue_share",
+        productIds: interactiveProducts.map((p) => p.id),
+        products: interactiveProducts,
+      }
       : {};
 
     const [outboundMsg] = await tx
@@ -502,11 +552,11 @@ async function runPipeline(params: ProcessMessageParams): Promise<AiDecision | n
       conversationId,
       ...(interactiveProducts.length > 0
         ? {
-            interactive: {
-              type: interactiveProducts.length === 1 ? "catalogue_card" : "catalogue_list",
-              products: interactiveProducts,
-            },
-          }
+          interactive: {
+            type: interactiveProducts.length === 1 ? "catalogue_card" : "catalogue_list",
+            products: interactiveProducts,
+          },
+        }
         : {}),
     });
     metaMessageId = result?.metaMessageId ?? null;

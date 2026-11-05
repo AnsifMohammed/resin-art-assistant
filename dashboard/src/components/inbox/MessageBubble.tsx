@@ -1,5 +1,16 @@
 import { useId, useState } from "react";
-import { AlertCircle, Bot, ChevronDown, Download, Package, ShoppingBag, Sparkles, Tag } from "lucide-react";
+import {
+  AlertCircle,
+  Bot,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Download,
+  MessageSquare,
+  Package,
+  Sparkles,
+  Tag,
+} from "lucide-react";
 import { cn } from "../../lib/cn.ts";
 import { escalationReasonLabel } from "../../lib/escalationReasons.ts";
 import { formatTime, humanize } from "../../lib/format.ts";
@@ -147,6 +158,103 @@ function getDownloadUrl(url: string): string {
   return url;
 }
 
+function ProductCardCarousel({
+  product,
+}: {
+  product: {
+    name?: string;
+    imageUrl?: string;
+    images?: string[];
+    leadTime?: number;
+    price?: string;
+    description?: string;
+  };
+}) {
+  const images =
+    Array.isArray(product.images) && product.images.length > 0
+      ? product.images
+      : product.imageUrl
+        ? [product.imageUrl]
+        : [];
+  const [activeIdx, setActiveIdx] = useState(0);
+
+  const prev = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setActiveIdx((i) => (i > 0 ? i - 1 : images.length - 1));
+  };
+
+  const next = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setActiveIdx((i) => (i < images.length - 1 ? i + 1 : 0));
+  };
+
+  return (
+    <div className="relative h-40 sm:h-44 w-full overflow-hidden bg-black/5 group">
+      {images.length > 0 ? (
+        <img
+          src={images[activeIdx]}
+          alt={`${product.name || "Product"} ${activeIdx + 1}`}
+          className="h-full w-full object-cover rounded-t-xl transition-all duration-300"
+        />
+      ) : (
+        <div className="flex h-full w-full items-center justify-center bg-surface-muted text-text-muted">
+          <Package className="h-8 w-8 opacity-40" />
+        </div>
+      )}
+
+      {/* Position indicator */}
+      {images.length > 1 && (
+        <div className="absolute top-2 left-2 rounded-md bg-black/60 px-2 py-0.5 text-10 font-semibold text-white backdrop-blur-xs">
+          {activeIdx + 1}/{images.length}
+        </div>
+      )}
+
+      {/* Lead time badge */}
+      {product.leadTime !== undefined && (
+        <div className="absolute top-2 right-2">
+          <span className="rounded-md bg-black/60 px-2 py-0.5 text-10 font-medium text-white backdrop-blur-xs">
+            ⏱️ ~{product.leadTime}d lead time
+          </span>
+        </div>
+      )}
+
+      {/* Carousel navigation arrows */}
+      {images.length > 1 && (
+        <>
+          <button
+            type="button"
+            onClick={prev}
+            className="absolute left-1.5 top-1/2 -translate-y-1/2 rounded-full bg-black/60 p-1 text-white opacity-80 group-hover:opacity-100 transition-opacity hover:bg-black/80 cursor-pointer"
+            aria-label="Previous image"
+          >
+            <ChevronLeft className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={next}
+            className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-full bg-black/60 p-1 text-white opacity-80 group-hover:opacity-100 transition-opacity hover:bg-black/80 cursor-pointer"
+            aria-label="Next image"
+          >
+            <ChevronRight className="h-3.5 w-3.5" />
+          </button>
+          {/* Dots */}
+          <div className="absolute bottom-2 inset-x-0 flex justify-center gap-1">
+            {images.map((_, dotIdx) => (
+              <span
+                key={dotIdx}
+                className={cn(
+                  "h-1.5 rounded-full transition-all",
+                  dotIdx === activeIdx ? "w-4 bg-white" : "w-1.5 bg-white/50",
+                )}
+              />
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 export function MessageBubble({ message, senderLabel, pending = false }: MessageBubbleProps) {
   const { senderType } = message;
   const media = Array.isArray(message.mediaUrls) ? message.mediaUrls.filter((u) => typeof u === "string" && u) : [];
@@ -155,14 +263,14 @@ export function MessageBubble({ message, senderLabel, pending = false }: Message
   const isCatalogue = metadata?.kind === "catalogue_share";
   const sharedProducts = Array.isArray(metadata?.products)
     ? (metadata.products as Array<{
-        id?: string;
-        slug?: string;
-        name?: string;
-        price?: string;
-        imageUrl?: string;
-        leadTime?: number;
-        description?: string;
-      }>)
+      id?: string;
+      slug?: string;
+      name?: string;
+      price?: string;
+      imageUrl?: string;
+      leadTime?: number;
+      description?: string;
+    }>)
     : [];
 
   // Suppress phantom empty messages (e.g. blank echoes from media dispatches)
@@ -227,27 +335,8 @@ export function MessageBubble({ message, senderLabel, pending = false }: Message
                 key={p.id || idx}
                 className="overflow-hidden rounded-2xl border border-border/80 bg-surface shadow-xs transition text-text"
               >
-                {/* Hero Image at TOP of card */}
-                {p.imageUrl ? (
-                  <div className="relative h-36 sm:h-40 w-full overflow-hidden bg-black/5">
-                    <img
-                      src={p.imageUrl}
-                      alt={p.name || "Product"}
-                      className="h-full w-full object-cover rounded-t-xl"
-                    />
-                    {p.leadTime !== undefined && (
-                      <div className="absolute top-2 right-2">
-                        <span className="rounded-md bg-black/60 px-2 py-0.5 text-10 font-medium text-white backdrop-blur-xs">
-                          ⏱️ ~{p.leadTime}d lead time
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="flex h-32 w-full items-center justify-center bg-surface-muted text-text-muted">
-                    <Package className="h-8 w-8 opacity-40" />
-                  </div>
-                )}
+                {/* Hero / Multi-Image Carousel at TOP of card */}
+                <ProductCardCarousel product={p} />
 
                 {/* Product Info in Middle */}
                 <div className="p-3">
@@ -261,160 +350,152 @@ export function MessageBubble({ message, senderLabel, pending = false }: Message
                     </p>
                   )}
 
-                  {/* 3 Intent Action Buttons at BOTTOM of card */}
-                  <div className="mt-3 space-y-1.5 border-t border-border/60 pt-2.5">
-                    <div className="flex items-center justify-center gap-1.5 rounded-lg border border-primary/30 bg-primary/10 py-1.5 text-11 font-semibold text-primary">
-                      <Tag className="h-3.5 w-3.5" />
-                      <span>🏷️ Sizes & Price</span>
-                    </div>
-                    <div className="flex items-center justify-center gap-1.5 rounded-lg border border-primary/30 bg-primary/10 py-1.5 text-11 font-semibold text-primary">
-                      <Sparkles className="h-3.5 w-3.5" />
-                      <span>🎨 Customize</span>
-                    </div>
-                    <div className="flex items-center justify-center gap-1.5 rounded-lg border border-primary/30 bg-primary/10 py-1.5 text-11 font-semibold text-primary">
-                      <ShoppingBag className="h-3.5 w-3.5" />
-                      <span>🛍️ Book / Order</span>
+                      {/* Single Prominent Enquire Now Action at BOTTOM of card */}
+                      <div className="mt-3 border-t border-border/60 pt-2.5">
+                        <div className="flex items-center justify-center gap-1.5 rounded-xl border border-primary/40 bg-primary/10 py-2 text-12 font-semibold text-primary shadow-xs">
+                          <MessageSquare className="h-3.5 w-3.5" />
+                          <span>💬 Enquire Now</span>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                </div>
-              </div>
             ))}
-          </div>
-        </div>
-      )}
-
-      {media.length > 0 && !isCatalogue && (
-        <div className="mb-2 space-y-1.5">
-          {media.map((url, i) => {
-            const { category, ext, filename } = getFileCategory(url);
-            const downloadUrl = getDownloadUrl(url);
-
-            if (category === "video") {
-              return (
-                <div key={`${url}-${i}`} className="group relative overflow-hidden rounded-xl bg-black/10 dark:bg-black/40">
-                  <video
-                    src={url}
-                    controls
-                    preload="metadata"
-                    className="max-h-64 w-full rounded-xl bg-black"
-                  />
-                  <div className="flex justify-end p-1">
-                    <a
-                      href={downloadUrl}
-                      download={filename}
-                      target="_blank"
-                      rel="noreferrer noopener"
-                      className="inline-flex items-center gap-1 rounded bg-black/60 px-2 py-0.5 text-10 font-medium text-white hover:bg-black cursor-pointer"
-                      title="Download video"
-                    >
-                      <Download className="h-3 w-3" />
-                      <span>Download</span>
-                    </a>
-                  </div>
                 </div>
-              );
-            }
-
-            if (category === "document") {
-              const docBadge = getDocumentBadge(ext);
-              return (
-                <div
-                  key={`${url}-${i}`}
-                  className={cn(
-                    "flex items-center gap-2.5 rounded-xl border border-current/15 p-2.5 transition-colors",
-                    senderType === "customer"
-                      ? "bg-surface-muted/60 text-text"
-                      : "bg-black/10 text-current",
-                  )}
-                >
-                  <div
-                    className={cn(
-                      "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg font-bold text-11 shadow-2xs",
-                      docBadge.bg,
-                    )}
-                  >
-                    {docBadge.label}
-                  </div>
-                  <a
-                    href={url}
-                    target="_blank"
-                    rel="noreferrer noopener"
-                    className="min-w-0 flex-1 hover:underline cursor-pointer"
-                    title={`Open ${filename}`}
-                  >
-                    <p className="truncate text-12 font-medium leading-snug">{filename}</p>
-                    <span className="text-10 opacity-75">Click to view document</span>
-                  </a>
-                  <a
-                    href={downloadUrl}
-                    download={filename}
-                    target="_blank"
-                    rel="noreferrer noopener"
-                    className="inline-flex items-center gap-1 rounded-md p-1.5 opacity-80 hover:bg-black/10 hover:opacity-100 transition cursor-pointer"
-                    title="Download document"
-                  >
-                    <Download className="h-4 w-4" />
-                  </a>
-                </div>
-              );
-            }
-
-            return (
-              <div key={`${url}-${i}`} className="group relative overflow-hidden rounded-xl">
-                <a
-                  href={url}
-                  target="_blank"
-                  rel="noreferrer noopener"
-                  className="block overflow-hidden rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                  title="Click to view full image"
-                >
-                  <img
-                    src={url}
-                    alt={`Attachment ${i + 1}`}
-                    loading="lazy"
-                    className="max-h-60 w-full max-w-[18rem] rounded-xl bg-black/5 object-cover transition-transform group-hover:scale-[1.02]"
-                  />
-                </a>
-                <a
-                  href={downloadUrl}
-                  download={filename || `image-${i + 1}`}
-                  target="_blank"
-                  rel="noreferrer noopener"
-                  className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded-md bg-black/70 px-2 py-1 text-10 font-medium text-white opacity-85 backdrop-blur-xs transition hover:bg-black hover:opacity-100 cursor-pointer shadow-sm"
-                  title="Download image"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <Download className="h-3 w-3" />
-                  <span>Download</span>
-                </a>
               </div>
-            );
-          })}
-        </div>
-      )}
+            )}
 
-      {message.content && !isCatalogue && (
-        <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{message.content}</p>
-      )}
+            {media.length > 0 && !isCatalogue && (
+              <div className="mb-2 space-y-1.5">
+                {media.map((url, i) => {
+                  const { category, ext, filename } = getFileCategory(url);
+                  const downloadUrl = getDownloadUrl(url);
 
-      <p className={cn("mt-1 flex items-center justify-end gap-1 text-11", metaTone[senderType])}>
-        {failed && (
-          <span className="inline-flex items-center gap-0.5 font-medium">
-            <AlertCircle className="h-3 w-3" aria-hidden /> Not delivered ·
-          </span>
-        )}
-        {pending ? "Sending…" : <time dateTime={message.createdAt}>{formatTime(message.createdAt)}</time>}
-      </p>
-    </div>
-  );
+                  if (category === "video") {
+                    return (
+                      <div key={`${url}-${i}`} className="group relative overflow-hidden rounded-xl bg-black/10 dark:bg-black/40">
+                        <video
+                          src={url}
+                          controls
+                          preload="metadata"
+                          className="max-h-64 w-full rounded-xl bg-black"
+                        />
+                        <div className="flex justify-end p-1">
+                          <a
+                            href={downloadUrl}
+                            download={filename}
+                            target="_blank"
+                            rel="noreferrer noopener"
+                            className="inline-flex items-center gap-1 rounded bg-black/60 px-2 py-0.5 text-10 font-medium text-white hover:bg-black cursor-pointer"
+                            title="Download video"
+                          >
+                            <Download className="h-3 w-3" />
+                            <span>Download</span>
+                          </a>
+                        </div>
+                      </div>
+                    );
+                  }
 
-  if (!message.aiDecision) return bubble;
+                  if (category === "document") {
+                    const docBadge = getDocumentBadge(ext);
+                    return (
+                      <div
+                        key={`${url}-${i}`}
+                        className={cn(
+                          "flex items-center gap-2.5 rounded-xl border border-current/15 p-2.5 transition-colors",
+                          senderType === "customer"
+                            ? "bg-surface-muted/60 text-text"
+                            : "bg-black/10 text-current",
+                        )}
+                      >
+                        <div
+                          className={cn(
+                            "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg font-bold text-11 shadow-2xs",
+                            docBadge.bg,
+                          )}
+                        >
+                          {docBadge.label}
+                        </div>
+                        <a
+                          href={url}
+                          target="_blank"
+                          rel="noreferrer noopener"
+                          className="min-w-0 flex-1 hover:underline cursor-pointer"
+                          title={`Open ${filename}`}
+                        >
+                          <p className="truncate text-12 font-medium leading-snug">{filename}</p>
+                          <span className="text-10 opacity-75">Click to view document</span>
+                        </a>
+                        <a
+                          href={downloadUrl}
+                          download={filename}
+                          target="_blank"
+                          rel="noreferrer noopener"
+                          className="inline-flex items-center gap-1 rounded-md p-1.5 opacity-80 hover:bg-black/10 hover:opacity-100 transition cursor-pointer"
+                          title="Download document"
+                        >
+                          <Download className="h-4 w-4" />
+                        </a>
+                      </div>
+                    );
+                  }
 
-  // Customer message with an AI decision: bubble + reasoning expander, kept together on the left.
-  return (
-    <div className="flex max-w-[85%] flex-col items-start self-start sm:max-w-[70%]">
-      {bubble}
-      <AiReasoning decision={message.aiDecision} />
-    </div>
-  );
+                  return (
+                    <div key={`${url}-${i}`} className="group relative overflow-hidden rounded-xl">
+                      <a
+                        href={url}
+                        target="_blank"
+                        rel="noreferrer noopener"
+                        className="block overflow-hidden rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                        title="Click to view full image"
+                      >
+                        <img
+                          src={url}
+                          alt={`Attachment ${i + 1}`}
+                          loading="lazy"
+                          className="max-h-60 w-full max-w-[18rem] rounded-xl bg-black/5 object-cover transition-transform group-hover:scale-[1.02]"
+                        />
+                      </a>
+                      <a
+                        href={downloadUrl}
+                        download={filename || `image-${i + 1}`}
+                        target="_blank"
+                        rel="noreferrer noopener"
+                        className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded-md bg-black/70 px-2 py-1 text-10 font-medium text-white opacity-85 backdrop-blur-xs transition hover:bg-black hover:opacity-100 cursor-pointer shadow-sm"
+                        title="Download image"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Download className="h-3 w-3" />
+                        <span>Download</span>
+                      </a>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {message.content && !isCatalogue && (
+              <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{message.content}</p>
+            )}
+
+            <p className={cn("mt-1 flex items-center justify-end gap-1 text-11", metaTone[senderType])}>
+              {failed && (
+                <span className="inline-flex items-center gap-0.5 font-medium">
+                  <AlertCircle className="h-3 w-3" aria-hidden /> Not delivered ·
+                </span>
+              )}
+              {pending ? "Sending…" : <time dateTime={message.createdAt}>{formatTime(message.createdAt)}</time>}
+            </p>
+          </div>
+          );
+
+          if (!message.aiDecision) return bubble;
+
+          // Customer message with an AI decision: bubble + reasoning expander, kept together on the left.
+          return (
+          <div className="flex max-w-[85%] flex-col items-start self-start sm:max-w-[70%]">
+            {bubble}
+            <AiReasoning decision={message.aiDecision} />
+          </div>
+          );
 }

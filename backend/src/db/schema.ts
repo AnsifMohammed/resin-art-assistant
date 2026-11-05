@@ -158,6 +158,22 @@ export const customers = pgTable("customers", {
   index("customers_business_segment_idx").on(t.businessId, t.isFavourite, t.isPriority),
 ]);
 
+export interface ActiveEnquiryData {
+  productSlug?: string | undefined;
+  productName?: string | undefined;
+  quantity?: number | undefined;
+  size?: string | undefined;
+  color?: string | undefined;
+  personalization?: string | undefined;
+  customNotes?: string | undefined;
+  referenceImages?: string[] | undefined;
+  estimatedPrice?: number | undefined;
+  status?: "collecting" | "ready_for_quote" | "quoted" | "order_created" | undefined;
+  orderId?: string | undefined;
+  orderNo?: string | undefined;
+  updatedAt?: string | undefined;
+}
+
 // One conversation per customer (ongoing thread)
 export const conversations = pgTable("conversations", {
   id: id(),
@@ -166,6 +182,9 @@ export const conversations = pgTable("conversations", {
   channelId: text("channel_id").notNull(),
   state: convStateEnum("state").notNull().default("ai_active"),
   tag: convTagEnum("tag"),
+  activeProductSlug: text("active_product_slug"),
+  activeEnquiry: jsonb("active_enquiry").$type<ActiveEnquiryData>().default({}),
+  aiMode: text("ai_mode").notNull().default("auto"),
   lastCustomerMessageAt: timestamp("last_customer_message_at"),
   windowClosesAt: timestamp("window_closes_at"),       // 24h after lastCustomerMessageAt
   lastMessageAt: timestamp("last_message_at"),         // any direction; inbox sort key
@@ -177,6 +196,7 @@ export const conversations = pgTable("conversations", {
   index("conversations_business_state_idx").on(t.businessId, t.state),
   index("conversations_customer_idx").on(t.customerId),
   index("conversations_business_last_msg_idx").on(t.businessId, t.lastMessageAt),
+  index("idx_conversations_active_product").on(t.businessId, t.activeProductSlug),
 ]);
 
 // Every message in every conversation
@@ -351,6 +371,7 @@ export const orders = pgTable("orders", {
   id: text("id").primaryKey().default(sql`(gen_random_uuid())::text`),
   businessId: businessId(),
   customerId: text("customer_id"),
+  conversationId: text("conversation_id"),
   orderNo: text("order_no").notNull(),
   customerName: text("customer_name").notNull(),
   customerPhone: text("customer_phone"),

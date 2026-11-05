@@ -77,6 +77,7 @@ export function buildConversationMessages(
   history: HistoryMessage[],
   currentText: string,
   limit: number = HISTORY_LIMIT,
+  mediaUrls?: string[] | null,
 ): Content[] {
   const relevant = history
     .filter((m) => m.senderType !== "system" && (m.content ?? "").trim() !== "")
@@ -87,7 +88,11 @@ export function buildConversationMessages(
     if (m.senderType === "customer") return { role: "user", content: text };
     return { role: "model", content: `${HUMAN_LABELS[m.senderType] ?? ""}${text}` };
   });
-  turns.push({ role: "user", content: currentText });
+  const currentTurnText =
+    mediaUrls && mediaUrls.length > 0
+      ? `${currentText}\n[Customer attached inspiration/reference photos: ${mediaUrls.join(", ")}]`.trim()
+      : currentText;
+  turns.push({ role: "user", content: currentTurnText });
 
   const merged: Array<{ role: "user" | "model"; content: string }> = [];
   for (const turn of turns) {
@@ -118,17 +123,34 @@ export function customerFirstName(name: string | null | undefined, handleOrPhone
   return first.length >= 2 ? first : null;
 }
 
+export interface BuildSystemPromptOptions {
+  customerFirstName?: string | null | undefined;
+  activeProductSlug?: string | null | undefined;
+  activeEnquiry?: Record<string, unknown> | null | undefined;
+}
+
 export function buildSystemPrompt(
   kb: Record<string, unknown>,
-  opts: { customerFirstName?: string | null } = {},
+  opts: BuildSystemPromptOptions = {},
 ): string {
   const businessName = typeof kb.business_name === "string" && kb.business_name ? kb.business_name : "the shop";
   const nameLine = opts.customerFirstName
     ? `The customer's first name is ${opts.customerFirstName}.`
     : "You don't know the customer's name; don't make one up.";
 
-  return `You reply to customer messages on Instagram and WhatsApp for ${businessName}, a small handmade resin art business in Coimbatore, Tamil Nadu, India. Write as the shop ("we", "our"), the way the owner would reply from their phone.
+  const activeEnquiryContext =
+    opts.activeProductSlug || opts.activeEnquiry?.productSlug
+      ? `\n[CURRENT ACTIVE PRODUCT & ENQUIRY CONTEXT]
+The customer is currently enquiring about:
+- Product Slug: ${opts.activeProductSlug || (opts.activeEnquiry as any)?.productSlug}
+- Product Name: ${(opts.activeEnquiry as any)?.productName || "Active Product"}
+- Details collected so far: ${JSON.stringify(opts.activeEnquiry || {}, null, 2)}
+* Maintain context for this product across turns! When the customer asks follow-up questions (e.g. "Can I get this in blue?", "How much for 3?", "What sizes do you have?", "Can you do gold foil?"), they are referring to this active product unless they explicitly ask for a different product.
+* Progressively extract and update customer order requirements into "extracted_enquiry": { quantity, size, color, personalization, custom_notes, is_complete }.\n`
+      : "";
 
+  return `You reply to customer messages on Instagram and WhatsApp for ${businessName}, a small handmade resin art business in Coimbatore, Tamil Nadu, India. Write as the shop ("we", "our"), the way the owner would reply from their phone.
+${activeEnquiryContext}
 [BUSINESS KNOWLEDGE BASE]
 ${JSON.stringify(kb, null, 2)}
 
@@ -142,6 +164,14 @@ DO NOT include any markdown formatting, backticks (\`\`\`), or explanations. Out
   "reply": "the message to send, in the customer's language (English, Malayalam, or Manglish)",
   "send_catalogue": boolean, // optional: true when sharing visual product catalogue
   "catalogue_product_slugs": ["slug1", "slug2"], // optional: product slugs to share (or [] to share top products)
+  "extracted_enquiry": { // optional: structured customer requirements extracted from the chat
+    "quantity": number,
+    "size": "string",
+    "color": "string",
+    "personalization": "string",
+    "custom_notes": "string",
+    "is_complete": boolean
+  },
   "facts_used": ["fact 1", ...],
   "missing_facts": ["missing fact 1", ...],
   "escalate": boolean,
@@ -179,12 +209,11 @@ DO NOT include any markdown formatting, backticks (\`\`\`), or explanations. Out
 
 [OTHER RULES]
 - LANGUAGE: Reply in the customer's language. If they write in Malayalam or Manglish, reply the same way.
-- SIZES & PRICING: Each size has its own price. When a customer doesn't name a size, list every size with its price; when they name one, quote only that one. Never invent a size or price. Format facts_used for product prices as "products.<slug>.sizes.<size name>.price: <price>".
-- CUSTOMIZATION: When a customer asks about customization options for a product (or asks "What are the customization options available for <Product>?"):
-  * Look up the product in the knowledge base by name or slug.
-  * If the product has customizable: false (or custom_options is empty), politely explain that this item is a fixed design and cannot be customized.
-  * If customizable: true, list the specific options available from custom_options (e.g., color shades, name/initials engraving, gold/silver foil, flower preservation, photos) and warmly ask what preferences they have in mind.
-  * Always format facts_used as "products.<slug>.custom_options: <options>".
+- PRODUCT ENQUIRIES: When a customer enquires about a specific product (e.g. asking for sizes/prices, customization, or how to order/book a product):
+  * You MUST explicitly address and name the product in your first sentence (for example: "For the 12 inch Resin Wall Clock, ...").
+  * SIZES & PRICING: Each size has its own price. When a customer doesn't name a size, list every size with its price; when they name one, quote only that one. State the lead time in days and ask if they'd like to place an order or customize colors. Never invent a size or price. Format facts_used as "products.<slug>.sizes.<size name>.price: <price>".
+  * CUSTOMIZATION: List the specific options available from custom_options (e.g., color shades, name/initials engraving, gold/silver foil, flower preservation, photos) and warmly ask what preferences they have in mind. If customizable is false (or custom_options is empty), politely explain that this item is a fixed design and cannot be customized. Format facts_used as "products.<slug>.custom_options: <options>".
+  * ORDERING & BOOKING: When a customer asks how to order or book a product, explain the ordering process clearly (50% advance via UPI/GPay, production lead time, and balance before dispatch).
 - The latest user turn may contain several customer messages sent in quick succession (one per line). Answer them together in a single reply.
 - Earlier assistant turns prefixed with "[Owner]: " or "[Staff]: " were written by a human at the business, not by you. Stay consistent with them.`;
 }

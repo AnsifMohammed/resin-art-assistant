@@ -1,6 +1,18 @@
 import { useId, useRef, useState, type FormEvent, type KeyboardEvent, type ChangeEvent } from "react";
-import { AlertTriangle, FileText, Film, Loader2, Package, Paperclip, Send, X } from "lucide-react";
+import {
+  AlertTriangle,
+  FileText,
+  Film,
+  Loader2,
+  Package,
+  Paperclip,
+  Send,
+  Sparkles,
+  Wand2,
+  X,
+} from "lucide-react";
 import { toast } from "sonner";
+import { getAiAssist } from "../../api/conversations.ts";
 import { uploadMedia } from "../../api/media.ts";
 import { cn } from "../../lib/cn.ts";
 import type { ChannelType } from "../../types/index.ts";
@@ -39,6 +51,7 @@ interface DraftAttachment {
 }
 
 export interface ReplyBoxProps {
+  conversationId?: string;
   /** Resolve with anything on success (text and attachments cleared); reject to keep the text. */
   onSend: (payload: { text?: string | undefined; mediaUrls?: string[] | undefined }) => Promise<unknown>;
   /** Send a template directly: { templateId, variables }. Reject with the ApiError on failure. */
@@ -58,6 +71,7 @@ export interface ReplyBoxProps {
 
 /** Enter sends, Shift+Enter adds a newline. Errors are reported by the caller (toast). */
 export function ReplyBox({
+  conversationId,
   onSend,
   onSendTemplate,
   onSendCatalogue,
@@ -71,6 +85,8 @@ export function ReplyBox({
   const [attachments, setAttachments] = useState<DraftAttachment[]>([]);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [catalogueOpen, setCatalogueOpen] = useState(false);
+  const [aiMenuOpen, setAiMenuOpen] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const inputId = useId();
@@ -204,6 +220,29 @@ export function ReplyBox({
     });
   };
 
+  const handleAiAction = async (action: string) => {
+    if (!conversationId) return;
+    setAiLoading(true);
+    setAiMenuOpen(false);
+    try {
+      const res = await getAiAssist(conversationId, { action, draftText: trimmed || undefined });
+      if (res.suggestion) {
+        setText(res.suggestion);
+        toast.success("AI draft inserted into composer");
+        requestAnimationFrame(() => {
+          const el = textareaRef.current;
+          if (!el) return;
+          el.focus();
+          el.setSelectionRange(res.suggestion.length, res.suggestion.length);
+        });
+      }
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to generate AI draft");
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
   return (
     <form onSubmit={onSubmit} className="shrink-0 border-t border-border bg-surface p-3 pb-safe sm:p-3.5">
       {windowClosed && (
@@ -331,6 +370,88 @@ export function ReplyBox({
               <span className="hidden sm:inline">Catalogue</span>
               <span className="sm:hidden">Products</span>
             </button>
+
+            {conversationId && (
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setAiMenuOpen((o) => !o)}
+                  disabled={disabled || aiLoading}
+                  className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-violet-500/30 bg-violet-500/10 px-2 py-1 text-11 font-medium text-violet-700 dark:text-violet-300 transition-colors hover:bg-violet-500/20 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 sm:px-2.5 sm:text-12"
+                  title="AI Copilot Assist"
+                >
+                  {aiLoading ? (
+                    <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-violet-500" />
+                  ) : (
+                    <Sparkles className="h-3.5 w-3.5 shrink-0 text-violet-500" />
+                  )}
+                  <span className="hidden sm:inline">AI Assist</span>
+                  <span className="sm:hidden">AI</span>
+                </button>
+
+                {aiMenuOpen && (
+                  <div
+                    className="absolute bottom-full left-0 mb-1.5 w-52 overflow-hidden rounded-xl border border-border bg-surface p-1 shadow-lg z-50 text-text"
+                    onMouseLeave={() => setAiMenuOpen(false)}
+                  >
+                    <div className="px-2 py-1 text-10 font-semibold text-text-muted uppercase tracking-wider">
+                      AI Copilot Tools
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleAiAction("generate")}
+                      className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-12 text-left hover:bg-surface-muted transition-colors cursor-pointer"
+                    >
+                      <Sparkles className="h-3.5 w-3.5 text-violet-500" />
+                      <span>✨ Draft Reply</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleAiAction("improve")}
+                      className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-12 text-left hover:bg-surface-muted transition-colors cursor-pointer"
+                    >
+                      <Wand2 className="h-3.5 w-3.5 text-blue-500" />
+                      <span>🪄 Improve Tone</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleAiAction("shorter")}
+                      className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-12 text-left hover:bg-surface-muted transition-colors cursor-pointer"
+                    >
+                      <span>✂️ Make Shorter</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleAiAction("friendlier")}
+                      className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-12 text-left hover:bg-surface-muted transition-colors cursor-pointer"
+                    >
+                      <span>😊 Make Friendlier</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleAiAction("next_question")}
+                      className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-12 text-left hover:bg-surface-muted transition-colors cursor-pointer"
+                    >
+                      <span>❓ Suggest Question</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleAiAction("summarize")}
+                      className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-12 text-left hover:bg-surface-muted transition-colors cursor-pointer"
+                    >
+                      <span>📋 Summarize Enquiry</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleAiAction("explain_product")}
+                      className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-12 text-left hover:bg-surface-muted transition-colors cursor-pointer"
+                    >
+                      <span>📦 Explain Product</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Hidden native device file input supporting photos, videos, PDFs, Word, PPT, Excel, TXT */}
             <input

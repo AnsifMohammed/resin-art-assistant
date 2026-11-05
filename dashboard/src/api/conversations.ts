@@ -47,3 +47,11 @@ export const resumeConversation = (id: string) =>
 /** POST /conversations/:id/resolve — returns the conversation to ai_active */
 export const resolveConversation = (id: string) =>
   api.post<ResolveResponse>(`/conversations/${enc(id)}/resolve`);
+
+/** POST /conversations/:id/ai-assist - generate or refine copilot draft */
+export const getAiAssist = (id: string, body: { action: string; draftText?: string | undefined }) =>
+  api.post<{ suggestion: string }>(`/conversations/${enc(id)}/ai-assist`, body);
+
+/** PATCH /conversations/:id/ai-mode - switch between auto, copilot, and takeover */
+export const updateAiMode = (id: string, body: { mode: "auto" | "copilot" | "takeover" }) =>
+  api.patch<{ conversation: any }>(`/conversations/${enc(id)}/ai-mode`, body);

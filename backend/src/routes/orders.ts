@@ -2,7 +2,7 @@ import type { FastifyInstance, FastifyPluginAsync } from "fastify";
 import { and, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../db/index.ts";
-import { auditLog, customers, orderItems, orders } from "../db/schema.ts";
+import { auditLog, conversations, customers, orderItems, orders } from "../db/schema.ts";
 import { AppError } from "../lib/errors.ts";
 import { authenticate } from "../middleware/authenticate.ts";
 import { requireAdmin } from "../middleware/requireAdmin.ts";
@@ -34,6 +34,7 @@ const createOrderSchema = z.object({
   customerPhone: z.string().optional().nullable(),
   customerEmail: z.string().optional().nullable(),
   customerId: z.string().optional().nullable(),
+  conversationId: z.string().optional().nullable(),
   channel: z.enum(["whatsapp", "instagram"]).default("whatsapp"),
   status: z.enum(orderStatusEnumValues).default("pending"),
   shippingAddress: z.string().optional().nullable(),
@@ -116,14 +117,14 @@ export const orderRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
       const items =
         orderIds.length > 0
           ? await db
-              .select()
-              .from(orderItems)
-              .where(
-                and(
-                  inArray(orderItems.orderId, orderIds),
-                  eq(orderItems.isDeleted, false)
-                )
+            .select()
+            .from(orderItems)
+            .where(
+              and(
+                inArray(orderItems.orderId, orderIds),
+                eq(orderItems.isDeleted, false)
               )
+            )
           : [];
 
       const itemsByOrderId = new Map<string, typeof items>();
@@ -317,6 +318,7 @@ export const orderRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
             businessId,
             orderNo,
             customerId: validCustomerId,
+            conversationId: data.conversationId?.trim() || null,
             customerName: data.customerName.trim(),
             customerPhone: data.customerPhone?.trim() || null,
             customerEmail: data.customerEmail?.trim() || null,
@@ -364,6 +366,32 @@ export const orderRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
 
       if (!createdOrder) {
         throw new AppError(500, "Failed to create order", "INTERNAL_ERROR");
+      }
+
+      if (data.conversationId) {
+        try {
+          const [conv] = await db
+            .select()
+            .from(conversations)
+            .where(eq(conversations.id, data.conversationId));
+          if (conv) {
+            const existingEnquiry = (conv.activeEnquiry as Record<string, unknown>) || {};
+            await db
+              .update(conversations)
+              .set({
+                activeEnquiry: {
+                  ...existingEnquiry,
+                  status: "order_created",
+                  orderId: createdOrder.id,
+                  orderNo: createdOrder.orderNo,
+                  updatedAt: new Date().toISOString(),
+                },
+              })
+              .where(eq(conversations.id, data.conversationId));
+          }
+        } catch {
+          // non-critical enquiry status update
+        }
       }
 
       // Audit log

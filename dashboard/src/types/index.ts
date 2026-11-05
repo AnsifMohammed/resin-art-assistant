@@ -192,6 +192,22 @@ export interface Customer {
   updatedAt: ISODateString;
 }
 
+export interface ActiveEnquiryData {
+  productSlug?: string;
+  productName?: string;
+  quantity?: number;
+  size?: string;
+  color?: string;
+  personalization?: string;
+  customNotes?: string;
+  referenceImages?: string[];
+  estimatedPrice?: number;
+  status?: "collecting" | "ready_for_quote" | "quoted" | "order_created";
+  orderId?: string;
+  orderNo?: string;
+  updatedAt?: string;
+}
+
 export interface Conversation {
   id: string;
   businessId: string;
@@ -199,6 +215,9 @@ export interface Conversation {
   channelId: string;
   state: ConvState;
   tag: ConvTag | null;
+  activeProductSlug?: string | null;
+  activeEnquiry?: ActiveEnquiryData | null;
+  aiMode?: "auto" | "copilot" | "takeover";
   lastCustomerMessageAt: ISODateString | null;
   windowClosesAt: ISODateString | null;
   /** Set on every stored message (customer, AI, human reply, echo). */
@@ -1224,6 +1243,7 @@ export interface CreateOrderRequest {
   customerPhone?: string | null | undefined;
   customerEmail?: string | null | undefined;
   customerId?: string | null | undefined;
+  conversationId?: string | null | undefined;
   channel?: "whatsapp" | "instagram" | undefined;
   status?: OrderStatus | undefined;
   shippingAddress?: string | null | undefined;

@@ -55,15 +55,15 @@ export const useMockDecisions = config.DEMO_MODE && isPlaceholderKey(config.GEMI
 export const ai = useMockDecisions
   ? null
   : new GoogleGenAI({
-      apiKey: config.GEMINI_API_KEY,
-      httpOptions: {
-        // Per-attempt timeout in ms.
-        timeout: GEMINI_TIMEOUT_MS,
-        // SDK-level retries: `attempts` includes the first call. Retries only on
-        // 408/429/5xx (SDK default status list) and network errors.
-        retryOptions: { attempts: GEMINI_MAX_RETRIES + 1, initialDelay: 1, maxDelay: 8 },
-      },
-    });
+    apiKey: config.GEMINI_API_KEY,
+    httpOptions: {
+      // Per-attempt timeout in ms.
+      timeout: GEMINI_TIMEOUT_MS,
+      // SDK-level retries: `attempts` includes the first call. Retries only on
+      // 408/429/5xx (SDK default status list) and network errors.
+      retryOptions: { attempts: GEMINI_MAX_RETRIES + 1, initialDelay: 1, maxDelay: 8 },
+    },
+  });
 
 /**
  * Decision returned when the LLM call fails or its output can't be parsed.
@@ -267,6 +267,12 @@ export async function processAiDecision(params: {
   /** Stored customer name and handle, used to address the customer by first name. */
   customerName?: string | null;
   customerHandle?: string | null;
+  /** Active product slug being enquired about. */
+  activeProductSlug?: string | null;
+  /** Existing structured enquiry data. */
+  activeEnquiry?: Record<string, unknown> | null;
+  /** Inbound media URLs (customer photos). */
+  mediaUrls?: string[] | null;
 }): Promise<AiDecision> {
   if (!ai) {
     logger.info(
@@ -281,10 +287,12 @@ export async function processAiDecision(params: {
     const kb = await getKnowledgeBase(params.businessId);
     const response = await ai.models.generateContent({
       model: config.GEMINI_MODEL,
-      contents: buildConversationMessages(params.history ?? [], params.incomingText),
+      contents: buildConversationMessages(params.history ?? [], params.incomingText, undefined, params.mediaUrls),
       config: {
         systemInstruction: buildSystemPrompt(kb, {
           customerFirstName: customerFirstName(params.customerName, params.customerHandle),
+          activeProductSlug: params.activeProductSlug,
+          activeEnquiry: params.activeEnquiry,
         }),
         responseMimeType: "application/json",
         responseJsonSchema: aiDecisionJsonSchema,

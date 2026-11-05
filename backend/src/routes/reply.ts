@@ -1,6 +1,9 @@
 import type { FastifyInstance, FastifyPluginAsync } from "fastify";
-import { and, eq, inArray, isNull, or } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, or } from "drizzle-orm";
 import { z } from "zod";
+import { ai, thinkingConfigFor } from "../ai/pipeline.ts";
+import { getKnowledgeBase } from "../ai/prompt.ts";
+import { config } from "../config.ts";
 import { db } from "../db/index.ts";
 import {
   auditLog,
@@ -47,6 +50,23 @@ const catalogueSchema = z.strictObject({
     .min(1, "Select at least 1 product")
     .max(10, "Maximum 10 products can be shared at once"),
   customNote: z.string().max(1000).optional(),
+});
+
+const aiAssistSchema = z.strictObject({
+  action: z.enum([
+    "generate",
+    "improve",
+    "shorter",
+    "friendlier",
+    "next_question",
+    "summarize",
+    "explain_product",
+  ]),
+  draftText: z.string().max(4000).optional(),
+});
+
+const aiModeSchema = z.strictObject({
+  mode: z.enum(["auto", "copilot", "takeover"]),
 });
 
 /**
@@ -190,9 +210,9 @@ export const replyRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
       const text =
         "templateId" in body
           ? renderTemplateReply(template!, channel.type, {
-              customerName: customer.name ?? customer.handleOrPhone,
-              ...body.variables,
-            })
+            customerName: customer.name ?? customer.handleOrPhone,
+            ...body.variables,
+          })
           : (body.text?.trim() || null);
 
       const mediaUrls = "mediaUrls" in body && Array.isArray(body.mediaUrls) ? body.mediaUrls : [];
@@ -407,7 +427,7 @@ export const replyRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
             ? `₹${minPrice.toLocaleString("en-IN")} – ₹${maxPrice.toLocaleString("en-IN")}`
             : `₹${minPrice.toLocaleString("en-IN")}`;
 
-        const images = Array.isArray(p.images) ? p.images : [];
+        const images = Array.isArray(p.images) ? (p.images as string[]) : [];
         const firstImg = typeof images[0] === "string" ? images[0] : undefined;
 
         return {
@@ -416,8 +436,11 @@ export const replyRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
           name: p.name,
           price: priceStr,
           imageUrl: firstImg,
+          images,
           leadTime: p.leadTimeDays,
           description: p.description ?? undefined,
+          customizable: p.customizable,
+          customOptions: Array.isArray(p.customOptions) ? p.customOptions : [],
         };
       });
 
@@ -542,6 +565,157 @@ export const replyRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
           state: "owner_handling",
         },
       });
+    },
+  );
+
+  app.post<{ Params: { id: string } }>(
+    "/conversations/:id/ai-assist",
+    { preHandler: [authenticate, requireStaffOrAdmin] },
+    async (request, reply) => {
+      const { id } = request.params;
+      const businessId = request.user.businessId;
+
+      const parsed = aiAssistSchema.safeParse(request.body);
+      if (!parsed.success) {
+        throw new AppError(400, "Invalid assist request payload", "VALIDATION_ERROR");
+      }
+
+      const { action, draftText } = parsed.data;
+
+      const [conv] = await db
+        .select()
+        .from(conversations)
+        .where(and(eq(conversations.id, id), eq(conversations.businessId, businessId)));
+
+      if (!conv) {
+        throw new AppError(404, "Conversation not found", "NOT_FOUND");
+      }
+
+      // Fetch last 10 messages for conversation context
+      const historyRows = await db
+        .select()
+        .from(messages)
+        .where(eq(messages.conversationId, id))
+        .orderBy(desc(messages.createdAt))
+        .limit(10);
+
+      const recentMessages = historyRows
+        .reverse()
+        .map((m) => `${m.senderType === "customer" ? "Customer" : "Shop"}: ${m.content || ""}`)
+        .join("\n");
+
+      // Active product if any
+      let productContext = "";
+      if (conv.activeProductSlug) {
+        const [p] = await db
+          .select()
+          .from(products)
+          .where(and(eq(products.slug, conv.activeProductSlug), eq(products.businessId, businessId)));
+        if (p) {
+          productContext = `Product: ${p.name}\nDescription: ${p.description || "Handmade resin art"}\nSizes & Pricing: ${JSON.stringify(p.sizes)}\nLead time: ${p.leadTimeDays} days\nCustomizable: ${p.customizable ? (p.customOptions ?? []).join(", ") : "No"}`;
+        }
+      }
+
+      const systemPrompt =
+        "You are an AI assistant for a handmade resin art business in India. You help the shop owner draft and refine replies to customers on WhatsApp and Instagram. Keep responses concise, warm, polite, and natural. Return plain text only with NO JSON, NO quotes, NO markdown headers.";
+
+      let taskPrompt = "";
+      switch (action) {
+        case "generate":
+          taskPrompt = `Based on the conversation history below${productContext ? ` and active product details:\n${productContext}` : ""},\ndraft a friendly, helpful reply to the customer:\n\nRecent chat:\n${recentMessages}`;
+          break;
+        case "improve":
+          taskPrompt = `Improve this draft reply to be more natural, warm, and clear:\n"${draftText || ""}"\n\nContext:\n${recentMessages}`;
+          break;
+        case "shorter":
+          taskPrompt = `Make this draft reply significantly shorter, concise, and punchy while keeping key details:\n"${draftText || ""}"`;
+          break;
+        case "friendlier":
+          taskPrompt = `Rewrite this draft reply to sound warmer, friendlier, and more enthusiastic with everyday Indian English tone:\n"${draftText || ""}"`;
+          break;
+        case "next_question":
+          taskPrompt = `Based on this conversation, suggest the single best next question to ask the customer to clarify their order/customization requirements:\n\n${recentMessages}`;
+          break;
+        case "summarize":
+          taskPrompt = `Summarize this customer's enquiry and requested specifications in 2-3 short bullet points:\n\n${recentMessages}`;
+          break;
+        case "explain_product":
+          taskPrompt = `Explain this product's features, options, and lead time in 2 friendly sentences for the customer:\n${productContext || "Handmade resin art"}`;
+          break;
+      }
+
+      if (!ai) {
+        let fallback = "Thank you for reaching out! Let me know which size and colour you prefer.";
+        if (action === "shorter") fallback = "Price is ₹1,200. Lead time is 3 days. Shall we proceed?";
+        if (action === "friendlier") fallback = "Hey! 😊 We'd love to make this for you! What colours do you have in mind?";
+        if (action === "next_question") fallback = "Would you like any initials or names added to the design?";
+        if (action === "summarize") fallback = "• Product: Letter Keychains\n• Quantity: 3\n• Status: Awaiting colour preference";
+        if (action === "explain_product") fallback = productContext ? productContext.slice(0, 150) : "Handcrafted with premium UV-resistant resin, customizable with colours and foil.";
+        return reply.send({ suggestion: fallback });
+      }
+
+      try {
+        const response = await ai.models.generateContent({
+          model: config.GEMINI_MODEL,
+          contents: [{ role: "user", parts: [{ text: taskPrompt }] }],
+          config: {
+            systemInstruction: systemPrompt,
+            temperature: 0.7,
+            maxOutputTokens: 300,
+            thinkingConfig: thinkingConfigFor(config.GEMINI_MODEL),
+          },
+        });
+        const suggestion = response.text?.trim() || "Let me know what you think!";
+        return reply.send({ suggestion });
+      } catch (err) {
+        request.log.error({ err }, "AI assist generation failed");
+        return reply.send({ suggestion: draftText || "Hey! How can I help you today?" });
+      }
+    },
+  );
+
+  app.patch<{ Params: { id: string } }>(
+    "/conversations/:id/ai-mode",
+    { preHandler: [authenticate, requireStaffOrAdmin] },
+    async (request, reply) => {
+      const { id } = request.params;
+      const businessId = request.user.businessId;
+
+      const parsed = aiModeSchema.safeParse(request.body);
+      if (!parsed.success) {
+        throw new AppError(400, "Invalid mode payload", "VALIDATION_ERROR");
+      }
+
+      const { mode } = parsed.data;
+
+      const [conv] = await db
+        .select()
+        .from(conversations)
+        .where(and(eq(conversations.id, id), eq(conversations.businessId, businessId)));
+
+      if (!conv) {
+        throw new AppError(404, "Conversation not found", "NOT_FOUND");
+      }
+
+      const stateUpdate = mode === "takeover" ? "owner_handling" : mode === "auto" ? "ai_active" : conv.state;
+
+      const [updated] = await db
+        .update(conversations)
+        .set({
+          aiMode: mode,
+          state: stateUpdate,
+          updatedAt: new Date(),
+        })
+        .where(eq(conversations.id, id))
+        .returning();
+
+      emitConversationUpdated(businessId, {
+        conversationId: id,
+        state: stateUpdate,
+        tag: conv.tag,
+      });
+
+      return reply.send({ conversation: updated });
     },
   );
 };

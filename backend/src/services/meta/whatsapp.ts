@@ -183,11 +183,11 @@ export async function sendWhatsAppInteractiveCard(
       type: "button",
       ...(opts.imageUrl
         ? {
-            header: {
-              type: "image",
-              image: { link: opts.imageUrl },
-            },
-          }
+          header: {
+            type: "image",
+            image: { link: opts.imageUrl },
+          },
+        }
         : {}),
       body: {
         text: opts.specsText,
@@ -197,22 +197,8 @@ export async function sendWhatsAppInteractiveCard(
           {
             type: "reply",
             reply: {
-              id: `action:sizes:${opts.slug}`,
-              title: "🏷️ Sizes & Price",
-            },
-          },
-          {
-            type: "reply",
-            reply: {
-              id: `action:custom:${opts.slug}`,
-              title: "🎨 Customize",
-            },
-          },
-          {
-            type: "reply",
-            reply: {
-              id: `action:order:${opts.slug}`,
-              title: "🛍️ Book / Order",
+              id: `action:enquire:${opts.slug}`,
+              title: "💬 Enquire Now",
             },
           },
         ],

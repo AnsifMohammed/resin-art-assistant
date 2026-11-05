@@ -1,6 +1,19 @@
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, AlertTriangle, CheckCircle2, PauseCircle, PlayCircle } from "lucide-react";
+import {
+  ArrowLeft,
+  AlertTriangle,
+  Bot,
+  Check,
+  CheckCircle2,
+  ChevronDown,
+  Loader2,
+  PauseCircle,
+  PlayCircle,
+  ShoppingBag,
+  X,
+} from "lucide-react";
+import { cn } from "../../lib/cn.ts";
 import { escalationReasonLabel } from "../../lib/escalationReasons.ts";
 import { ChannelIcon } from "../shared/ChannelIcon.tsx";
 import { ConfirmDialog } from "../shared/ConfirmDialog.tsx";
@@ -8,6 +21,8 @@ import { TagBadge } from "../ui/Badge.tsx";
 import { EmptyState } from "../ui/EmptyState.tsx";
 import { useToast } from "../ui/Toast.tsx";
 import { useAuth } from "../../hooks/useAuth.ts";
+import { updateAiMode } from "../../api/conversations.ts";
+import { useCreateOrder } from "../../hooks/useOrders.ts";
 import {
   appendMessageToCache,
   usePauseConversation,
@@ -72,7 +87,7 @@ function PauseResumeButton({ conversation }: { conversation: ConversationDetail 
       >
         <PlayCircle className="h-3.5 w-3.5 shrink-0 text-emerald-500" aria-hidden />
         <span className="hidden sm:inline">Resume AI</span>
-        
+
       </button>
     );
   }
@@ -108,12 +123,84 @@ export function ChatView({ conversation, onBack, backOnlyOnMobile = false, onRes
   const reply = useReply(conversation.id);
   const sendCatalogue = useSendCatalogue(conversation.id);
   const resolve = useResolve(conversation.id);
+  const createOrder = useCreateOrder();
   const [confirmResolve, setConfirmResolve] = useState(false);
   const [imgFailed, setImgFailed] = useState(false);
+  const [showOrderModal, setShowOrderModal] = useState(false);
+  const [orderAmount, setOrderAmount] = useState("1200");
+  const [orderQty, setOrderQty] = useState(conversation.activeEnquiry?.quantity || 1);
+  const [aiMode, setAiMode] = useState<"auto" | "copilot" | "takeover">(conversation.aiMode || "auto");
+  const [modeLoading, setModeLoading] = useState(false);
+  const [modeDropdown, setModeDropdown] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const stickToBottom = useRef(true);
   const now = useNow(30_000);
   const isAdmin = user?.role === "admin";
+
+  // Sync aiMode when conversation prop changes
+  useEffect(() => {
+    setAiMode(conversation.aiMode || "auto");
+  }, [conversation.aiMode, conversation.id]);
+
+  const handleModeChange = async (mode: "auto" | "copilot" | "takeover") => {
+    setModeLoading(true);
+    setModeDropdown(false);
+    try {
+      await updateAiMode(conversation.id, { mode });
+      setAiMode(mode);
+      qc.invalidateQueries({ queryKey: ["conversations"] });
+      qc.invalidateQueries({ queryKey: ["conversation", conversation.id] });
+      toast({
+        variant: "success",
+        title: `Switched to ${mode === "auto" ? "AI Auto" : mode === "copilot" ? "AI Copilot" : "Human Takeover"}`,
+      });
+    } catch (err: any) {
+      toast({ variant: "error", title: "Couldn't update mode", description: err.message });
+    } finally {
+      setModeLoading(false);
+    }
+  };
+
+  const handleConvertOrder = async () => {
+    const enquiry = conversation.activeEnquiry || {};
+    const prodName = enquiry.productName || enquiry.productSlug || "Resin Art Item";
+    const qty = orderQty || enquiry.quantity || 1;
+    const price = parseFloat(orderAmount) || 1200;
+
+    createOrder.mutate(
+      {
+        customerName: name,
+        customerPhone: conversation.customer.handleOrPhone,
+        customerId: conversation.customer.id,
+        conversationId: conversation.id,
+        channel: conversation.channelType === "instagram" ? "instagram" : "whatsapp",
+        items: [
+          {
+            productName: prodName,
+            quantity: qty,
+            unitPrice: price,
+            customizations: {
+              ...(enquiry.size ? { size: enquiry.size } : {}),
+              ...(enquiry.color ? { color: enquiry.color } : {}),
+              ...(enquiry.personalization ? { personalization: enquiry.personalization } : {}),
+              ...(enquiry.customNotes ? { customNotes: enquiry.customNotes } : {}),
+            },
+          },
+        ],
+      },
+      {
+        onSuccess: (res) => {
+          setShowOrderModal(false);
+          toast({ variant: "success", title: `Order ${res.order.orderNo} created successfully!` });
+          qc.invalidateQueries({ queryKey: ["conversations"] });
+          qc.invalidateQueries({ queryKey: ["conversation", conversation.id] });
+        },
+        onError: (err) => {
+          toast({ variant: "error", title: "Failed to create order", description: err.message });
+        },
+      },
+    );
+  };
 
   // Reset profile pic error state when switching conversations.
   useEffect(() => { setImgFailed(false); }, [conversation.id]);
@@ -268,6 +355,63 @@ export function ChatView({ conversation, onBack, backOnlyOnMobile = false, onRes
           </div>
 
           <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+            {isAdmin && (
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setModeDropdown((v) => !v)}
+                  disabled={modeLoading}
+                  className={headerButton}
+                  title="Change AI Operating Mode"
+                >
+                  <Bot className="h-3.5 w-3.5 shrink-0 text-primary" />
+                  <span className="hidden sm:inline">
+                    {aiMode === "auto" ? "AI Auto" : aiMode === "copilot" ? "AI Copilot" : "Human Takeover"}
+                  </span>
+                  <ChevronDown className="h-3 w-3 text-text-muted" />
+                </button>
+                {modeDropdown && (
+                  <div
+                    className="absolute right-0 top-full mt-1.5 w-44 rounded-xl border border-border bg-surface p-1 shadow-lg z-50 text-text"
+                    onMouseLeave={() => setModeDropdown(false)}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => handleModeChange("auto")}
+                      className={cn(
+                        "flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-11 text-left hover:bg-surface-muted transition-colors cursor-pointer",
+                        aiMode === "auto" && "font-semibold text-primary",
+                      )}
+                    >
+                      <span>🤖 AI Auto</span>
+                      {aiMode === "auto" && <Check className="h-3 w-3" />}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleModeChange("copilot")}
+                      className={cn(
+                        "flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-11 text-left hover:bg-surface-muted transition-colors cursor-pointer",
+                        aiMode === "copilot" && "font-semibold text-primary",
+                      )}
+                    >
+                      <span>✨ AI Copilot</span>
+                      {aiMode === "copilot" && <Check className="h-3 w-3" />}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleModeChange("takeover")}
+                      className={cn(
+                        "flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-11 text-left hover:bg-surface-muted transition-colors cursor-pointer",
+                        aiMode === "takeover" && "font-semibold text-primary",
+                      )}
+                    >
+                      <span>👤 Human Takeover</span>
+                      {aiMode === "takeover" && <Check className="h-3 w-3" />}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
             {isAdmin && <PauseResumeButton conversation={conversation} />}
             {canResolve && (
               <button
@@ -287,6 +431,66 @@ export function ChatView({ conversation, onBack, backOnlyOnMobile = false, onRes
           </div>
         </div>
       </header>
+
+      {/* Active Product & Structured Enquiry Context Banner */}
+      {conversation.activeEnquiry && (conversation.activeEnquiry.productSlug || conversation.activeEnquiry.productName) && (
+        <div className="shrink-0 border-b border-primary/20 bg-primary/5 px-3 py-2 sm:px-4 sm:py-2.5 flex flex-wrap items-center justify-between gap-2.5 text-12">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 rounded-lg border border-primary/40 bg-primary/10 px-2 py-0.5 text-11 font-bold text-primary">
+              <ShoppingBag className="h-3.5 w-3.5" />
+              <span>{conversation.activeEnquiry.productName || conversation.activeEnquiry.productSlug}</span>
+            </span>
+
+            {conversation.activeEnquiry.quantity && (
+              <span className="rounded-md bg-surface px-2 py-0.5 text-11 text-text border border-border">
+                Qty: <strong className="text-primary">{conversation.activeEnquiry.quantity}</strong>
+              </span>
+            )}
+            {conversation.activeEnquiry.size && (
+              <span className="rounded-md bg-surface px-2 py-0.5 text-11 text-text border border-border">
+                Size: <strong>{conversation.activeEnquiry.size}</strong>
+              </span>
+            )}
+            {conversation.activeEnquiry.color && (
+              <span className="rounded-md bg-surface px-2 py-0.5 text-11 text-text border border-border">
+                Color: <strong>{conversation.activeEnquiry.color}</strong>
+              </span>
+            )}
+            {conversation.activeEnquiry.personalization && (
+              <span
+                className="rounded-md bg-surface px-2 py-0.5 text-11 text-text border border-border truncate max-w-[200px]"
+                title={conversation.activeEnquiry.personalization}
+              >
+                Custom: <strong>{conversation.activeEnquiry.personalization}</strong>
+              </span>
+            )}
+            {Array.isArray(conversation.activeEnquiry.referenceImages) &&
+              conversation.activeEnquiry.referenceImages.length > 0 && (
+                <span className="rounded-md bg-surface px-2 py-0.5 text-11 text-text border border-border">
+                  📷 {conversation.activeEnquiry.referenceImages.length} photo(s)
+                </span>
+              )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            {conversation.activeEnquiry.status === "order_created" ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-0.5 text-11 font-medium text-emerald-600 dark:text-emerald-400">
+                <Check className="h-3 w-3" />
+                <span>Order #{conversation.activeEnquiry.orderNo || "Created"}</span>
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setShowOrderModal(true)}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1 text-11 font-semibold text-primary-foreground shadow-xs hover:brightness-105 transition cursor-pointer"
+              >
+                <ShoppingBag className="h-3.5 w-3.5" />
+                <span>Convert to Order</span>
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Thread */}
       <div
@@ -339,6 +543,7 @@ export function ChatView({ conversation, onBack, backOnlyOnMobile = false, onRes
 
       <ReplyBox
         key={conversation.id}
+        conversationId={conversation.id}
         onSend={handleSend}
         onSendTemplate={handleSendTemplate}
         onSendCatalogue={handleSendCatalogue}
@@ -348,6 +553,118 @@ export function ChatView({ conversation, onBack, backOnlyOnMobile = false, onRes
         channel={conversation.channelType}
         customerName={name}
       />
+
+      {/* Convert to Order Modal */}
+      {showOrderModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
+          <div className="w-full max-w-md rounded-2xl border border-border bg-surface p-5 shadow-xl text-text">
+            <div className="flex items-center justify-between border-b border-border/60 pb-3">
+              <div className="flex items-center gap-2">
+                <ShoppingBag className="h-5 w-5 text-primary" />
+                <h3 className="text-15 font-bold font-outfit">Convert Enquiry to Order</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowOrderModal(false)}
+                className="rounded-lg p-1 text-text-muted hover:bg-surface-muted hover:text-text cursor-pointer"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-3.5 text-12">
+              <div>
+                <label className="block text-11 font-medium text-text-muted mb-1">Customer</label>
+                <input
+                  type="text"
+                  readOnly
+                  value={`${name} (${conversation.customer.handleOrPhone})`}
+                  className="w-full rounded-lg border border-border bg-surface-muted px-3 py-1.5 text-text"
+                />
+              </div>
+
+              <div>
+                <label className="block text-11 font-medium text-text-muted mb-1">Product</label>
+                <input
+                  type="text"
+                  readOnly
+                  value={
+                    conversation.activeEnquiry?.productName ||
+                    conversation.activeEnquiry?.productSlug ||
+                    "Resin Art Item"
+                  }
+                  className="w-full rounded-lg border border-border bg-surface-muted px-3 py-1.5 text-text font-medium"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-11 font-medium text-text-muted mb-1">Quantity</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={orderQty}
+                    onChange={(e) => setOrderQty(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                    className="w-full rounded-lg border border-border bg-surface px-3 py-1.5 text-text"
+                  />
+                </div>
+                <div>
+                  <label className="block text-11 font-medium text-text-muted mb-1">Unit Price (₹)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={orderAmount}
+                    onChange={(e) => setOrderAmount(e.target.value)}
+                    className="w-full rounded-lg border border-border bg-surface px-3 py-1.5 text-text font-semibold text-primary"
+                  />
+                </div>
+              </div>
+
+              {conversation.activeEnquiry && (
+                <div className="rounded-xl border border-border/70 bg-surface-muted/40 p-2.5 space-y-1 text-11">
+                  <span className="font-semibold text-text">Customer Specifications:</span>
+                  <div className="text-text-muted space-y-0.5 mt-1">
+                    {conversation.activeEnquiry.size && <p>• Size: {conversation.activeEnquiry.size}</p>}
+                    {conversation.activeEnquiry.color && <p>• Color: {conversation.activeEnquiry.color}</p>}
+                    {conversation.activeEnquiry.personalization && (
+                      <p>• Custom: {conversation.activeEnquiry.personalization}</p>
+                    )}
+                    {conversation.activeEnquiry.customNotes && (
+                      <p>• Notes: {conversation.activeEnquiry.customNotes}</p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="mt-5 flex items-center justify-end gap-2 border-t border-border/60 pt-3">
+              <button
+                type="button"
+                onClick={() => setShowOrderModal(false)}
+                className="rounded-lg border border-border px-3 py-1.5 text-12 font-medium text-text hover:bg-surface-muted transition cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={createOrder.isPending}
+                onClick={handleConvertOrder}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-1.5 text-12 font-semibold text-primary-foreground shadow-xs hover:brightness-105 transition cursor-pointer disabled:opacity-50"
+              >
+                {createOrder.isPending ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Check className="h-3.5 w-3.5" />
+                )}
+                <span>
+                  Create Order (₹
+                  {((parseFloat(orderAmount) || 0) * (orderQty || 1)).toLocaleString("en-IN")})
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <ConfirmDialog
         isOpen={confirmResolve}
