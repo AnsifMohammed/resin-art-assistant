@@ -39,7 +39,7 @@ const broadcastFields = {
   templateId: z.string().min(1),
   segment: z.enum(broadcastSegmentEnum.enumValues),
   filters: filtersSchema,
-  variables: z.record(z.string(), z.string().max(1000)),
+  variables: z.record(z.string(), z.string().max(1000)).refine(v => Object.keys(v).length <= 50, { message: "Variables cannot exceed 50 keys" }),
   scheduledAt: z.iso.datetime({ offset: true }).nullable(),
 };
 

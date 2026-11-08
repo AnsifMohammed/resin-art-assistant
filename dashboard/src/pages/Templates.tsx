@@ -241,16 +241,37 @@ function TemplateCard({
 
 function TemplateCardSkeleton() {
   return (
-    <div className="p-5 rounded-xl border border-border bg-surface space-y-4">
-      <div className="flex items-start justify-between gap-2">
-        <Skeleton className="w-40 h-5" />
-        <Skeleton className="w-20 h-5" />
+    <div className="p-5 rounded-xl border border-border bg-surface flex flex-col justify-between space-y-4">
+      <div>
+        {/* name + channel badge */}
+        <div className="flex items-start justify-between gap-2 mb-1.5">
+          <Skeleton className="w-44 h-5" />
+          <Skeleton className="w-20 h-5 shrink-0" />
+        </div>
+        {/* category badge row */}
+        <div className="flex gap-1.5 mb-3">
+          <Skeleton className="w-20 h-5 rounded" />
+        </div>
+        {/* body block */}
+        <div className="p-3 rounded-lg border border-border/50 bg-surface-muted/60 space-y-1.5">
+          <Skeleton className="w-full h-3" />
+          <Skeleton className="w-5/6 h-3" />
+          <Skeleton className="w-4/6 h-3" />
+        </div>
+        {/* variables row */}
+        <div className="mt-3 flex gap-1.5">
+          <Skeleton className="w-16 h-4 rounded" />
+          <Skeleton className="w-20 h-4 rounded" />
+        </div>
       </div>
-      <Skeleton className="w-24 h-4" />
-      <Skeleton className="w-full h-20 rounded-lg" />
+      {/* footer */}
       <div className="pt-3 border-t border-border/40 flex items-center justify-between">
         <Skeleton className="w-28 h-3" />
-        <Skeleton className="w-20 h-5" />
+        <div className="flex gap-1">
+          <Skeleton className="w-6 h-6 rounded-lg" />
+          <Skeleton className="w-6 h-6 rounded-lg" />
+          <Skeleton className="w-6 h-6 rounded-lg" />
+        </div>
       </div>
     </div>
   );

@@ -1017,6 +1017,7 @@ export default function Orders() {
   const [targetStatus, setTargetStatus] = useState<OrderStatus>("in_production");
   const [statusTrackingId, setStatusTrackingId] = useState("");
   const [statusCourier, setStatusCourier] = useState("");
+  const [sendNotification, setSendNotification] = useState(true);
 
   // Production Progress Modal State
   const [progressModalOrder, setProgressModalOrder] = useState<DbOrder | null>(null);
@@ -1148,6 +1149,9 @@ export default function Orders() {
     setTargetStatus(nextStatus);
     setStatusTrackingId(order.trackingId || "");
     setStatusCourier(order.courier || "");
+    const currentIdx = COLUMNS.findIndex((c) => c.id === order.status);
+    const nextIdx = COLUMNS.findIndex((c) => c.id === nextStatus);
+    setSendNotification(nextIdx >= currentIdx);
   };
 
   const confirmStatusUpdate = async () => {
@@ -1159,11 +1163,12 @@ export default function Orders() {
           status: targetStatus,
           trackingId: statusTrackingId.trim() || undefined,
           courier: statusCourier.trim() || undefined,
+          sendNotification,
         },
       });
 
       toast.success("Order status updated", {
-        description: `${updatingOrder.orderNo} moved to ${targetStatus.replace("_", " ")}`,
+        description: `${updatingOrder.orderNo} moved to ${targetStatus.replaceAll("_", " ")}`,
       });
       setUpdatingOrder(null);
     } catch (err: unknown) {
@@ -1695,7 +1700,7 @@ export default function Orders() {
                         <td className="p-3.5">
                           <div className="flex flex-col gap-1 items-start">
                             <span className="px-2 py-0.5 rounded text-11 font-semibold capitalize bg-surface-muted border border-border">
-                              {o.status.replace("_", " ")}
+                              {o.status.replaceAll("_", " ")}
                             </span>
                             {o.status === "in_production" && (
                               isOverdue ? (
@@ -2032,6 +2037,7 @@ export default function Orders() {
             setActiveOrder(null);
             setIsEditingDetails(false);
             setUpdatingOrder(null);
+            setProgressModalOrder(null);
           }}
         >
           <div
@@ -2052,6 +2058,7 @@ export default function Orders() {
                     setActiveOrder(null);
                     setIsEditingDetails(false);
                     setUpdatingOrder(null);
+                    setProgressModalOrder(null);
                   }}
                   className="p-1 rounded-lg text-text-muted hover:text-text cursor-pointer"
                 >
@@ -2578,7 +2585,7 @@ export default function Orders() {
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-16 font-bold font-outfit text-text">
-                  Update Order Status: {targetStatus.replace("_", " ")}
+                  Update Order Status: {targetStatus.replaceAll("_", " ")}
                 </h3>
                 <p className="text-12 text-text-muted">
                   Order #{updatingOrder.orderNo} · {updatingOrder.customerName}
@@ -2600,7 +2607,15 @@ export default function Orders() {
                 <select
                   disabled={updateOrderStatusMutation.isPending}
                   value={targetStatus}
-                  onChange={(e) => setTargetStatus(e.target.value as OrderStatus)}
+                  onChange={(e) => {
+                    const next = e.target.value as OrderStatus;
+                    setTargetStatus(next);
+                    if (updatingOrder) {
+                      const currentIdx = COLUMNS.findIndex((c) => c.id === updatingOrder.status);
+                      const nextIdx = COLUMNS.findIndex((c) => c.id === next);
+                      setSendNotification(nextIdx >= currentIdx);
+                    }
+                  }}
                   className="w-full pl-3 pr-8 py-1.5 appearance-none rounded-lg border border-border bg-surface text-12 text-text focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed transition-opacity"
                 >
                   {COLUMNS.map((col) => (
@@ -2642,36 +2657,39 @@ export default function Orders() {
               </div>
             )}
 
-            {/* Status message preview (the backend does not send this automatically) */}
-            <div className="p-4 rounded-xl border border-emerald-500/30 bg-emerald-500/5 space-y-2">
-              <div className="flex items-center justify-between text-11 font-semibold text-emerald-600 dark:text-emerald-400">
-                <span className="flex items-center gap-1">
-                  <Phone className="w-3.5 h-3.5" /> Status message preview
+            {/* Notify customer toggle */}
+            <div className={`p-3 rounded-xl border ${sendNotification ? "border-emerald-500/30 bg-emerald-500/5" : "border-border bg-surface-muted"}`}>
+              <label className="flex items-center justify-between cursor-pointer select-none gap-3">
+                <span className="flex items-center gap-2 text-12 font-semibold text-text">
+                  <Phone className="w-3.5 h-3.5 text-text-muted shrink-0" />
+                  Notify customer via WhatsApp / Instagram
                 </span>
-                <span className="font-medium text-text-muted">Not sent automatically</span>
-              </div>
-
-              <div className="p-3 rounded-lg bg-surface border border-border shadow-xs text-12 text-text leading-relaxed">
-                <p>
-                  Hi <strong>{updatingOrder.customerName}</strong>! 🎉
-                </p>
-                <p className="mt-1">
-                  Your order <strong>#{updatingOrder.orderNo}</strong> has been updated to{" "}
-                  <strong className="text-primary capitalize">
-                    {targetStatus.replace("_", " ")}
-                  </strong>
-                  .
-                </p>
-                {targetStatus === "dispatched" && (
-                  <p className="mt-1 text-teal-500 font-medium">
-                    Tracking ID: <strong>{statusTrackingId.trim() || "—"}</strong>
-                    {statusCourier.trim() && <> (via {statusCourier.trim()})</>}
+                <button
+                  type="button"
+                  onClick={() => setSendNotification((v) => !v)}
+                  className={`relative inline-flex h-5 w-9 shrink-0 rounded-full transition-colors cursor-pointer ${sendNotification ? "bg-emerald-500" : "bg-border"}`}
+                >
+                  <span className={`absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${sendNotification ? "translate-x-4" : "translate-x-0"}`} />
+                </button>
+              </label>
+              {sendNotification && (
+                <div className="mt-3 p-3 rounded-lg bg-surface border border-border shadow-xs text-12 text-text leading-relaxed">
+                  <p>Hi <strong>{updatingOrder.customerName}</strong>! 🎉</p>
+                  <p className="mt-1">
+                    Your order <strong>#{updatingOrder.orderNo}</strong> has been updated to{" "}
+                    <strong className="text-primary capitalize">{targetStatus.replaceAll("_", " ")}</strong>.
                   </p>
-                )}
-                <p className="mt-1 text-11 text-text-muted">
-                  Thank you for supporting handcrafted resin art! — Saba Art, Coimbatore
-                </p>
-              </div>
+                  {targetStatus === "dispatched" && (
+                    <p className="mt-1 text-teal-500 font-medium">
+                      Tracking ID: <strong>{statusTrackingId.trim() || "—"}</strong>
+                      {statusCourier.trim() && <> (via {statusCourier.trim()})</>}
+                    </p>
+                  )}
+                  <p className="mt-1 text-11 text-text-muted">
+                    Thank you for supporting handcrafted resin art! — Saba Art, Coimbatore
+                  </p>
+                </div>
+              )}
             </div>
 
             <div className="flex items-center justify-end gap-2 pt-3 border-t border-border">
@@ -2689,7 +2707,7 @@ export default function Orders() {
                 className="px-4 py-2 rounded-lg bg-primary hover:bg-amber-600 text-primary-foreground text-13 font-semibold cursor-pointer shadow-xs flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
               >
                 {updateOrderStatusMutation.isPending && <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />}
-                <span>Confirm Update</span>
+                <span>{sendNotification ? "Update & Notify" : "Update Only"}</span>
               </button>
             </div>
           </div>

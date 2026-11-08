@@ -151,7 +151,7 @@ export function useOrderMessages(orderId: string | null | undefined, options: { 
     queryKey: queryKeys.orders.messages(orderId || ""),
     queryFn: ({ signal }) => getOrderMessages(orderId!, signal),
     enabled: Boolean(orderId) && enabled,
-    refetchInterval: 5000,
+    refetchInterval: Boolean(orderId) && enabled ? 5000 : false,
   });
 }
 

@@ -42,7 +42,7 @@ export function useSendPaymentRequest(orderId: string) {
       sendPaymentRequest(orderId, paymentId, customMessage),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.payments.byOrder(orderId) });
-      qc.invalidateQueries({ queryKey: ["orders", orderId, "messages"] });
+      qc.invalidateQueries({ queryKey: queryKeys.orders.messages(orderId) });
     },
   });
 }

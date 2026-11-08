@@ -515,12 +515,17 @@ export const orderRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
     { preHandler: [authenticate, requireAdmin] },
     async (request) => {
       const businessId = request.user.businessId;
-      const query = request.query as {
+      const rawQuery = request.query as {
         status?: string;
         search?: string;
         dueFrom?: string;
         dueTo?: string;
+        page?: string;
+        limit?: string;
       };
+      const page = Math.max(1, parseInt(rawQuery.page ?? "1", 10) || 1);
+      const limit = Math.min(100, Math.max(1, parseInt(rawQuery.limit ?? "50", 10) || 50));
+      const query = rawQuery;
 
       const conditions = [
         eq(orders.businessId, businessId),
@@ -552,11 +557,19 @@ export const orderRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
         );
       }
 
+      const [countRow] = await db
+        .select({ total: sql<number>`count(*)::int` })
+        .from(orders)
+        .where(and(...conditions));
+      const totalOrders = countRow?.total ?? 0;
+
       const orderList = await db
         .select()
         .from(orders)
         .where(and(...conditions))
-        .orderBy(desc(orders.createdAt));
+        .orderBy(desc(orders.createdAt))
+        .limit(limit)
+        .offset((page - 1) * limit);
 
       // Fetch items for all matching orders
       const orderIds = orderList.map((o) => o.id);
@@ -642,7 +655,8 @@ export const orderRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
       return {
         orders: results,
         statusCounts,
-        total: results.length,
+        total: totalOrders,
+        pagination: { page, limit, total: totalOrders },
       };
     }
   );
@@ -909,6 +923,9 @@ export const orderRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
 
       if (data.status !== undefined) {
         updateData.status = data.status;
+        const STATUS_ORDER = ["pending", "confirmed", "in_production", "ready", "dispatched", "delivered"];
+        const newIdx = STATUS_ORDER.indexOf(data.status);
+        const oldIdx = STATUS_ORDER.indexOf(existing.status);
         if (data.status === "in_production" && !existing.productionStartedAt) {
           updateData.productionStartedAt = new Date();
         }
@@ -917,6 +934,15 @@ export const orderRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
         }
         if (data.status === "delivered" && !existing.deliveredAt) {
           updateData.deliveredAt = new Date();
+        }
+        if (newIdx < STATUS_ORDER.indexOf("in_production") && oldIdx >= STATUS_ORDER.indexOf("in_production")) {
+          updateData.productionStartedAt = null;
+        }
+        if (newIdx < STATUS_ORDER.indexOf("dispatched") && oldIdx >= STATUS_ORDER.indexOf("dispatched")) {
+          updateData.dispatchedAt = null;
+        }
+        if (newIdx < STATUS_ORDER.indexOf("delivered") && oldIdx >= STATUS_ORDER.indexOf("delivered")) {
+          updateData.deliveredAt = null;
         }
       }
 
@@ -932,27 +958,29 @@ export const orderRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
         );
 
       if (data.items && data.items.length > 0) {
-        // Soft delete old items
-        await db
-          .update(orderItems)
-          .set({ isDeleted: true, deletedAt: new Date() })
-          .where(eq(orderItems.orderId, existing.id));
+        updatedItems = await db.transaction(async (tx) => {
+          // Soft delete old items
+          await tx
+            .update(orderItems)
+            .set({ isDeleted: true, deletedAt: new Date() })
+            .where(eq(orderItems.orderId, existing.id));
 
-        // Insert new items
-        updatedItems = await db
-          .insert(orderItems)
-          .values(
-            data.items.map((it) => ({
-              orderId: existing.id,
-              productId: it.productId ?? null,
-              productName: it.productName,
-              productDescription: it.productDescription ?? null,
-              quantity: it.quantity,
-              unitPrice: it.unitPrice.toFixed(2),
-              customizations: it.customizations ?? {},
-            }))
-          )
-          .returning();
+          // Insert new items
+          return tx
+            .insert(orderItems)
+            .values(
+              data.items!.map((it) => ({
+                orderId: existing.id,
+                productId: it.productId ?? null,
+                productName: it.productName,
+                productDescription: it.productDescription ?? null,
+                quantity: it.quantity,
+                unitPrice: it.unitPrice.toFixed(2),
+                customizations: it.customizations ?? {},
+              }))
+            )
+            .returning();
+        });
 
         const subtotal = data.items.reduce(
           (sum, it) => sum + it.quantity * it.unitPrice,
@@ -1037,6 +1065,9 @@ export const orderRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
 
       if (trackingId) updateData.trackingId = trackingId;
       if (courier) updateData.courier = courier;
+      const STATUS_ORDER_POST = ["pending", "confirmed", "in_production", "ready", "dispatched", "delivered"];
+      const newIdxPost = STATUS_ORDER_POST.indexOf(status);
+      const oldIdxPost = STATUS_ORDER_POST.indexOf(existing.status);
       if (status === "in_production" && !existing.productionStartedAt) {
         updateData.productionStartedAt = new Date();
       }
@@ -1045,6 +1076,15 @@ export const orderRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
       }
       if (status === "delivered" && !existing.deliveredAt) {
         updateData.deliveredAt = new Date();
+      }
+      if (newIdxPost < STATUS_ORDER_POST.indexOf("in_production") && oldIdxPost >= STATUS_ORDER_POST.indexOf("in_production")) {
+        updateData.productionStartedAt = null;
+      }
+      if (newIdxPost < STATUS_ORDER_POST.indexOf("dispatched") && oldIdxPost >= STATUS_ORDER_POST.indexOf("dispatched")) {
+        updateData.dispatchedAt = null;
+      }
+      if (newIdxPost < STATUS_ORDER_POST.indexOf("delivered") && oldIdxPost >= STATUS_ORDER_POST.indexOf("delivered")) {
+        updateData.deliveredAt = null;
       }
 
       const [updatedOrder] = await db
@@ -1279,10 +1319,13 @@ export const orderRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
         throw new AppError(404, "Message not found", "NOT_FOUND");
       }
 
+      const rawChannel =
+        (msg.metadata as any)?.channel ||
+        order.channel;
       const targetChannel: "whatsapp" | "instagram" =
-        ((msg.metadata as any)?.channel as "whatsapp" | "instagram") ||
-        (order.channel as "whatsapp" | "instagram") ||
-        "whatsapp";
+        rawChannel === "whatsapp" || rawChannel === "instagram"
+          ? rawChannel
+          : "whatsapp";
 
       const custConv = await findOrCreateCustomerConversation(businessId, order, targetChannel);
       const recipient =
@@ -1381,23 +1424,16 @@ export const orderRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
         throw new AppError(404, "Order not found", "NOT_FOUND");
       }
 
-      await db
-        .update(orders)
-        .set({
-          isDeleted: true,
-          deletedAt: new Date(),
-          deletedBy: request.user.sub,
-        })
-        .where(eq(orders.id, existing.id));
-
-      await db
-        .update(orderItems)
-        .set({
-          isDeleted: true,
-          deletedAt: new Date(),
-          deletedBy: request.user.sub,
-        })
-        .where(eq(orderItems.orderId, existing.id));
+      await db.transaction(async (tx) => {
+        await tx
+          .update(orders)
+          .set({ isDeleted: true, deletedAt: new Date(), deletedBy: request.user.sub })
+          .where(eq(orders.id, existing.id));
+        await tx
+          .update(orderItems)
+          .set({ isDeleted: true, deletedAt: new Date(), deletedBy: request.user.sub })
+          .where(eq(orderItems.orderId, existing.id));
+      });
 
       await db.insert(auditLog).values({
         businessId,

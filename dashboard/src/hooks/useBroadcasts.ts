@@ -19,22 +19,32 @@ import { useDebounced } from "./useDebounced.ts";
 
 const AUDIENCE_DEBOUNCE_MS = 300;
 
-/** Admin only: GET /broadcasts (newest first). */
+const ACTIVE_STATUSES = new Set(["scheduled", "sending"]);
+
+/** Admin only: GET /broadcasts (newest first). Polls every 4 s while any broadcast is active. */
 export function useBroadcasts(params: BroadcastListParams = {}) {
   return useQuery({
     queryKey: queryKeys.broadcasts.list(params),
     queryFn: ({ signal }) => listBroadcasts(params, signal),
     placeholderData: keepPreviousData,
+    refetchInterval: (query) => {
+      const broadcasts = query.state.data?.broadcasts ?? [];
+      return broadcasts.some((b) => ACTIVE_STATUSES.has(b.status)) ? 4_000 : false;
+    },
   });
 }
 
-/** Admin only: GET /broadcasts/:id with a page of recipients. Pass null to skip. */
+/** Admin only: GET /broadcasts/:id with a page of recipients. Polls every 3 s while sending. */
 export function useBroadcast(id: string | null | undefined, params: { page?: number; limit?: number } = {}) {
   return useQuery({
     queryKey: queryKeys.broadcasts.detail(id ?? "", params),
     queryFn: ({ signal }) => getBroadcast(id as string, params, signal),
     placeholderData: keepPreviousData,
     enabled: Boolean(id),
+    refetchInterval: (query) => {
+      const status = query.state.data?.broadcast?.status;
+      return status && ACTIVE_STATUSES.has(status) ? 3_000 : false;
+    },
   });
 }
 
