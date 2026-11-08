@@ -4,6 +4,7 @@ import {
   Ban,
   Check,
   CheckCircle2,
+  ChevronDown,
   Clock,
   Link as LinkIcon,
   Plus,
@@ -302,15 +303,18 @@ export function PaymentsPanel({
               {/* Kind */}
               <div>
                 <label className="text-[11px] font-semibold text-text-muted block mb-1">Type</label>
-                <select
-                  value={newKind}
-                  onChange={(e) => setNewKind(e.target.value as PaymentKind)}
-                  className="w-full text-12 px-2.5 py-1.5 rounded-lg bg-surface-muted border border-border text-text focus:outline-none focus:ring-1 focus:ring-primary"
-                >
-                  <option value="advance">Advance</option>
-                  <option value="balance">Balance</option>
-                  <option value="other">Other / Custom</option>
-                </select>
+                <div className="relative">
+                  <select
+                    value={newKind}
+                    onChange={(e) => setNewKind(e.target.value as PaymentKind)}
+                    className="w-full appearance-none text-12 px-2.5 py-1.5 pr-8 rounded-lg bg-surface-muted border border-border text-text focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
+                  >
+                    <option value="advance">Advance</option>
+                    <option value="balance">Balance</option>
+                    <option value="other">Other / Custom</option>
+                  </select>
+                  <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted" />
+                </div>
               </div>
 
               {/* Amount */}
@@ -333,17 +337,20 @@ export function PaymentsPanel({
               {/* Method */}
               <div>
                 <label className="text-[11px] font-semibold text-text-muted block mb-1">Method</label>
-                <select
-                  value={newMethod}
-                  onChange={(e) => setNewMethod(e.target.value)}
-                  className="w-full text-12 px-2.5 py-1.5 rounded-lg bg-surface-muted border border-border text-text focus:outline-none focus:ring-1 focus:ring-primary"
-                >
-                  {PAYMENT_METHODS.map((m) => (
-                    <option key={m} value={m}>
-                      {m}
-                    </option>
-                  ))}
-                </select>
+                <div className="relative">
+                  <select
+                    value={newMethod}
+                    onChange={(e) => setNewMethod(e.target.value)}
+                    className="w-full appearance-none text-12 px-2.5 py-1.5 pr-8 rounded-lg bg-surface-muted border border-border text-text focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
+                  >
+                    {PAYMENT_METHODS.map((m) => (
+                      <option key={m} value={m}>
+                        {m}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted" />
+                </div>
               </div>
 
               {/* Reference */}

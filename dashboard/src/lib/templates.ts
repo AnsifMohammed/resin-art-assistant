@@ -1,4 +1,4 @@
-import type { TemplateCategory, TemplateChannel } from "../types/index.ts";
+import type { TemplateChannel } from "../types/index.ts";
 
 /** Same rules as backend/src/lib/templates.ts: {name} where name is \w+. */
 const VARIABLE_RE = /\{(\w+)\}/g;
@@ -35,7 +35,7 @@ export const COMMON_TEMPLATE_VARIABLES = [
   "offerEndDate",
 ] as const;
 
-export const templateCategoryLabels: Record<TemplateCategory, string> = {
+const CATEGORY_LABEL_MAP: Record<string, string> = {
   delivery: "Delivery",
   festive: "Festive",
   custom_order: "Custom order",
@@ -43,6 +43,15 @@ export const templateCategoryLabels: Record<TemplateCategory, string> = {
   general: "General",
   production_progress: "Production Progress",
 };
+
+export function categoryLabel(category: string): string {
+  return CATEGORY_LABEL_MAP[category] ??
+    category.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+export const templateCategoryLabels: Record<string, string> = new Proxy(CATEGORY_LABEL_MAP, {
+  get(target, key: string) { return target[key] ?? categoryLabel(key); },
+});
 
 export const templateChannelLabels: Record<TemplateChannel, string> = {
   whatsapp: "WhatsApp",

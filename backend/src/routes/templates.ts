@@ -6,9 +6,12 @@ import {
   auditLog,
   messageTemplates,
   metaTemplateStatusEnum,
-  templateCategoryEnum,
   templateChannelEnum,
 } from "../db/schema.ts";
+
+const DEFAULT_CATEGORIES = [
+  "delivery", "festive", "custom_order", "payment", "general", "production_progress",
+] as const;
 import { AppError } from "../lib/errors.ts";
 import { extractVariables, templateMaxLength } from "../lib/templates.ts";
 import { authenticate } from "../middleware/authenticate.ts";
@@ -37,14 +40,14 @@ function toTemplate(t: TemplateRow) {
 }
 
 const listQuerySchema = z.object({
-  category: z.enum(templateCategoryEnum.enumValues).optional(),
+  category: z.string().min(1).max(50).optional(),
   channel: z.enum(["whatsapp", "instagram"]).optional(),
   active: z.enum(["true", "false", "all"]).default("all"),
 });
 
 const templateFields = {
   name: z.string().trim().min(1).max(80),
-  category: z.enum(templateCategoryEnum.enumValues),
+  category: z.string().trim().min(1).max(50),
   channel: z.enum(templateChannelEnum.enumValues),
   body: z.string().trim().min(1),
   isActive: z.boolean(),
@@ -143,19 +146,19 @@ export function copyName(name: string, taken: Set<string>): string {
 export const DEFAULT_PRODUCTION_TEMPLATES = [
   {
     name: "Production Progress Update",
-    category: "production_progress" as const,
+    category: "production_progress",
     channel: "both" as const,
     body: "Hi {CustomerName}! Your order #{OrderNumber} is currently in production. Our team is carefully working on your {ProductName}. It has been {ProductionDays} days since production started. We appreciate your patience and will keep you updated!",
   },
   {
     name: "Production Delay Notification",
-    category: "production_progress" as const,
+    category: "production_progress",
     channel: "both" as const,
     body: "Hi {CustomerName}! We wanted to update you regarding your order #{OrderNumber}. Your handmade {ProductName} is taking a little longer than expected due to the production process. We sincerely appreciate your patience. We'll keep you informed about the progress.",
   },
   {
     name: "Production Completion Update",
-    category: "production_progress" as const,
+    category: "production_progress",
     channel: "both" as const,
     body: "Hi {CustomerName}! Great news! Your order #{OrderNumber} has completed production and is now ready. Thank you for patiently waiting for your handmade creation!",
   },
@@ -227,6 +230,40 @@ export const templateRoutes: FastifyPluginAsync = async (app: FastifyInstance) =
         request.user.role === "staff" ? eq(messageTemplates.isActive, true) : undefined,
       );
       return { template: toTemplate(template) };
+    },
+  );
+
+  // GET /templates/categories — returns default + any custom categories in use
+  app.get(
+    "/templates/categories",
+    { preHandler: [authenticate, requireStaffOrAdmin] },
+    async (request) => {
+      const { businessId } = request.user;
+      const rows = await db
+        .selectDistinct({ category: messageTemplates.category })
+        .from(messageTemplates)
+        .where(eq(messageTemplates.businessId, businessId));
+      const inUse = rows.map((r) => r.category);
+      const custom = inUse.filter((c) => !(DEFAULT_CATEGORIES as readonly string[]).includes(c));
+      return { categories: [...DEFAULT_CATEGORIES, ...custom] };
+    },
+  );
+
+  // DELETE /templates/categories/:category — reassign all templates to "general" (custom only)
+  app.delete(
+    "/templates/categories/:category",
+    { preHandler: [authenticate, requireAdmin] },
+    async (request, reply) => {
+      const { businessId } = request.user;
+      const { category } = request.params as { category: string };
+      if ((DEFAULT_CATEGORIES as readonly string[]).includes(category)) {
+        return reply.status(400).send({ error: "Cannot delete a built-in category" });
+      }
+      await db
+        .update(messageTemplates)
+        .set({ category: "general" })
+        .where(and(eq(messageTemplates.businessId, businessId), eq(messageTemplates.category, category)));
+      return { ok: true };
     },
   );
 

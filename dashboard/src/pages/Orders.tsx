@@ -29,7 +29,6 @@ import { toast } from "sonner";
 import { ChannelIcon } from "../components/shared/ChannelIcon.tsx";
 import { Skeleton } from "../components/shared/Skeleton.tsx";
 import { EmptyState } from "../components/shared/EmptyState.tsx";
-import { SegmentedControl } from "../components/shared/SegmentedControl.tsx";
 import { PaymentsPanel } from "../components/orders/PaymentsPanel.tsx";
 import type { PaymentSummary, DbOrder, DbOrderItem, OrderStatus, OrderMessage } from "../types/index.ts";
 import {
@@ -134,75 +133,75 @@ export function getOrderDueMilestone(order: DbOrder): DueMilestone | null {
   const elapsedDays = Math.max(prodDays, today.diff(created, "day"));
   const midpoint = Math.floor(totalDuration / 2);
 
-  // 1. Overdue (blinking rose/red)
+  // 1. Overdue — static red left border, ping dot on badge only
   if (remainingDays < 0) {
     return {
       type: "overdue",
       label: `Overdue (${Math.abs(remainingDays)}d)`,
-      badgeClass: "bg-rose-500/15 text-rose-700 dark:text-rose-400 border-rose-500/40 animate-pulse",
-      borderClass: "border-border/80 border-l-4 border-l-rose-500 dark:border-l-rose-400 bg-rose-500/[0.05] ring-1 ring-rose-500/40 animate-pulse",
+      badgeClass: "bg-rose-500/15 text-rose-700 dark:text-rose-400 border-rose-500/40",
+      borderClass: "border-border/80 border-l-4 border-l-rose-500 dark:border-l-rose-400 bg-rose-500/[0.04]",
       dotClass: "bg-rose-500",
       pingClass: "bg-rose-400",
     };
   }
 
-  // 2. Due Today (blinking rose/red)
+  // 2. Due Today — static red left border, ping dot on badge only
   if (remainingDays === 0) {
     return {
       type: "today",
       label: "Due Today",
-      badgeClass: "bg-rose-500/15 text-rose-700 dark:text-rose-400 border-rose-500/40 animate-pulse",
-      borderClass: "border-border/80 border-l-4 border-l-rose-500 dark:border-l-rose-400 bg-rose-500/[0.05] ring-1 ring-rose-500/40 animate-pulse",
+      badgeClass: "bg-rose-500/15 text-rose-700 dark:text-rose-400 border-rose-500/40",
+      borderClass: "border-border/80 border-l-4 border-l-rose-500 dark:border-l-rose-400 bg-rose-500/[0.04]",
       dotClass: "bg-rose-500",
       pingClass: "bg-rose-400",
     };
   }
 
-  // 3. 1 Day Remaining (blinking warm amber)
+  // 3. 1 Day Remaining — amber left border, ping dot
   if (remainingDays === 1) {
     return {
       type: "1d",
       label: "1 Day Remaining",
-      badgeClass: "bg-amber-600/15 text-amber-800 dark:text-amber-300 border-amber-600/40 animate-pulse",
-      borderClass: "border-border/80 border-l-4 border-l-amber-600 dark:border-l-amber-500 bg-amber-600/[0.05] ring-1 ring-amber-600/30 animate-pulse",
+      badgeClass: "bg-amber-600/15 text-amber-800 dark:text-amber-300 border-amber-600/40",
+      borderClass: "border-border/80 border-l-4 border-l-amber-600 dark:border-l-amber-500 bg-amber-600/[0.04]",
       dotClass: "bg-amber-600",
       pingClass: "bg-amber-400",
     };
   }
 
-  // 4. 2 Days Remaining (blinking orange)
+  // 4. 2 Days Remaining — orange left border, ping dot
   if (remainingDays === 2) {
     return {
       type: "2d",
       label: "2 Days Remaining",
-      badgeClass: "bg-orange-500/15 text-orange-700 dark:text-orange-400 border-orange-500/40 animate-pulse",
-      borderClass: "border-border/80 border-l-4 border-l-orange-500 dark:border-l-orange-400 bg-orange-500/[0.04] ring-1 ring-orange-500/30 animate-pulse",
+      badgeClass: "bg-orange-500/15 text-orange-700 dark:text-orange-400 border-orange-500/40",
+      borderClass: "border-border/80 border-l-4 border-l-orange-500 dark:border-l-orange-400 bg-orange-500/[0.03]",
       dotClass: "bg-orange-500",
       pingClass: "bg-orange-400",
     };
   }
 
-  // 5. 7 Days Remaining (blinking soft amber)
+  // 5. 7 Days Remaining — subtle amber left border, no ping
   if (remainingDays === 7) {
     return {
       type: "7d",
       label: "7 Days Remaining",
-      badgeClass: "bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30 animate-pulse",
-      borderClass: "border-border/80 border-l-4 border-l-amber-400 dark:border-l-amber-500 bg-amber-500/[0.03] ring-1 ring-amber-400/30 animate-pulse",
+      badgeClass: "bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30",
+      borderClass: "border-border/80 border-l-4 border-l-amber-400 dark:border-l-amber-500",
       dotClass: "bg-amber-500",
-      pingClass: "bg-amber-400",
+      pingClass: "",
     };
   }
 
-  // 6. Midpoint Reached (blinking calm blue)
+  // 6. Midpoint Reached — subtle blue left border, no ping
   if (totalDuration >= 3 && elapsedDays === midpoint && midpoint > 0) {
     return {
       type: "midpoint",
       label: "Midpoint Reached",
-      badgeClass: "bg-blue-500/15 text-blue-700 dark:text-blue-400 border-blue-500/30 animate-pulse",
-      borderClass: "border-border/80 border-l-4 border-l-blue-400 dark:border-l-blue-500 bg-blue-500/[0.03] ring-1 ring-blue-400/30 animate-pulse",
+      badgeClass: "bg-blue-500/15 text-blue-700 dark:text-blue-400 border-blue-500/30",
+      borderClass: "border-border/80 border-l-4 border-l-blue-400 dark:border-l-blue-500",
       dotClass: "bg-blue-500",
-      pingClass: "bg-blue-400",
+      pingClass: "",
     };
   }
 
@@ -219,14 +218,8 @@ interface OrderCardProps {
 }
 
 function OrderPaymentChip({ summary, orderTotal }: { summary?: PaymentSummary | undefined; orderTotal: number }) {
-  if (!summary || summary.totalPaid === 0) {
-    const bal = summary?.balanceDue ?? orderTotal;
-    return (
-      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-stone-500/10 text-stone-600 dark:text-stone-400 border border-stone-500/20 tabular-nums whitespace-nowrap">
-        Bal: ₹{bal.toLocaleString("en-IN")}
-      </span>
-    );
-  }
+  // No payment made yet — hide the chip entirely
+  if (!summary || summary.totalPaid === 0) return null;
 
   if (summary.paymentState === "fully_paid") {
     return (
@@ -238,7 +231,7 @@ function OrderPaymentChip({ summary, orderTotal }: { summary?: PaymentSummary | 
 
   return (
     <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 tabular-nums whitespace-nowrap">
-      Advance Paid · Bal: ₹{summary.balanceDue.toLocaleString("en-IN")}
+      Adv · Bal: ₹{summary.balanceDue.toLocaleString("en-IN")}
     </span>
   );
 }
@@ -274,11 +267,27 @@ function OrderCard({
       }`}
     >
       <div className="space-y-2">
-        {/* Top: Order #, Date, Status */}
+        {/* Top: Order #, Milestone badge (if any), Date */}
         <div className="flex items-center justify-between gap-1.5">
-          <span className="text-12 font-bold font-outfit text-text group-hover:text-primary transition-colors truncate">
-            #{order.orderNo}
-          </span>
+          <div className="flex items-center gap-1.5 min-w-0 overflow-hidden">
+            <span className="text-12 font-bold font-outfit text-text group-hover:text-primary transition-colors truncate shrink-0 max-w-[90px]">
+              #{order.orderNo}
+            </span>
+            {milestone && (
+              <span
+                className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-semibold border shrink-0 ${milestone.badgeClass}`}
+                title={`Production Milestone: ${milestone.label}`}
+              >
+                <span className="relative flex h-1.5 w-1.5 shrink-0">
+                  {milestone.pingClass && (
+                    <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${milestone.pingClass} opacity-75`} />
+                  )}
+                  <span className={`relative inline-flex rounded-full h-1.5 w-1.5 ${milestone.dotClass}`} />
+                </span>
+                <span className="truncate">{milestone.label}</span>
+              </span>
+            )}
+          </div>
           <div className="flex items-center gap-1.5 shrink-0">
             {isGrid && colInfo && (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold capitalize bg-surface-muted text-text-muted border border-border/50">
@@ -297,22 +306,6 @@ function OrderCard({
           <ChannelIcon channel={order.channel} size={13} className="shrink-0" />
           <span className="font-semibold text-text truncate min-w-0">{order.customerName}</span>
         </div>
-
-        {/* Milestone Indicator Badge (e.g. Midpoint Reached, 7/2/1 Days Remaining) */}
-        {milestone && (
-          <div className="pt-0.5">
-            <span
-              className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-semibold border ${milestone.badgeClass}`}
-              title={`Production Milestone: ${milestone.label}`}
-            >
-              <span className="relative flex h-2 w-2 shrink-0">
-                <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${milestone.pingClass} opacity-75`} />
-                <span className={`relative inline-flex rounded-full h-2 w-2 ${milestone.dotClass}`} />
-              </span>
-              <span>{milestone.label}</span>
-            </span>
-          </div>
-        )}
 
         {/* In Production Duration Badge */}
         {order.status === "in_production" && (
@@ -352,11 +345,14 @@ function OrderCard({
       </div>
 
       <div className="space-y-1.5 pt-2 border-t border-border/40">
-        {/* Amount & Due date / Tracking - Due date aligned to rightmost corner */}
+        {/* Amount + Payment chip on left, Tracking + Due date on right */}
         <div className="flex items-center justify-between gap-1 min-w-0">
-          <span className="text-12 sm:text-13 font-bold font-outfit text-text tabular-nums shrink-0">
-            ₹{Number(order.totalAmount).toLocaleString("en-IN")}
-          </span>
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className="text-12 sm:text-13 font-bold font-outfit text-text tabular-nums shrink-0">
+              ₹{Number(order.totalAmount).toLocaleString("en-IN")}
+            </span>
+            <OrderPaymentChip summary={order.paymentSummary} orderTotal={Number(order.totalAmount)} />
+          </div>
 
           <div className="flex items-center gap-1.5 shrink-0">
             {order.trackingId ? (
@@ -365,7 +361,7 @@ function OrderCard({
                 className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-surface-muted text-10 font-mono text-text hover:bg-border transition-colors cursor-pointer shrink-0"
                 title="Click to copy tracking ID"
               >
-                <Truck className="w-3 h-3 text-teal shrink-0" />
+                <Truck className="w-3 h-3 text-teal-500 shrink-0" />
                 <Copy className="w-2.5 h-2.5 shrink-0" />
               </button>
             ) : null}
@@ -373,11 +369,6 @@ function OrderCard({
               <Clock className="w-2.5 h-2.5 shrink-0" /> {formatDueDate(order.expectedDeliveryDate)}
             </span>
           </div>
-        </div>
-
-        {/* Payment Balance Chip - fixed alignment, no wrap */}
-        <div className="flex items-center min-w-0">
-          <OrderPaymentChip summary={order.paymentSummary} orderTotal={Number(order.totalAmount)} />
         </div>
 
         {/* Action Buttons: 1-Click Advance + Move To Stage Dropdown (Hidden on delivered tab) */}
@@ -998,6 +989,7 @@ export default function Orders() {
   const [dueRange, setDueRange] = useState<DueDateRange>({ preset: "all" });
   const [duePreset, setDuePreset] = useState<DueRangePreset>("all");
   const [showCustomDuePicker, setShowCustomDuePicker] = useState(false);
+  const [showDueDropdown, setShowDueDropdown] = useState(false);
   const [customDueStartDate, setCustomDueStartDate] = useState(() => dayjs().format("YYYY-MM-DD"));
   const [customDueEndDate, setCustomDueEndDate] = useState(() => dayjs().add(7, "day").format("YYYY-MM-DD"));
 
@@ -1133,6 +1125,16 @@ export default function Orders() {
       }
     }
   }, [searchParams, orders]);
+
+  useEffect(() => {
+    if (!showDueDropdown) return;
+    const handler = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest("[data-due-dropdown]")) setShowDueDropdown(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [showDueDropdown]);
 
   const copyTracking = (trackingId: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -1374,83 +1376,75 @@ export default function Orders() {
 
         {/* Action Buttons & Due Date Filter */}
         <div className="flex flex-wrap items-center gap-2">
-          {/* Due Date Presets SegmentedControl & Custom Picker */}
-          <div className="relative flex items-center gap-1.5">
-            <span className="text-11 font-medium text-text-muted hidden md:inline">Due:</span>
-            <SegmentedControl<DueRangePreset>
-              size="sm"
-              options={[
-                { value: "all", label: "All" },
-                {
-                  value: "7d",
-                  label: (
-                    <>
-                      <span className="hidden sm:inline">7 days</span>
-                      <span className="sm:hidden">7d</span>
-                    </>
-                  ),
-                },
-                {
-                  value: "15d",
-                  label: (
-                    <>
-                      <span className="hidden sm:inline">15 days</span>
-                      <span className="sm:hidden">15d</span>
-                    </>
-                  ),
-                },
-                {
-                  value: "1m",
-                  label: (
-                    <>
-                      <span className="hidden sm:inline">1 month</span>
-                      <span className="sm:hidden">1m</span>
-                    </>
-                  ),
-                },
-                { value: "custom", label: "Custom" },
-              ]}
-              value={duePreset}
-              onChange={handleDuePresetChange}
-            />
+          {/* Due Date Filter — compact dropdown */}
+          <div className="relative" data-due-dropdown>
+            <button
+              type="button"
+              onClick={() => setShowDueDropdown((v) => !v)}
+              className={`flex items-center gap-1.5 h-9 px-3 rounded-xl border text-12 font-medium transition-colors cursor-pointer ${
+                duePreset !== "all"
+                  ? "border-primary/50 bg-primary/10 text-primary"
+                  : "border-border bg-surface hover:bg-surface-muted text-text"
+              }`}
+            >
+              <Calendar className="w-3.5 h-3.5 shrink-0" />
+              <span>
+                Due:{" "}
+                {{ all: "All", "7d": "7 days", "15d": "15 days", "1m": "1 month", custom: "Custom" }[duePreset]}
+              </span>
+              <ChevronDown className={`w-3.5 h-3.5 text-text-muted transition-transform ${showDueDropdown ? "rotate-180" : ""}`} />
+            </button>
 
-            {/* Custom Due Date Floating Picker (identical to Analytics) */}
-            {showCustomDuePicker && (
-              <div className="absolute right-0 top-10 z-50 p-3 rounded-xl border border-border bg-surface shadow-xl flex flex-wrap items-center gap-2 max-w-[calc(100vw-2rem)] animate-in fade-in slide-in-from-top-2 duration-150">
-                <Calendar className="w-4 h-4 text-primary shrink-0" />
-                <input
-                  type="date"
-                  value={customDueStartDate}
-                  max={customDueEndDate || undefined}
-                  onChange={(e) => setCustomDueStartDate(e.target.value)}
-                  className="px-2 py-1 text-11 rounded-md border border-border bg-surface-muted text-text focus:outline-none focus:ring-1 focus:ring-primary"
-                />
-                <span className="text-text-muted text-11">to</span>
-                <input
-                  type="date"
-                  value={customDueEndDate}
-                  min={customDueStartDate || undefined}
-                  onChange={(e) => setCustomDueEndDate(e.target.value)}
-                  className="px-2 py-1 text-11 rounded-md border border-border bg-surface-muted text-text focus:outline-none focus:ring-1 focus:ring-primary"
-                />
-                <button
-                  type="button"
-                  onClick={applyCustomDueRange}
-                  className="px-2.5 py-1 rounded-md bg-primary text-primary-foreground text-11 font-medium hover:bg-amber-600 transition-colors cursor-pointer"
-                >
-                  Apply
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowCustomDuePicker(false);
-                    setDuePreset(dueRange.preset);
-                  }}
-                  className="p-1 rounded-md hover:bg-surface-muted text-text-muted cursor-pointer"
-                  aria-label="Close custom picker"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
+            {showDueDropdown && (
+              <div className="absolute left-0 top-full mt-1.5 z-50 min-w-[160px] rounded-xl border border-border bg-surface shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
+                {(["all", "7d", "15d", "1m", "custom"] as DueRangePreset[]).map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => {
+                      handleDuePresetChange(preset);
+                      if (preset !== "custom") setShowDueDropdown(false);
+                    }}
+                    className={`w-full text-left px-3.5 py-2 text-12 font-medium transition-colors cursor-pointer flex items-center justify-between ${
+                      duePreset === preset
+                        ? "bg-primary/10 text-primary"
+                        : "text-text hover:bg-surface-muted"
+                    }`}
+                  >
+                    {{ all: "All", "7d": "7 days", "15d": "15 days", "1m": "1 month", custom: "Custom range" }[preset]}
+                    {duePreset === preset && <Check className="w-3.5 h-3.5" />}
+                  </button>
+                ))}
+
+                {/* Custom date inputs shown inline in dropdown */}
+                {showCustomDuePicker && (
+                  <div className="px-3.5 py-3 border-t border-border space-y-2">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="date"
+                        value={customDueStartDate}
+                        max={customDueEndDate || undefined}
+                        onChange={(e) => setCustomDueStartDate(e.target.value)}
+                        className="flex-1 px-2 py-1 text-11 rounded-md border border-border bg-surface-muted text-text focus:outline-none focus:ring-1 focus:ring-primary"
+                      />
+                      <span className="text-text-muted text-11 shrink-0">to</span>
+                      <input
+                        type="date"
+                        value={customDueEndDate}
+                        min={customDueStartDate || undefined}
+                        onChange={(e) => setCustomDueEndDate(e.target.value)}
+                        className="flex-1 px-2 py-1 text-11 rounded-md border border-border bg-surface-muted text-text focus:outline-none focus:ring-1 focus:ring-primary"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => { applyCustomDueRange(); setShowDueDropdown(false); }}
+                      className="w-full px-2.5 py-1.5 rounded-lg bg-primary text-primary-foreground text-12 font-medium hover:bg-amber-600 transition-colors cursor-pointer"
+                    >
+                      Apply
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -1726,7 +1720,7 @@ export default function Orders() {
                         <td className="p-3.5 text-text-muted">{formatOrderDate(o.createdAt)}</td>
                         <td className="p-3.5">
                           {o.trackingId ? (
-                            <span className="font-mono text-11 text-teal flex items-center gap-1">
+                            <span className="font-mono text-11 text-teal-500 flex items-center gap-1">
                               <Truck className="w-3.5 h-3.5" /> {o.trackingId}
                             </span>
                           ) : (
@@ -1808,7 +1802,7 @@ export default function Orders() {
                       placeholder="e.g. Divya Subramanian"
                       value={createCustomerName}
                       onChange={(e) => setCreateCustomerName(e.target.value)}
-                      className="mt-1 w-full px-3 py-1.5 rounded-lg border border-border bg-surface text-12 text-text focus:outline-none focus:ring-1 focus:ring-primary"
+                      className="mt-1 w-full px-3 py-2 rounded-lg border border-border bg-surface text-13 text-text focus:outline-none focus:ring-1 focus:ring-primary"
                     />
                   </div>
                   <div>
@@ -1817,7 +1811,7 @@ export default function Orders() {
                       <select
                         value={createChannel}
                         onChange={(e) => setCreateChannel(e.target.value as "whatsapp" | "instagram")}
-                        className="w-full pl-3 pr-8 py-1.5 appearance-none rounded-lg border border-border bg-surface text-12 text-text focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
+                        className="w-full pl-3 pr-8 py-2 appearance-none rounded-lg border border-border bg-surface text-13 text-text focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
                       >
                         <option value="whatsapp">WhatsApp</option>
                         <option value="instagram">Instagram</option>
@@ -1832,7 +1826,7 @@ export default function Orders() {
                       placeholder="+91 98401 23456"
                       value={createCustomerPhone}
                       onChange={(e) => setCreateCustomerPhone(e.target.value)}
-                      className="mt-1 w-full px-3 py-1.5 rounded-lg border border-border bg-surface text-12 text-text focus:outline-none focus:ring-1 focus:ring-primary"
+                      className="mt-1 w-full px-3 py-2 rounded-lg border border-border bg-surface text-13 text-text focus:outline-none focus:ring-1 focus:ring-primary"
                     />
                   </div>
                   <div>
@@ -1842,7 +1836,7 @@ export default function Orders() {
                       placeholder="customer@gmail.com"
                       value={createCustomerEmail}
                       onChange={(e) => setCreateCustomerEmail(e.target.value)}
-                      className="mt-1 w-full px-3 py-1.5 rounded-lg border border-border bg-surface text-12 text-text focus:outline-none focus:ring-1 focus:ring-primary"
+                      className="mt-1 w-full px-3 py-2 rounded-lg border border-border bg-surface text-13 text-text focus:outline-none focus:ring-1 focus:ring-primary"
                     />
                   </div>
                 </div>
@@ -1880,7 +1874,7 @@ export default function Orders() {
                           placeholder="Product Name (e.g. Ocean Coaster Set of 4)"
                           value={item.productName}
                           onChange={(e) => handleItemChange(idx, "productName", e.target.value)}
-                          className="w-full px-2.5 py-1 rounded-md border border-border bg-surface text-12 text-text focus:outline-none focus:ring-1 focus:ring-primary"
+                          className="w-full px-3 py-1.5 rounded-md border border-border bg-surface text-13 text-text focus:outline-none focus:ring-1 focus:ring-primary"
                         />
                       </div>
                       <div className="grid grid-cols-3 gap-2">
@@ -1892,7 +1886,7 @@ export default function Orders() {
                             placeholder="1"
                             value={item.quantity}
                             onChange={(e) => handleItemChange(idx, "quantity", e.target.value)}
-                            className="w-full px-2 py-1 rounded-md border border-border bg-surface text-12 text-text focus:outline-none focus:ring-1 focus:ring-primary"
+                            className="w-full px-2.5 py-1.5 rounded-md border border-border bg-surface text-13 text-text focus:outline-none focus:ring-1 focus:ring-primary"
                           />
                         </div>
                         <div className="col-span-1">
@@ -1904,12 +1898,12 @@ export default function Orders() {
                             placeholder="0.00"
                             value={item.unitPrice}
                             onChange={(e) => handleItemChange(idx, "unitPrice", e.target.value)}
-                            className="w-full px-2 py-1 rounded-md border border-border bg-surface text-12 text-text focus:outline-none focus:ring-1 focus:ring-primary"
+                            className="w-full px-2.5 py-1.5 rounded-md border border-border bg-surface text-13 text-text focus:outline-none focus:ring-1 focus:ring-primary"
                           />
                         </div>
                         <div className="col-span-1 flex flex-col justify-end">
                           <label className="text-[10px] text-text-muted">Line Total</label>
-                          <span className="text-12 font-bold font-outfit text-text py-1">
+                          <span className="text-13 font-bold font-outfit text-text py-1.5">
                             ₹{((parseInt(String(item.quantity), 10) || 0) * (parseFloat(String(item.unitPrice)) || 0)).toLocaleString("en-IN")}
                           </span>
                         </div>
@@ -1920,7 +1914,7 @@ export default function Orders() {
                           placeholder="Customizations (e.g. Gold foil, Roman numerals)"
                           value={item.productDescription}
                           onChange={(e) => handleItemChange(idx, "productDescription", e.target.value)}
-                          className="w-full px-2.5 py-1 rounded-md border border-border bg-surface text-11 text-text-muted focus:outline-none"
+                          className="w-full px-3 py-1.5 rounded-md border border-border bg-surface text-12 text-text-muted focus:outline-none"
                         />
                       </div>
                     </div>
@@ -1972,7 +1966,7 @@ export default function Orders() {
                     placeholder="Street, Area, City, Pin Code"
                     value={createShippingAddress}
                     onChange={(e) => setCreateShippingAddress(e.target.value)}
-                    className="mt-1 w-full px-3 py-1.5 rounded-lg border border-border bg-surface text-12 text-text focus:outline-none focus:ring-1 focus:ring-primary"
+                    className="mt-1 w-full px-3 py-2 rounded-lg border border-border bg-surface text-13 text-text focus:outline-none focus:ring-1 focus:ring-primary"
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
@@ -1983,7 +1977,7 @@ export default function Orders() {
                       placeholder="e.g. Shiprocket (DTDC)"
                       value={createCourier}
                       onChange={(e) => setCreateCourier(e.target.value)}
-                      className="mt-1 w-full px-3 py-1.5 rounded-lg border border-border bg-surface text-12 text-text focus:outline-none focus:ring-1 focus:ring-primary"
+                      className="mt-1 w-full px-3 py-2 rounded-lg border border-border bg-surface text-13 text-text focus:outline-none focus:ring-1 focus:ring-primary"
                     />
                   </div>
                   <div>
@@ -1992,7 +1986,7 @@ export default function Orders() {
                       type="date"
                       value={createExpectedDate}
                       onChange={(e) => setCreateExpectedDate(e.target.value)}
-                      className="mt-1 w-full px-3 py-1.5 rounded-lg border border-border bg-surface text-12 text-text focus:outline-none focus:ring-1 focus:ring-primary"
+                      className="mt-1 w-full px-3 py-2 rounded-lg border border-border bg-surface text-13 text-text focus:outline-none focus:ring-1 focus:ring-primary"
                     />
                   </div>
                 </div>
@@ -2003,7 +1997,7 @@ export default function Orders() {
                     placeholder="Special requests or packaging instructions"
                     value={createCustomerNotes}
                     onChange={(e) => setCreateCustomerNotes(e.target.value)}
-                    className="mt-1 w-full px-3 py-1.5 rounded-lg border border-border bg-surface text-12 text-text focus:outline-none focus:ring-1 focus:ring-primary"
+                    className="mt-1 w-full px-3 py-2 rounded-lg border border-border bg-surface text-13 text-text focus:outline-none focus:ring-1 focus:ring-primary"
                   />
                 </div>
               </div>
@@ -2037,6 +2031,7 @@ export default function Orders() {
           onClick={() => {
             setActiveOrder(null);
             setIsEditingDetails(false);
+            setUpdatingOrder(null);
           }}
         >
           <div
@@ -2051,20 +2046,12 @@ export default function Orders() {
                 <p className="text-12 text-text-muted">Placed {formatOrderDate(liveActiveOrder.createdAt)}</p>
               </div>
               <div className="flex items-center gap-1.5">
-                {!isEditingDetails && (
-                  <button
-                    type="button"
-                    onClick={() => handleStartEditing(liveActiveOrder)}
-                    className="px-2.5 py-1 rounded-lg border border-border bg-surface hover:bg-surface-muted text-11 font-semibold text-primary flex items-center gap-1 cursor-pointer transition-colors"
-                  >
-                    <Edit2 className="w-3 h-3" /> Edit Order
-                  </button>
-                )}
                 <button
                   type="button"
                   onClick={() => {
                     setActiveOrder(null);
                     setIsEditingDetails(false);
+                    setUpdatingOrder(null);
                   }}
                   className="p-1 rounded-lg text-text-muted hover:text-text cursor-pointer"
                 >
@@ -2169,102 +2156,275 @@ export default function Orders() {
               );
             })()}
 
-            {/* Customer & Chat Card */}
-            <div className="p-4 rounded-xl border border-border bg-surface space-y-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  {!isEditingDetails ? (
-                    <h4 className="font-semibold text-text">{liveActiveOrder.customerName}</h4>
-                  ) : (
+            {isEditingDetails ? (
+              /* ── Edit Order Form (same style as Create Order) ── */
+              <form onSubmit={(e) => { e.preventDefault(); handleSaveOrderEdits(); }} className="space-y-4">
+                {/* Customer Information */}
+                <div className="space-y-3 p-4 rounded-xl border border-border bg-surface-muted">
+                  <p className="text-11 font-semibold uppercase tracking-wider text-text-muted">Customer Information</p>
+                  <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-12 font-medium text-text-muted mb-1">Customer Name</label>
+                      <label className="text-11 font-medium text-text">Customer Name *</label>
                       <input
                         type="text"
+                        required
+                        placeholder="e.g. Divya Subramanian"
                         value={editCustomerName}
                         onChange={(e) => setEditCustomerName(e.target.value)}
-                        className="w-full h-10 px-3 rounded-lg border border-border bg-surface text-14 text-text font-semibold focus:outline-none focus:border-primary"
+                        className="mt-1 w-full px-3 py-2 rounded-lg border border-border bg-surface text-13 text-text focus:outline-none focus:ring-1 focus:ring-primary"
                       />
                     </div>
-                  )}
-                  <div className="flex items-center gap-1.5 text-12 text-text-muted mt-0.5">
-                    <ChannelIcon channel={liveActiveOrder.channel} size={13} />
-                    {!isEditingDetails ? (
-                      <span>{liveActiveOrder.customerPhone || "Direct Customer"}</span>
-                    ) : (
+                    <div>
+                      <label className="text-11 font-medium text-text">Channel</label>
+                      <div className="mt-1 flex items-center gap-2 h-[34px] px-3 rounded-lg border border-border bg-surface-muted text-13 text-text-muted">
+                        <ChannelIcon channel={liveActiveOrder.channel} size={13} />
+                        <span className="capitalize">{liveActiveOrder.channel}</span>
+                      </div>
+                    </div>
+                    <div className="col-span-2">
+                      <label className="text-11 font-medium text-text">Phone / Handle</label>
                       <input
                         type="text"
-                        placeholder="Phone / Handle"
+                        placeholder="+91 98401 23456"
                         value={editCustomerPhone}
                         onChange={(e) => setEditCustomerPhone(e.target.value)}
-                        className="h-9 px-3 rounded-lg border border-border bg-surface text-13 text-text focus:outline-none focus:border-primary"
+                        className="mt-1 w-full px-3 py-2 rounded-lg border border-border bg-surface text-13 text-text focus:outline-none focus:ring-1 focus:ring-primary"
                       />
-                    )}
+                    </div>
                   </div>
                 </div>
-                {!isEditingDetails && (
-                  <button
-                    type="button"
-                    onClick={() => navigate(`/inbox`)}
-                    className="px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-12 font-semibold inline-flex items-center gap-1 cursor-pointer"
-                  >
-                    <MessageSquare className="w-3.5 h-3.5" />
-                    <span>Open chat</span>
-                  </button>
-                )}
-              </div>
 
-              {/* Delivery Info / Editable Form */}
-              <div className="text-12 text-text-muted pt-2 border-t border-border/40 space-y-2">
-                <div className="flex items-center justify-between">
-                  <p className="font-medium text-text">Shipping & Logistics:</p>
-                  {!isEditingDetails ? (
+                {/* Order Items */}
+                <div className="space-y-3 p-4 rounded-xl border border-border bg-surface">
+                  <div className="flex items-center justify-between">
+                    <p className="text-11 font-semibold uppercase tracking-wider text-text-muted">Order Items</p>
                     <button
                       type="button"
-                      onClick={() => handleStartEditing(liveActiveOrder)}
-                      className="text-11 font-medium text-primary hover:text-amber-600 flex items-center gap-1 cursor-pointer"
+                      onClick={handleEditAddItem}
+                      className="text-11 font-semibold text-primary hover:text-amber-600 flex items-center gap-1 cursor-pointer"
                     >
-                      <Edit2 className="w-3 h-3" /> Edit Order & Prices
+                      <Plus className="w-3.5 h-3.5" /> Add Item
                     </button>
-                  ) : (
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setIsEditingDetails(false)}
-                        className="text-11 text-text-muted hover:text-text cursor-pointer"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleSaveOrderEdits}
-                        disabled={updateOrderMutation.isPending}
-                        className="text-11 font-semibold text-emerald-600 hover:text-emerald-700 flex items-center gap-0.5 cursor-pointer disabled:opacity-50"
-                      >
-                        {updateOrderMutation.isPending ? (
-                          <Loader2 className="w-3 h-3 animate-spin" />
-                        ) : (
-                          <Check className="w-3.5 h-3.5" />
+                  </div>
+                  <div className="space-y-2.5">
+                    {editItems.map((item, idx) => (
+                      <div key={idx} className="p-3 rounded-lg border border-border/70 bg-surface-muted space-y-2 relative">
+                        {editItems.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => handleEditRemoveItem(idx)}
+                            className="absolute right-2 top-2 text-text-muted hover:text-red-500 cursor-pointer p-1"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
                         )}
-                        <span>Save Changes</span>
-                      </button>
+                        <div>
+                          <input
+                            type="text"
+                            required
+                            placeholder="Product Name (e.g. Ocean Coaster Set of 4)"
+                            value={item.productName}
+                            onChange={(e) => handleEditItemChange(idx, "productName", e.target.value)}
+                            className="w-full px-3 py-1.5 rounded-md border border-border bg-surface text-13 text-text focus:outline-none focus:ring-1 focus:ring-primary"
+                          />
+                        </div>
+                        <div className="grid grid-cols-3 gap-2">
+                          <div className="col-span-1">
+                            <label className="text-[10px] text-text-muted">Quantity</label>
+                            <input
+                              type="number"
+                              min="1"
+                              placeholder="1"
+                              value={item.quantity}
+                              onChange={(e) => handleEditItemChange(idx, "quantity", e.target.value)}
+                              className="w-full px-2.5 py-1.5 rounded-md border border-border bg-surface text-13 text-text focus:outline-none focus:ring-1 focus:ring-primary"
+                            />
+                          </div>
+                          <div className="col-span-1">
+                            <label className="text-[10px] text-text-muted">Unit Price (₹)</label>
+                            <input
+                              type="number"
+                              min="0"
+                              step="10"
+                              placeholder="0.00"
+                              value={item.unitPrice}
+                              onChange={(e) => handleEditItemChange(idx, "unitPrice", e.target.value)}
+                              className="w-full px-2.5 py-1.5 rounded-md border border-border bg-surface text-13 text-text focus:outline-none focus:ring-1 focus:ring-primary"
+                            />
+                          </div>
+                          <div className="col-span-1 flex flex-col justify-end">
+                            <label className="text-[10px] text-text-muted">Line Total</label>
+                            <span className="text-13 font-bold font-outfit text-text py-1.5">
+                              ₹{((parseInt(String(item.quantity), 10) || 0) * (parseFloat(String(item.unitPrice)) || 0)).toLocaleString("en-IN")}
+                            </span>
+                          </div>
+                        </div>
+                        <div>
+                          <input
+                            type="text"
+                            placeholder="Customizations (e.g. Gold foil, Roman numerals)"
+                            value={item.productDescription}
+                            onChange={(e) => handleEditItemChange(idx, "productDescription", e.target.value)}
+                            className="w-full px-3 py-1.5 rounded-md border border-border bg-surface text-12 text-text-muted focus:outline-none"
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="pt-2 border-t border-border/50 space-y-1.5 text-12">
+                    <div className="flex justify-between text-text-muted">
+                      <span>Subtotal:</span>
+                      <span>₹{editSubtotal.toLocaleString("en-IN")}</span>
                     </div>
-                  )}
+                    <div className="flex items-center justify-between">
+                      <span className="text-text-muted">Delivery Charge:</span>
+                      <input
+                        type="number"
+                        min="0"
+                        placeholder="0"
+                        value={editDeliveryCharge}
+                        onChange={(e) => setEditDeliveryCharge(e.target.value)}
+                        className="w-20 px-2 py-0.5 rounded border border-border bg-surface text-right text-12"
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-text-muted">Discount Amount:</span>
+                      <input
+                        type="number"
+                        min="0"
+                        placeholder="0"
+                        value={editDiscountAmount}
+                        onChange={(e) => setEditDiscountAmount(e.target.value)}
+                        className="w-20 px-2 py-0.5 rounded border border-border bg-surface text-right text-12"
+                      />
+                    </div>
+                    <div className="flex justify-between text-14 font-bold text-text pt-1 border-t border-border">
+                      <span>Grand Total:</span>
+                      <span className="text-primary font-outfit text-16">₹{editTotal.toLocaleString("en-IN")}</span>
+                    </div>
+                  </div>
                 </div>
 
-                {!isEditingDetails ? (
-                  <>
+                {/* Delivery & Logistics */}
+                <div className="space-y-3 p-4 rounded-xl border border-border bg-surface-muted">
+                  <p className="text-11 font-semibold uppercase tracking-wider text-text-muted">Delivery & Logistics</p>
+                  <div>
+                    <label className="text-11 font-medium text-text">Shipping Address</label>
+                    <textarea
+                      rows={2}
+                      placeholder="Street, Area, City, Pin Code"
+                      value={editShippingAddress}
+                      onChange={(e) => setEditShippingAddress(e.target.value)}
+                      className="mt-1 w-full px-3 py-2 rounded-lg border border-border bg-surface text-13 text-text focus:outline-none focus:ring-1 focus:ring-primary"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-11 font-medium text-text">Courier Partner</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Shiprocket (DTDC)"
+                        value={editCourier}
+                        onChange={(e) => setEditCourier(e.target.value)}
+                        className="mt-1 w-full px-3 py-2 rounded-lg border border-border bg-surface text-13 text-text focus:outline-none focus:ring-1 focus:ring-primary"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-11 font-medium text-text">Expected Delivery Date</label>
+                      <input
+                        type="date"
+                        value={editExpectedDate}
+                        onChange={(e) => setEditExpectedDate(e.target.value)}
+                        className="mt-1 w-full px-3 py-2 rounded-lg border border-border bg-surface text-13 text-text focus:outline-none focus:ring-1 focus:ring-primary"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-11 font-medium text-text">Tracking ID</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. DTDC1234567890"
+                      value={editTrackingId}
+                      onChange={(e) => setEditTrackingId(e.target.value)}
+                      className="mt-1 w-full px-3 py-2 rounded-lg border border-border bg-surface text-13 text-text focus:outline-none focus:ring-1 focus:ring-primary"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-11 font-medium text-text">Customer Notes</label>
+                    <input
+                      type="text"
+                      placeholder="Special requests or packaging instructions"
+                      value={editCustomerNotes}
+                      onChange={(e) => setEditCustomerNotes(e.target.value)}
+                      className="mt-1 w-full px-3 py-2 rounded-lg border border-border bg-surface text-13 text-text focus:outline-none focus:ring-1 focus:ring-primary"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingDetails(false)}
+                    className="px-4 py-2 rounded-lg border border-border bg-surface hover:bg-surface-muted text-13 font-medium text-text cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={updateOrderMutation.isPending}
+                    className="px-4 py-2 rounded-lg bg-primary hover:bg-amber-600 text-primary-foreground text-13 font-semibold flex items-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-50"
+                  >
+                    {updateOrderMutation.isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                    <span>Save Changes</span>
+                  </button>
+                </div>
+              </form>
+            ) : (
+              /* ── View Mode ── */
+              <>
+                {/* Customer & Chat Card */}
+                <div className="p-4 rounded-xl border border-border bg-surface space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="font-semibold text-text">{liveActiveOrder.customerName}</h4>
+                      <div className="flex items-center gap-1.5 text-12 text-text-muted mt-0.5">
+                        <ChannelIcon channel={liveActiveOrder.channel} size={13} />
+                        <span className="truncate">{liveActiveOrder.customerPhone || "Direct Customer"}</span>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/inbox`)}
+                      className="px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-12 font-semibold inline-flex items-center gap-1 cursor-pointer"
+                    >
+                      <MessageSquare className="w-3.5 h-3.5" />
+                      <span>Open chat</span>
+                    </button>
+                  </div>
+
+                  <div className="text-12 text-text-muted pt-2 border-t border-border/40 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <p className="font-medium text-text">Shipping & Logistics:</p>
+                      <button
+                        type="button"
+                        onClick={() => handleStartEditing(liveActiveOrder)}
+                        className="text-11 font-medium text-primary hover:text-amber-600 flex items-center gap-1 cursor-pointer"
+                      >
+                        <Edit2 className="w-3 h-3" /> Edit Order & Prices
+                      </button>
+                    </div>
                     <p className="text-text mt-0.5">
                       {liveActiveOrder.shippingAddress || "No shipping address provided"}
                     </p>
                     <div className="flex items-center justify-between pt-1">
-                      <span className="font-mono text-11 text-teal">
+                      <span className="font-mono text-11 text-teal-500">
                         Courier: {liveActiveOrder.courier || "Pending"}
                       </span>
                       {liveActiveOrder.trackingId && (
                         <button
                           type="button"
                           onClick={(e) => copyTracking(liveActiveOrder.trackingId!, e)}
-                          className="font-mono text-11 text-teal hover:underline flex items-center gap-1 cursor-pointer"
+                          className="font-mono text-11 text-teal-500 hover:underline flex items-center gap-1 cursor-pointer"
                         >
                           {liveActiveOrder.trackingId} <Copy className="w-2.5 h-2.5" />
                         </button>
@@ -2295,237 +2455,60 @@ export default function Orders() {
                         Notes: {liveActiveOrder.customerNotes}
                       </p>
                     )}
-                  </>
-                ) : (
-                  /* Editable Shipping Inputs */
-                  <div className="space-y-3 pt-1">
-                    <div>
-                      <label className="block text-12 font-medium text-text-muted mb-1">Shipping Address</label>
-                      <textarea
-                        rows={2}
-                        value={editShippingAddress}
-                        onChange={(e) => setEditShippingAddress(e.target.value)}
-                        className="w-full px-3 py-2 rounded-lg border border-border bg-surface text-14 text-text focus:outline-none focus:border-primary"
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-12 font-medium text-text-muted mb-1">Courier</label>
-                        <input
-                          type="text"
-                          placeholder="e.g. Shiprocket (DTDC)"
-                          value={editCourier}
-                          onChange={(e) => setEditCourier(e.target.value)}
-                          className="w-full h-10 px-3 rounded-lg border border-border bg-surface text-14 text-text focus:outline-none focus:border-primary"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-12 font-medium text-text-muted mb-1">Tracking ID</label>
-                        <input
-                          type="text"
-                          value={editTrackingId}
-                          onChange={(e) => setEditTrackingId(e.target.value)}
-                          className="w-full h-10 px-3 rounded-lg border border-border bg-surface text-14 text-text focus:outline-none focus:border-primary"
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-12 font-medium text-text-muted mb-1">Expected Delivery Date</label>
-                      <input
-                        type="date"
-                        value={editExpectedDate}
-                        onChange={(e) => setEditExpectedDate(e.target.value)}
-                        className="w-full h-10 px-3 rounded-lg border border-border bg-surface text-14 text-text focus:outline-none focus:border-primary"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-12 font-medium text-text-muted mb-1">Customer Notes</label>
-                      <input
-                        type="text"
-                        value={editCustomerNotes}
-                        onChange={(e) => setEditCustomerNotes(e.target.value)}
-                        className="w-full h-10 px-3 rounded-lg border border-border bg-surface text-14 text-text focus:outline-none focus:border-primary"
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Items Breakdown & Price Editor */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <p className="text-12 font-semibold uppercase tracking-wider text-text-muted">
-                  Items ({!isEditingDetails ? liveActiveOrder.items?.length || 0 : editItems.length})
-                </p>
-                {isEditingDetails && (
-                  <button
-                    type="button"
-                    onClick={handleEditAddItem}
-                    className="text-11 font-semibold text-primary hover:text-amber-600 flex items-center gap-1 cursor-pointer"
-                  >
-                    <Plus className="w-3.5 h-3.5" /> Add Product
-                  </button>
-                )}
-              </div>
-
-              {!isEditingDetails ? (
-                /* Read-Only Items Breakdown */
-                <div className="divide-y divide-border/40 rounded-xl border border-border bg-surface p-3 space-y-2">
-                  {liveActiveOrder.items?.map((it: DbOrderItem, idx: number) => (
-                    <div key={it.id || idx} className="pt-2 first:pt-0 flex items-center justify-between">
-                      <div>
-                        <p className="font-medium text-text text-13">{it.productName}</p>
-                        <p className="text-11 text-text-muted">
-                          Qty: {it.quantity} × ₹{Number(it.unitPrice).toLocaleString("en-IN")}
-                        </p>
-                        {it.productDescription && (
-                          <p className="text-[11px] text-text-muted italic">{it.productDescription}</p>
-                        )}
-                      </div>
-                      <p className="font-bold font-outfit text-text tabular-nums text-13">
-                        ₹{(it.quantity * Number(it.unitPrice)).toLocaleString("en-IN")}
-                      </p>
-                    </div>
-                  ))}
-                  <div className="pt-2 space-y-1 text-12 text-text-muted">
-                    <div className="flex justify-between">
-                      <span>Subtotal:</span>
-                      <span>₹{Number(liveActiveOrder.subtotal).toLocaleString("en-IN")}</span>
-                    </div>
-                    {Number(liveActiveOrder.deliveryCharge) > 0 && (
-                      <div className="flex justify-between">
-                        <span>Delivery Charge:</span>
-                        <span>₹{Number(liveActiveOrder.deliveryCharge).toLocaleString("en-IN")}</span>
-                      </div>
-                    )}
-                    {Number(liveActiveOrder.discountAmount) > 0 && (
-                      <div className="flex justify-between text-emerald-600">
-                        <span>Discount:</span>
-                        <span>-₹{Number(liveActiveOrder.discountAmount).toLocaleString("en-IN")}</span>
-                      </div>
-                    )}
-                  </div>
-                  <div className="pt-3 flex items-center justify-between font-bold text-15 border-t border-border text-text">
-                    <span>Grand Total</span>
-                    <span className="text-primary tabular-nums">
-                      ₹{Number(liveActiveOrder.totalAmount).toLocaleString("en-IN")}
-                    </span>
                   </div>
                 </div>
-              ) : (
-                /* Editable Items & Pricing Form */
-                <div className="rounded-xl border border-primary/30 bg-surface p-3 space-y-3">
-                  <div className="space-y-2.5">
-                    {editItems.map((item, idx) => (
-                      <div key={idx} className="p-2.5 rounded-lg border border-border bg-surface-muted space-y-2 relative">
-                        {editItems.length > 1 && (
-                          <button
-                            type="button"
-                            onClick={() => handleEditRemoveItem(idx)}
-                            className="absolute right-2 top-2 text-text-muted hover:text-red-500 cursor-pointer p-1"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        )}
+
+                {/* Items Breakdown */}
+                <div className="space-y-2">
+                  <p className="text-12 font-semibold uppercase tracking-wider text-text-muted">
+                    Items ({liveActiveOrder.items?.length || 0})
+                  </p>
+                  <div className="divide-y divide-border/40 rounded-xl border border-border bg-surface p-3 space-y-2">
+                    {liveActiveOrder.items?.map((it: DbOrderItem, idx: number) => (
+                      <div key={it.id || idx} className="pt-2 first:pt-0 flex items-center justify-between">
                         <div>
-                          <label className="block text-12 font-medium text-text-muted mb-1">Product Name</label>
-                          <input
-                            type="text"
-                            required
-                            placeholder="Product Name"
-                            value={item.productName}
-                            onChange={(e) => handleEditItemChange(idx, "productName", e.target.value)}
-                            className="w-full h-10 px-3 rounded-lg border border-border bg-surface text-14 text-text font-medium focus:outline-none focus:border-primary"
-                          />
+                          <p className="font-medium text-text text-13">{it.productName}</p>
+                          <p className="text-11 text-text-muted">
+                            Qty: {it.quantity} × ₹{Number(it.unitPrice).toLocaleString("en-IN")}
+                          </p>
+                          {it.productDescription && (
+                            <p className="text-[11px] text-text-muted italic">{it.productDescription}</p>
+                          )}
                         </div>
-                        <div className="grid grid-cols-3 gap-3">
-                          <div>
-                            <label className="block text-12 font-medium text-text-muted mb-1">Quantity</label>
-                            <input
-                              type="number"
-                              min="1"
-                              placeholder="1"
-                              value={item.quantity}
-                              onChange={(e) => handleEditItemChange(idx, "quantity", e.target.value)}
-                              className="w-full h-10 px-3 rounded-lg border border-border bg-surface text-14 text-text focus:outline-none focus:border-primary"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-12 font-medium text-text-muted mb-1">Unit Price (₹)</label>
-                            <input
-                              type="number"
-                              min="0"
-                              step="10"
-                              placeholder="0.00"
-                              value={item.unitPrice}
-                              onChange={(e) => handleEditItemChange(idx, "unitPrice", e.target.value)}
-                              className="w-full h-10 px-3 rounded-lg border border-border bg-surface text-14 text-text focus:outline-none focus:border-primary"
-                            />
-                          </div>
-                          <div className="flex flex-col justify-end">
-                            <label className="block text-12 font-medium text-text-muted mb-1">Line Total</label>
-                            <span className="h-10 flex items-center text-14 font-bold font-outfit text-text">
-                              ₹{((parseInt(String(item.quantity), 10) || 0) * (parseFloat(String(item.unitPrice)) || 0)).toLocaleString("en-IN")}
-                            </span>
-                          </div>
-                        </div>
-                        <div>
-                          <input
-                            type="text"
-                            placeholder="Customizations (optional)"
-                            value={item.productDescription}
-                            onChange={(e) => handleEditItemChange(idx, "productDescription", e.target.value)}
-                            className="w-full h-9 px-3 rounded-lg border border-border bg-surface text-13 text-text-muted focus:outline-none focus:border-primary"
-                          />
-                        </div>
+                        <p className="font-bold font-outfit text-text tabular-nums text-13">
+                          ₹{(it.quantity * Number(it.unitPrice)).toLocaleString("en-IN")}
+                        </p>
                       </div>
                     ))}
-                  </div>
-
-                  {/* Pricing Inputs in Edit Mode */}
-                  <div className="pt-2 border-t border-border space-y-2 text-12">
-                    <div className="flex justify-between text-text-muted">
-                      <span>Subtotal:</span>
-                      <span>₹{editSubtotal.toLocaleString("en-IN")}</span>
+                    <div className="pt-2 space-y-1 text-12 text-text-muted">
+                      <div className="flex justify-between">
+                        <span>Subtotal:</span>
+                        <span>₹{Number(liveActiveOrder.subtotal).toLocaleString("en-IN")}</span>
+                      </div>
+                      {Number(liveActiveOrder.deliveryCharge) > 0 && (
+                        <div className="flex justify-between">
+                          <span>Delivery Charge:</span>
+                          <span>₹{Number(liveActiveOrder.deliveryCharge).toLocaleString("en-IN")}</span>
+                        </div>
+                      )}
+                      {Number(liveActiveOrder.discountAmount) > 0 && (
+                        <div className="flex justify-between text-emerald-600">
+                          <span>Discount:</span>
+                          <span>-₹{Number(liveActiveOrder.discountAmount).toLocaleString("en-IN")}</span>
+                        </div>
+                      )}
                     </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-text-muted">Delivery Charge (₹):</span>
-                      <input
-                        type="number"
-                        min="0"
-                        placeholder="0"
-                        value={editDeliveryCharge}
-                        onChange={(e) => setEditDeliveryCharge(e.target.value)}
-                        className="w-28 h-9 px-3 rounded-lg border border-border bg-surface text-right text-14 text-text focus:outline-none focus:border-primary"
-                      />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-text-muted">Discount Amount (₹):</span>
-                      <input
-                        type="number"
-                        min="0"
-                        placeholder="0"
-                        value={editDiscountAmount}
-                        onChange={(e) => setEditDiscountAmount(e.target.value)}
-                        className="w-28 h-9 px-3 rounded-lg border border-border bg-surface text-right text-14 text-text focus:outline-none focus:border-primary"
-                      />
-                    </div>
-                    <div className="flex justify-between text-14 font-bold text-text pt-2 border-t border-border">
-                      <span>New Grand Total:</span>
-                      <span className="text-primary font-outfit text-16">
-                        ₹{editTotal.toLocaleString("en-IN")}
+                    <div className="pt-3 flex items-center justify-between font-bold text-15 border-t border-border text-text">
+                      <span>Grand Total</span>
+                      <span className="text-primary tabular-nums">
+                        ₹{Number(liveActiveOrder.totalAmount).toLocaleString("en-IN")}
                       </span>
                     </div>
                   </div>
                 </div>
-              )}
-            </div>
 
-            {/* Actions Footer */}
-            <div className="pt-4 border-t border-border flex items-center justify-between">
-              {!isEditingDetails ? (
-                <>
+                {/* Actions Footer */}
+                <div className="pt-4 border-t border-border flex items-center justify-between">
                   <button
                     type="button"
                     onClick={() => setDeletingOrder(liveActiveOrder)}
@@ -2543,6 +2526,15 @@ export default function Orders() {
                     </button>
                     <button
                       type="button"
+                      onClick={() => setProgressModalOrder(liveActiveOrder)}
+                      className="px-3 py-1.5 rounded-lg border border-border bg-surface hover:bg-surface-muted text-12 font-medium text-text flex items-center gap-1.5 cursor-pointer transition-colors"
+                      title="Send WhatsApp / Instagram update to customer"
+                    >
+                      <Send className="w-3.5 h-3.5" />
+                      <span>Send Update</span>
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => handleStartEditing(liveActiveOrder)}
                       className="px-4 py-1.5 rounded-lg bg-primary hover:bg-amber-600 text-12 font-semibold text-primary-foreground flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors"
                     >
@@ -2550,32 +2542,9 @@ export default function Orders() {
                       <span>Edit Order</span>
                     </button>
                   </div>
-                </>
-              ) : (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => setIsEditingDetails(false)}
-                    className="px-3 py-1.5 rounded-lg border border-border bg-surface hover:bg-surface-muted text-12 font-medium text-text-muted hover:text-text cursor-pointer transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleSaveOrderEdits}
-                    disabled={updateOrderMutation.isPending}
-                    className="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-12 font-semibold text-white flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors disabled:opacity-50"
-                  >
-                    {updateOrderMutation.isPending ? (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    ) : (
-                      <Check className="w-3.5 h-3.5" />
-                    )}
-                    <span>Save Order</span>
-                  </button>
-                </>
-              )}
-            </div>
+                </div>
+              </>
+            )}
 
             {/* Payments & Invoicing Panel */}
             <div className="pt-2 border-t border-border/40">
@@ -2694,7 +2663,7 @@ export default function Orders() {
                   .
                 </p>
                 {targetStatus === "dispatched" && (
-                  <p className="mt-1 text-teal font-medium">
+                  <p className="mt-1 text-teal-500 font-medium">
                     Tracking ID: <strong>{statusTrackingId.trim() || "—"}</strong>
                     {statusCourier.trim() && <> (via {statusCourier.trim()})</>}
                   </p>

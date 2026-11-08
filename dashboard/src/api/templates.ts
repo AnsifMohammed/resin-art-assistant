@@ -29,3 +29,10 @@ export const deleteTemplate = (id: string) => api.delete<void>(`/templates/${enc
 
 /** POST /templates/:id/duplicate (admin only) → copy named "<name> (Copy)". */
 export const duplicateTemplate = (id: string) => api.post<TemplateResponse>(`/templates/${enc(id)}/duplicate`);
+
+/** GET /templates/categories — default categories + any custom ones in use. */
+export const fetchTemplateCategories = (signal?: AbortSignal) =>
+  api.get<{ categories: string[] }>("/templates/categories", undefined, signal);
+
+export const deleteTemplateCategory = (category: string) =>
+  api.delete<{ ok: boolean }>(`/templates/categories/${encodeURIComponent(category)}`);

@@ -49,9 +49,6 @@ export const paymentKindEnum = pgEnum("payment_kind", ["advance", "balance", "ot
 
 export const paymentStatusEnum = pgEnum("payment_status", ["pending", "paid", "void"]);
 
-export const templateCategoryEnum = pgEnum("template_category", [
-  "delivery", "festive", "custom_order", "payment", "general", "production_progress"
-]);
 
 export const templateChannelEnum = pgEnum("template_channel", ["whatsapp", "instagram", "both"]);
 
@@ -330,7 +327,7 @@ export const messageTemplates = pgTable("message_templates", {
   id: id(),
   businessId: businessId(),
   name: text("name").notNull(),
-  category: templateCategoryEnum("category").notNull(),
+  category: text("category").notNull().default("general"),
   channel: templateChannelEnum("channel").notNull().default("both"),
   body: text("body").notNull(),
   variables: jsonb("variables").$type<string[]>().notNull().default([]),  // derived from body

@@ -7,6 +7,7 @@ import { useTemplates } from "../../hooks/useTemplates.ts";
 import { cn } from "../../lib/cn.ts";
 import {
   TEMPLATE_MAX_LENGTH,
+  categoryLabel,
   extractVariables,
   renderTemplate,
   splitTemplateBody,
@@ -156,7 +157,7 @@ export function TemplatePicker({
 
   const categoryTabs: Array<{ key: CategoryFilter; label: string }> = [
     { key: "all", label: "All" },
-    ...TEMPLATE_CATEGORIES.map((c) => ({ key: c, label: templateCategoryLabels[c] })),
+    ...TEMPLATE_CATEGORIES.map((c) => ({ key: c, label: templateCategoryLabels[c] ?? categoryLabel(c) })),
   ];
 
   return createPortal(

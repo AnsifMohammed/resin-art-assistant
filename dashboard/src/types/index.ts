@@ -70,7 +70,7 @@ export type LanguageDetected = "english" | "malayalam" | "manglish";
 
 export type ActorType = "admin" | "staff" | "ai" | "system";
 
-export const TEMPLATE_CATEGORIES = [
+export const DEFAULT_TEMPLATE_CATEGORIES = [
   "delivery",
   "festive",
   "custom_order",
@@ -78,7 +78,8 @@ export const TEMPLATE_CATEGORIES = [
   "general",
   "production_progress",
 ] as const;
-export type TemplateCategory = (typeof TEMPLATE_CATEGORIES)[number];
+export const TEMPLATE_CATEGORIES = DEFAULT_TEMPLATE_CATEGORIES;
+export type TemplateCategory = string;
 
 export const TEMPLATE_CHANNELS = ["whatsapp", "instagram", "both"] as const;
 export type TemplateChannel = (typeof TEMPLATE_CHANNELS)[number];
