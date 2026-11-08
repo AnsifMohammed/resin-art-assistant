@@ -1,4 +1,4 @@
-import { and, asc, eq, isNull } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import { processAiDecision } from "../../ai/pipeline.ts";
 import type { AiDecision } from "../../ai/types.ts";
 import { db } from "../../db/index.ts";
@@ -12,6 +12,7 @@ import {
   escalationReasonEnum,
   escalations,
   messages,
+  products,
 } from "../../db/schema.ts";
 import { Sentry } from "../../instrument.ts";
 import { markMessageSent } from "../../lib/conversation.ts";
@@ -322,13 +323,22 @@ async function runPipeline(params: ProcessMessageParams): Promise<AiDecision | n
   }
 
   // 4. Call AI pipeline (rules are applied inside)
-  logger.info({ conversationId, batchSize: batch.length }, "Running AI pipeline on message batch");
+  // If the triggering message is a product button click, pass the slug so the AI
+  // focuses its reply on that specific product rather than guessing from the text.
+  const latestMeta = latestInbound.metadata as Record<string, unknown> | null;
+  const focusedProductSlug =
+    latestMeta?.kind === "product_enquiry" && typeof latestMeta.slug === "string"
+      ? latestMeta.slug
+      : undefined;
+
+  logger.info({ conversationId, batchSize: batch.length, focusedProductSlug }, "Running AI pipeline on message batch");
   const decision = await processAiDecision({
     businessId,
     incomingText: rawText,
     history: history.map((m) => ({ senderType: m.senderType, content: m.content })),
     customerName: customer?.name ?? null,
     customerHandle: customer?.handleOrPhone ?? null,
+    ...(focusedProductSlug ? { focusedProductSlug } : {}),
   });
 
   // Re-check the pause switch: it may have been flipped during the LLM call.
@@ -353,7 +363,75 @@ async function runPipeline(params: ProcessMessageParams): Promise<AiDecision | n
     return escalated ? decision : null;
   }
 
-  // 6. Auto-reply. Atomically confirm the conversation is still ai_active
+  // 6. Fetch interactive products if AI decided to share catalogue
+  let interactiveProducts: Array<{
+    id: string;
+    slug: string;
+    name: string;
+    price: string;
+    imageUrl?: string | undefined;
+    leadTime: number;
+    description?: string | undefined;
+  }> = [];
+
+  if (decision.send_catalogue) {
+    let matchedProducts: Array<typeof products.$inferSelect> = [];
+    const slugs = Array.isArray(decision.catalogue_product_slugs)
+      ? decision.catalogue_product_slugs.filter((s): s is string => typeof s === "string" && s.trim().length > 0)
+      : [];
+
+    if (slugs.length > 0) {
+      matchedProducts = await db
+        .select()
+        .from(products)
+        .where(
+          and(
+            eq(products.businessId, businessId),
+            eq(products.isActive, true),
+            inArray(products.slug, slugs),
+          ),
+        );
+    }
+
+    if (matchedProducts.length === 0) {
+      matchedProducts = await db
+        .select()
+        .from(products)
+        .where(and(eq(products.businessId, businessId), eq(products.isActive, true)))
+        .orderBy(asc(products.sortOrder), asc(products.name))
+        .limit(5);
+    }
+
+    interactiveProducts = matchedProducts.map((p) => {
+      const sizes = Array.isArray(p.sizes) ? p.sizes : [];
+      const prices = sizes
+        .map((s: any) => (typeof s?.price === "number" ? s.price : null))
+        .filter((price): price is number => price !== null);
+      const minPrice = prices.length > 0 ? Math.min(...prices) : 0;
+      const maxPrice = prices.length > 0 ? Math.max(...prices) : 0;
+      const priceStr =
+        prices.length === 0
+          ? "Price on request"
+          : prices.length > 1 && minPrice !== maxPrice
+            ? `₹${minPrice.toLocaleString("en-IN")} – ₹${maxPrice.toLocaleString("en-IN")}`
+            : `₹${minPrice.toLocaleString("en-IN")}`;
+
+      const images = Array.isArray(p.images) ? p.images : [];
+      const firstImg = typeof images[0] === "string" ? images[0] : undefined;
+
+      return {
+        id: p.id,
+        slug: p.slug,
+        name: p.name,
+        price: priceStr,
+        imageUrl: firstImg,
+        leadTime: p.leadTimeDays,
+        description: p.description ?? undefined,
+      };
+    });
+  }
+
+  // 7. Auto-reply. Atomically confirm the conversation is still ai_active
   //    (row lock held until commit) before recording and sending the reply.
   const committed = await db.transaction(async (tx) => {
     const [claimed] = await tx
@@ -373,6 +451,14 @@ async function runPipeline(params: ProcessMessageParams): Promise<AiDecision | n
 
     if (!claimed) return null;
 
+    const msgMetadata: Record<string, unknown> = interactiveProducts.length > 0
+      ? {
+          kind: "catalogue_share",
+          productIds: interactiveProducts.map((p) => p.id),
+          products: interactiveProducts,
+        }
+      : {};
+
     const [outboundMsg] = await tx
       .insert(messages)
       .values({
@@ -382,6 +468,7 @@ async function runPipeline(params: ProcessMessageParams): Promise<AiDecision | n
         senderType: "ai",
         senderId: null,
         content: decision.reply,
+        metadata: msgMetadata,
         deliveryStatus: "queued",
       })
       .returning();
@@ -424,6 +511,14 @@ async function runPipeline(params: ProcessMessageParams): Promise<AiDecision | n
       text: decision.reply,
       businessId,
       conversationId,
+      ...(interactiveProducts.length > 0
+        ? {
+            interactive: {
+              type: interactiveProducts.length === 1 ? "catalogue_card" : "catalogue_list",
+              products: interactiveProducts,
+            },
+          }
+        : {}),
     });
     metaMessageId = result?.metaMessageId ?? null;
   } catch (err) {
@@ -461,13 +556,14 @@ async function runPipeline(params: ProcessMessageParams): Promise<AiDecision | n
   await db.insert(auditLog).values({
     businessId,
     actorType: "ai",
-    action: "auto_reply_sent",
+    action: interactiveProducts.length > 0 ? "catalogue_shared" : "auto_reply_sent",
     conversationId,
     details: {
       intent: decision.intent,
       messageId: committed.outboundMsg?.id,
       batchSize: batch.length,
       replyPreview: decision.reply.slice(0, 100),
+      ...(interactiveProducts.length > 0 ? { catalogueProductCount: interactiveProducts.length } : {}),
     },
   });
   emitConversationUpdated(businessId, { conversationId, state: "ai_active", tag: committed.tag });

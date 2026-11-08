@@ -17,8 +17,8 @@ import { authenticate } from "../middleware/authenticate.ts";
 import { requireAdmin } from "../middleware/requireAdmin.ts";
 
 const analyticsQuerySchema = z.object({
-  from: z.string().datetime({ offset: true }).optional(),
-  to: z.string().datetime({ offset: true }).optional(),
+  from: z.string().optional(),
+  to: z.string().optional(),
   channel: z.enum(["whatsapp", "instagram"]).optional(),
 });
 
@@ -85,6 +85,15 @@ export const analyticsRoutes: FastifyPluginAsync = async (app: FastifyInstance) 
 
       const fromDate = new Date(from);
       const toDate = new Date(to);
+      if (isNaN(fromDate.getTime()) || isNaN(toDate.getTime())) {
+        throw new AppError(400, "Invalid date format for `from` or `to`", "VALIDATION_ERROR");
+      }
+      if (typeof to === "string" && to.length === 10) {
+        toDate.setHours(23, 59, 59, 999);
+      }
+      if (typeof from === "string" && from.length === 10) {
+        fromDate.setHours(0, 0, 0, 0);
+      }
       if (fromDate.getTime() > toDate.getTime()) {
         throw new AppError(400, "`from` must be before `to`", "VALIDATION_ERROR");
       }

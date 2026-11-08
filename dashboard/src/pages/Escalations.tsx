@@ -1,7 +1,9 @@
 import { useMemo, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
+import dayjs from "dayjs";
 import {
   AlertTriangle,
+  Calendar,
   Clock,
   UserCheck,
   UserPlus,
@@ -11,10 +13,12 @@ import {
   CheckCircle2,
   Loader2,
   ChevronDown,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "../context/AuthContext.tsx";
 import { ChannelIcon } from "../components/shared/ChannelIcon.tsx";
+import { SegmentedControl } from "../components/shared/SegmentedControl.tsx";
 import { SkeletonCard } from "../components/shared/Skeleton.tsx";
 import { WindowCountdown } from "../components/inbox/WindowCountdown.tsx";
 import { AssignModal } from "../components/escalations/AssignModal.tsx";
@@ -27,6 +31,46 @@ import { customerLabel, formatDateTime, formatDuration } from "../lib/format.ts"
 import { ESCALATION_REASONS, type EscalationListItem } from "../types/index.ts";
 
 type FilterType = "all" | "unassigned" | "mine";
+type EscalationDatePreset = "all" | "1d" | "7d" | "30d" | "custom";
+
+interface EscalationDateRange {
+  from?: string;
+  to?: string;
+}
+
+function getEscalationDateRange(
+  preset: EscalationDatePreset,
+  customStart?: string,
+  customEnd?: string,
+): EscalationDateRange {
+  if (preset === "all") return {};
+  const now = dayjs();
+  if (preset === "1d") {
+    return {
+      from: now.startOf("day").toISOString(),
+      to: now.toISOString(),
+    };
+  }
+  if (preset === "7d") {
+    return {
+      from: now.subtract(6, "day").startOf("day").toISOString(),
+      to: now.toISOString(),
+    };
+  }
+  if (preset === "30d") {
+    return {
+      from: now.subtract(29, "day").startOf("day").toISOString(),
+      to: now.toISOString(),
+    };
+  }
+  if (preset === "custom" && customStart && customEnd) {
+    return {
+      from: dayjs(customStart).startOf("day").toISOString(),
+      to: dayjs(customEnd).endOf("day").toISOString(),
+    };
+  }
+  return {};
+}
 
 const ONE_HOUR_MS = 60 * 60 * 1000;
 
@@ -113,13 +157,38 @@ export default function Escalations() {
   const userId = user?.id;
   const now = useNow(30_000);
 
-  const escalationsQuery = useEscalations();
+  const [datePreset, setDatePreset] = useState<EscalationDatePreset>("all");
+  const [showCustomPicker, setShowCustomPicker] = useState(false);
+  const [customStartDate, setCustomStartDate] = useState(() => dayjs().subtract(6, "day").format("YYYY-MM-DD"));
+  const [customEndDate, setCustomEndDate] = useState(() => dayjs().format("YYYY-MM-DD"));
+
+  const dateRange = useMemo(() => {
+    return getEscalationDateRange(datePreset, customStartDate, customEndDate);
+  }, [datePreset, customStartDate, customEndDate]);
+
+  const escalationsQuery = useEscalations({
+    from: dateRange.from,
+    to: dateRange.to,
+  });
   const { data, isPending, isError, error, refetch } = escalationsQuery;
 
   const [filterType, setFilterType] = useState<FilterType>("all");
   const [reasonFilter, setReasonFilter] = useState<string>("all");
   const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
   const [assigning, setAssigning] = useState<EscalationListItem | null>(null);
+
+  const applyCustomRange = () => {
+    if (!customStartDate || !customEndDate) {
+      toast.error("Pick a start and end date");
+      return;
+    }
+    if (dayjs(customStartDate).isAfter(dayjs(customEndDate))) {
+      toast.error("The start date must be before the end date");
+      return;
+    }
+    setDatePreset("custom");
+    setShowCustomPicker(false);
+  };
 
   // Open escalations in this user's scope. The server already scopes staff to
   // assigned-to-them + unassigned; filter defensively here too.
@@ -188,6 +257,8 @@ export default function Escalations() {
   const clearFilters = () => {
     setFilterType("all");
     setReasonFilter("all");
+    setDatePreset("all");
+    setShowCustomPicker(false);
   };
 
   const statValue = (value: string | number) => (isPending ? "—" : value);
@@ -232,10 +303,23 @@ export default function Escalations() {
         <div className="w-14 h-14 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 mx-auto flex items-center justify-center">
           <CheckCircle2 className="w-8 h-8" />
         </div>
-        <h3 className="text-16 font-bold font-outfit text-text">All caught up!</h3>
+        <h3 className="text-16 font-bold font-outfit text-text">
+          {datePreset !== "all" ? "No escalations in this date range" : "All caught up!"}
+        </h3>
         <p className="text-13 text-text-muted max-w-sm mx-auto">
-          There are no pending escalations waiting for human handling right now.
+          {datePreset !== "all"
+            ? "There are no pending escalations matching the selected date range."
+            : "There are no pending escalations waiting for human handling right now."}
         </p>
+        {datePreset !== "all" && (
+          <button
+            type="button"
+            onClick={clearFilters}
+            className="mt-2 text-12 font-medium text-primary hover:underline cursor-pointer"
+          >
+            Reset date filter
+          </button>
+        )}
       </div>
     );
   } else if (filteredEscalations.length === 0) {
@@ -524,23 +608,84 @@ export default function Escalations() {
           </button>
         </div>
 
-        <div className="flex items-center gap-2">
-          <span className="text-12 text-text-muted font-medium">Reason:</span>
-          <div className="relative inline-flex items-center">
-            <select
-              value={reasonFilter}
-              aria-label="Filter by escalation reason"
-              onChange={(ev) => setReasonFilter(ev.target.value)}
-              className="h-8 pl-2.5 pr-7.5 appearance-none rounded-lg border border-border bg-surface-muted text-12 text-text font-medium focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
-            >
-              <option value="all">All reasons</option>
-              {reasonOptions.map((r) => (
-                <option key={r} value={r}>
-                  {escalationReasonLabel(r)}
-                </option>
-              ))}
-            </select>
-            <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted" aria-hidden />
+        <div className="flex flex-wrap items-center gap-2.5 relative">
+          {/* Date Presets SegmentedControl matching Analytics */}
+          <SegmentedControl<EscalationDatePreset>
+            size="sm"
+            options={[
+              { value: "all", label: "All" },
+              { value: "1d", label: "1d" },
+              { value: "7d", label: "7d" },
+              { value: "30d", label: "30d" },
+              { value: "custom", label: "Custom" },
+            ]}
+            value={datePreset}
+            onChange={(val) => {
+              setDatePreset(val);
+              if (val === "custom") {
+                setShowCustomPicker(true);
+              } else {
+                setShowCustomPicker(false);
+              }
+            }}
+          />
+
+          {/* Custom Date Range Floating Dropdown */}
+          {showCustomPicker && (
+            <div className="absolute right-0 top-10 z-50 p-3 rounded-xl border border-border bg-surface shadow-xl flex flex-wrap items-center gap-2 max-w-[calc(100vw-2rem)] animate-in fade-in slide-in-from-top-2 duration-150">
+              <Calendar className="w-4 h-4 text-primary shrink-0" />
+              <input
+                type="date"
+                value={customStartDate}
+                max={customEndDate || undefined}
+                onChange={(e) => setCustomStartDate(e.target.value)}
+                className="px-2 py-1 text-11 rounded-md border border-border bg-surface-muted text-text focus:outline-none focus:ring-1 focus:ring-primary"
+              />
+              <span className="text-text-muted text-11">to</span>
+              <input
+                type="date"
+                value={customEndDate}
+                min={customStartDate || undefined}
+                max={dayjs().format("YYYY-MM-DD")}
+                onChange={(e) => setCustomEndDate(e.target.value)}
+                className="px-2 py-1 text-11 rounded-md border border-border bg-surface-muted text-text focus:outline-none focus:ring-1 focus:ring-primary"
+              />
+              <button
+                type="button"
+                onClick={applyCustomRange}
+                className="px-2.5 py-1 text-11 font-semibold rounded-md bg-primary text-primary-foreground hover:bg-amber-600 transition-colors cursor-pointer"
+              >
+                Apply
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowCustomPicker(false)}
+                className="p-1 rounded-md text-text-muted hover:text-text cursor-pointer"
+                aria-label="Close custom date picker"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+
+          <div className="flex items-center gap-1.5">
+            <span className="text-12 text-text-muted font-medium">Reason:</span>
+            <div className="relative inline-flex items-center">
+              <select
+                value={reasonFilter}
+                aria-label="Filter by escalation reason"
+                onChange={(ev) => setReasonFilter(ev.target.value)}
+                className="h-8 pl-2.5 pr-7.5 appearance-none rounded-lg border border-border bg-surface-muted text-12 text-text font-medium focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
+              >
+                <option value="all">All reasons</option>
+                {reasonOptions.map((r) => (
+                  <option key={r} value={r}>
+                    {escalationReasonLabel(r)}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted" aria-hidden />
+            </div>
           </div>
         </div>
       </div>

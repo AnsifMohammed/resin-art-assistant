@@ -374,6 +374,21 @@ export type ReplyRequest =
   | { text?: string | undefined; mediaUrls?: string[] | undefined }
   | { templateId: string; variables?: Record<string, string> };
 
+export interface SendCatalogueRequest {
+  productIds: string[];
+  customNote?: string | undefined;
+}
+
+export interface CatalogueSharedProduct {
+  id: string;
+  slug: string;
+  name: string;
+  price: string;
+  imageUrl?: string;
+  leadTime: number;
+  description?: string;
+}
+
 export interface ReplyResponse {
   message: Message;
   conversation: Pick<Conversation, "id" | "state">;
@@ -441,7 +456,9 @@ export type UpdateTemplateRequest = Partial<CreateTemplateRequest>;
 
 export interface EscalationListParams {
   /** Omitted = open only. Staff always get open only. */
-  resolved?: boolean;
+  resolved?: boolean | undefined;
+  from?: string | undefined;
+  to?: string | undefined;
 }
 
 export interface EscalationListItem extends Escalation {

@@ -31,7 +31,8 @@ function isFullHeightRoute(pathname: string): boolean {
     pathname === "/orders" ||
     pathname.startsWith("/orders/") ||
     pathname === "/customers" ||
-    pathname.startsWith("/customers/")
+    pathname.startsWith("/customers/") ||
+    pathname === "/catalogue"
   );
 }
 

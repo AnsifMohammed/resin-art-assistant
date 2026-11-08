@@ -12,6 +12,7 @@ import {
   appendMessageToCache,
   usePauseConversation,
   useReply,
+  useSendCatalogue,
   useResolve,
   useResumeConversation,
 } from "../../hooks/useConversations.ts";
@@ -105,6 +106,7 @@ export function ChatView({ conversation, onBack, backOnlyOnMobile = false, onRes
   const { toast } = useToast();
   const qc = useQueryClient();
   const reply = useReply(conversation.id);
+  const sendCatalogue = useSendCatalogue(conversation.id);
   const resolve = useResolve(conversation.id);
   const [confirmResolve, setConfirmResolve] = useState(false);
   const [imgFailed, setImgFailed] = useState(false);
@@ -176,6 +178,16 @@ export function ChatView({ conversation, onBack, backOnlyOnMobile = false, onRes
   // The template picker shows its own errors (variables mapped to inputs, others toasted).
   const handleSendTemplate = (templateId: string, variables: Record<string, string>) =>
     reply.mutateAsync({ templateId, variables });
+
+  const handleSendCatalogue = (productIds: string[], customNote?: string) =>
+    sendCatalogue.mutateAsync({ productIds, customNote }).catch((err: unknown) => {
+      toast({
+        variant: "error",
+        title: "Catalogue not sent",
+        description: err instanceof Error ? err.message : "Something went wrong.",
+      });
+      throw err;
+    });
 
   const handleResolve = () =>
     resolve.mutate(undefined, {
@@ -329,7 +341,8 @@ export function ChatView({ conversation, onBack, backOnlyOnMobile = false, onRes
         key={conversation.id}
         onSend={handleSend}
         onSendTemplate={handleSendTemplate}
-        sending={reply.isPending}
+        onSendCatalogue={handleSendCatalogue}
+        sending={reply.isPending || sendCatalogue.isPending}
         disabled={resolve.isPending}
         windowClosed={windowClosed}
         channel={conversation.channelType}

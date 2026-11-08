@@ -9,6 +9,7 @@ import { escalationRoutes } from "./escalations.ts";
 import { healthRoutes } from "./health.ts";
 import { igCommentsRoutes } from "./ig-comments.ts";
 import { legalRoutes } from "./legal.ts";
+import { mediaRoutes } from "./media.ts";
 import { knowledgeBaseRoutes } from "./knowledge-base.ts";
 import { orderRoutes } from "./orders.ts";
 import { paymentRoutes } from "./payments.ts";
@@ -28,6 +29,7 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
   await app.register(legalRoutes);
   await app.register(authRoutes);
   await app.register(pushRoutes);
+  await app.register(mediaRoutes);
   await app.register(simulateRoutes);
   await app.register(conversationRoutes);
   await app.register(replyRoutes);

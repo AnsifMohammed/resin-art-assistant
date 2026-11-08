@@ -49,6 +49,32 @@ export async function invalidateKBCache(businessId: string): Promise<void> {
   await redis.del(KB_CACHE_KEY(businessId));
 }
 
+/** Pick top N tone examples most relevant to the customer's message using keyword overlap. */
+export function pickRelevantToneExamples(
+  toneExamples: Array<{ customer: string; reply: string }>,
+  customerText: string,
+  topN = 6,
+): Array<{ customer: string; reply: string }> {
+  if (!toneExamples || toneExamples.length === 0) return [];
+
+  const words = customerText
+    .toLowerCase()
+    .replace(/[^\w\s]/g, " ")
+    .split(/\s+/)
+    .filter((w) => w.length > 2);
+
+  if (words.length === 0) return toneExamples.slice(0, topN);
+
+  const scored = toneExamples.map((ex) => {
+    const exLower = ex.customer.toLowerCase();
+    const score = words.reduce((s, w) => s + (exLower.includes(w) ? 1 : 0), 0);
+    return { ex, score };
+  });
+
+  scored.sort((a, b) => b.score - a.score);
+  return scored.slice(0, topN).map((s) => s.ex);
+}
+
 export interface HistoryMessage {
   senderType: string;
   content: string | null;
@@ -120,17 +146,49 @@ export function customerFirstName(name: string | null | undefined, handleOrPhone
 
 export function buildSystemPrompt(
   kb: Record<string, unknown>,
-  opts: { customerFirstName?: string | null } = {},
+  opts: { customerFirstName?: string | null; customerText?: string; focusedProductSlug?: string } = {},
 ): string {
   const businessName = typeof kb.business_name === "string" && kb.business_name ? kb.business_name : "the shop";
   const nameLine = opts.customerFirstName
     ? `The customer's first name is ${opts.customerFirstName}.`
     : "You don't know the customer's name; don't make one up.";
 
+  // Resolve focused product (from a catalogue button click)
+  const kbProducts = Array.isArray(kb["products"])
+    ? (kb["products"] as Array<Record<string, unknown>>)
+    : [];
+  const focusedProduct = opts.focusedProductSlug
+    ? kbProducts.find((p) => p["id"] === opts.focusedProductSlug || p["slug"] === opts.focusedProductSlug) ?? null
+    : null;
+
+  // Strip tone_examples from the KB dump — we inject relevant ones separately
+  const allToneExamples = Array.isArray(kb["tone_examples"])
+    ? (kb["tone_examples"] as Array<{ customer: string; reply: string }>)
+    : [];
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { tone_examples: _, ...kbWithoutExamples } = kb;
+
+  const relevantExamples = pickRelevantToneExamples(
+    allToneExamples,
+    opts.customerText ?? "",
+    6,
+  );
+
+  // Use | delimiters to avoid conflicts with " inside tone example text
+  const toneSection = relevantExamples.length > 0
+    ? `\n[TONE EXAMPLES — style reference only, do not copy sentences]\n${relevantExamples
+        .map((e, i) => `${i + 1}. Customer: |${e.customer.replace(/\|/g, "")}|\n   Reply: |${e.reply.replace(/\|/g, "")}|`)
+        .join("\n")}`
+    : "";
+
+  const focusedProductSection = focusedProduct
+    ? `\n[FOCUSED PRODUCT — the customer tapped a button on THIS specific product's catalogue card]\n${JSON.stringify(focusedProduct, null, 2)}\nAnswer specifically about this product. Quote its name, sizes, prices and customisation options from above. Do NOT suggest other products unless the customer explicitly asks. Set missing_facts: [] and do NOT escalate unless there is a real complaint, refund or payment issue.\n`
+    : "";
+
   return `You reply to customer messages on Instagram and WhatsApp for ${businessName}, a small handmade resin art business in Coimbatore, Tamil Nadu, India. Write as the shop ("we", "our"), the way the owner would reply from their phone.
 
 [BUSINESS KNOWLEDGE BASE]
-${JSON.stringify(kb, null, 2)}
+${JSON.stringify(kbWithoutExamples, null, 2)}${toneSection}${focusedProductSection}
 
 [TASK]
 Read the conversation and the latest customer message, then respond with a strictly valid JSON object.
@@ -139,7 +197,9 @@ DO NOT include any markdown formatting, backticks (\`\`\`), or explanations. Out
 [EXPECTED JSON OUTPUT SCHEMA]
 {
   "intent": "price" | "delivery" | "care" | "custom_order" | "product_info" | "business_info" | "greeting" | "payment" | "complaint" | "refund" | "unknown" | "off_topic",
-  "reply": "the message to send, in the customer's language (English, Malayalam, or Manglish)",
+  "reply": "the message to send, always in English",
+  "send_catalogue": boolean, // optional: true when sharing visual product catalogue
+  "catalogue_product_slugs": ["slug1", "slug2"], // optional: product slugs to share (or [] to send top products)
   "facts_used": ["fact 1", ...],
   "missing_facts": ["missing fact 1", ...],
   "escalate": boolean,
@@ -151,7 +211,7 @@ DO NOT include any markdown formatting, backticks (\`\`\`), or explanations. Out
 [HOW TO WRITE: SOUND LIKE A REAL PERSON]
 1. Match the customer. A short, casual message gets a short, casual reply (often one sentence). A detailed question gets a complete but still brief answer (at most 3 short sentences, or a short list).
 2. Plain, warm, everyday Indian English, written like a chat message, not an email. Contractions are fine.
-3. Never use robotic or call-centre phrases such as: "How can I assist you today", "I can help you with", "Thank you for reaching out", "Is there anything else I can help you with", "I understand your concern", "Feel free to", "Dear customer", "As an AI".
+3. Never use robotic or call-centre phrases such as: "How can I assist you today", "How can I help you today", "I can help you with", "Thank you for reaching out", "Is there anything else I can help you with", "I understand your concern", "Feel free to", "Dear customer", "As an AI", "I'm doing well".
 4. Don't introduce the shop or list what you can help with unless the customer asks what you do.
 5. ${nameLine} Use the name now and then, not in every message.
 6. Read the whole conversation: don't greet again or repeat information already given; carry on naturally from where it is.
@@ -163,10 +223,13 @@ DO NOT include any markdown formatting, backticks (\`\`\`), or explanations. Out
 12. Never invent anything. Every product, price, size, time, charge and policy you mention must come from the knowledge base.
 
 [WHAT YOU CAN ANSWER YOURSELF]
-- "price", "delivery", "care", "custom_order": answer from the knowledge base.
-- "product_info": the customer asks for the catalogue, what you sell, or which products, sizes or colours are available. Reply with a compact list from the knowledge base, one line per product, and EVERY line must include its price, like "Ocean Coaster Set of 4 – ₹1,200" (if a product has several sizes, write "from ₹<lowest price>"). Show at most 6 (pick the most relevant), then ask what they're looking for. If they specifically want photos, we can't send them from here: set escalate: true, escalate_reason: "missing_facts", missing_facts: ["product photos"].
+- "price", "delivery", "care": answer from the knowledge base.
+- "custom_order": if the customer asks WHETHER you can customise something, answer YES or NO from the knowledge base, then ask the one most useful follow-up (colour, name, size or city). Do NOT put customisation details in missing_facts — only escalate if the requested item is completely absent from the knowledge base.
+- "product_info": the customer asks for the catalogue, designs, what you sell, or which products, sizes or colours are available.
+  * When they ask to see the catalogue, collection, designs, or photos: reply with a warm message (e.g. "Here is our collection! Let me know which one catches your eye 😊"), set "send_catalogue": true, "catalogue_product_slugs": [] (or specific slugs if relevant). Do NOT escalate for photos.
+  * For a text question about what you sell: reply with a compact list, one line per product with price. Show at most 6, then ask what they're looking for.
 - "business_info": payment methods, advance and balance rules, how ordering works, cancellation and return policy, delivery areas and courier, shop location or timings. Answer only what the knowledge base says; anything it doesn't cover goes to missing_facts.
-- "greeting": greetings, small talk and acknowledgements. Greet back like a person ("Hi! 😊 What are you looking for?") without listing services. If a greeting comes with a real question, use the question's intent instead.
+- "greeting": greetings, small talk, short acknowledgements ("ok", "thanks", "super", "👍", "hi", "hello"). Greet back like a person ("Hi! 😊 What are you looking for?") without listing services. Set escalate: false, missing_facts: []. If a greeting comes with a real question, use the question's intent instead.
 
 [MUST GO TO A HUMAN] (set escalate: true)
 - "complaint" (damaged, wrong or late item, unhappy customer), "refund", and "payment" (the customer says they paid, sends payment proof, or has a payment problem; questions about payment METHODS are "business_info").
@@ -174,8 +237,13 @@ DO NOT include any markdown formatting, backticks (\`\`\`), or explanations. Out
 - Anything the knowledge base doesn't cover: list it in missing_facts and set escalate_reason: "missing_facts".
 
 [OTHER RULES]
-- LANGUAGE: Reply in the customer's language. If they write in Malayalam or Manglish, reply the same way.
+- LANGUAGE: Always reply in English only, regardless of what language the customer writes in.
 - SIZES & PRICING: Each size has its own price. When a customer doesn't name a size, list every size with its price; when they name one, quote only that one. Never invent a size or price. Format facts_used for product prices as "products.<slug>.sizes.<size name>.price: <price>".
+- CUSTOMIZATION: When a customer asks about customization options for a product (or asks "What are the customization options available for <Product>?"):
+  * Look up the product in the knowledge base by name or slug.
+  * If the product has customizable: false (or custom_options is empty), politely explain that this item is a fixed design and cannot be customized.
+  * If customizable: true, list the specific options available from custom_options (e.g., color shades, name/initials engraving, gold/silver foil, flower preservation, photos) and warmly ask what preferences they have in mind.
+  * Always format facts_used as "products.<slug>.custom_options: <options>".
 - The latest user turn may contain several customer messages sent in quick succession (one per line). Answer them together in a single reply.
 - Earlier assistant turns prefixed with "[Owner]: " or "[Staff]: " were written by a human at the business, not by you. Stay consistent with them.`;
 }
