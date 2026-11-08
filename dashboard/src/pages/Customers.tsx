@@ -1044,7 +1044,6 @@ export default function Customers() {
   const navigate = useNavigate();
   const [segment, setSegment] = useState<Segment>("all");
   const [searchInput, setSearchInput] = useState("");
-  const [cityInput, setCityInput] = useState("");
   const [language, setLanguage] = useState("");
   const [channel, setChannel] = useState<ChannelType | "">("");
   const [sort, setSort] = useState<CustomerSort>("recent");
@@ -1067,12 +1066,10 @@ export default function Customers() {
   };
 
   const search = useDebounced(searchInput.trim(), SEARCH_DEBOUNCE_MS);
-  const city = useDebounced(cityInput.trim(), SEARCH_DEBOUNCE_MS);
 
   // Changing any filter swaps the query key, so the infinite list restarts from page 1.
   const params: Omit<CustomerListParams, "page" | "limit"> = { segment, sort };
   if (search) params.search = search.slice(0, 100);
-  if (city) params.city = city.slice(0, 80);
   if (language) params.language = language;
   if (channel) params.channel = channel;
   const resetKey = JSON.stringify(params);
@@ -1082,7 +1079,7 @@ export default function Customers() {
 
   const { rows: customers, counts, total, hasNextPage, isFetchingNextPage, fetchNextPage } = query;
   const canFetchMore = !query.isFetching && !query.isPlaceholderData;
-  const filtersActive = Boolean(search || city || language || channel);
+  const filtersActive = Boolean(search || language || channel);
 
   const openChat = (c: CustomerListItem) => {
     if (c.conversationId) navigate(`/inbox?c=${encodeURIComponent(c.conversationId)}`);
@@ -1090,7 +1087,6 @@ export default function Customers() {
 
   const clearFilters = () => {
     setSearchInput("");
-    setCityInput("");
     setLanguage("");
     setChannel("");
   };
@@ -1475,19 +1471,6 @@ export default function Customers() {
           </select>
           <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted" aria-hidden />
         </div>
-
-        {/* City Filter */}
-        <input
-          type="text"
-          placeholder="Filter city..."
-          aria-label="Filter by city"
-          value={cityInput}
-          maxLength={80}
-          onChange={(e) => setCityInput(e.target.value)}
-          className={`w-28 h-8 px-2.5 rounded-lg border text-12 placeholder:text-text-muted focus:outline-none focus:ring-1 focus:ring-primary ${
-            cityInput ? "border-primary/50 bg-primary/10 text-text font-semibold" : "border-border bg-surface-muted text-text"
-          }`}
-        />
 
         {/* Language Filter */}
         <div className="relative inline-flex items-center">
