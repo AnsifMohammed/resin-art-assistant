@@ -217,7 +217,7 @@ interface OrderCardProps {
   isGrid?: boolean;
 }
 
-function OrderPaymentChip({ summary, orderTotal }: { summary?: PaymentSummary | undefined; orderTotal: number }) {
+function OrderPaymentChip({ summary, orderTotal: _orderTotal }: { summary?: PaymentSummary | undefined; orderTotal: number }) {
   // No payment made yet — hide the chip entirely
   if (!summary || summary.totalPaid === 0) return null;
 
@@ -2559,6 +2559,7 @@ export default function Orders() {
                 orderId={liveActiveOrder.id}
                 orderTotal={Number(liveActiveOrder.totalAmount)}
                 order={liveActiveOrder}
+                fullOrder={liveActiveOrder}
               />
             </div>
 

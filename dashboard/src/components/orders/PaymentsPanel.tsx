@@ -19,9 +19,9 @@ import {
   useVoidPayment,
 } from "../../hooks/usePayments.ts";
 import { formatDateTime } from "../../lib/format.ts";
-import { EmptyState } from "../shared/EmptyState.tsx";
 import { PaymentRequestModal } from "./PaymentRequestModal.tsx";
-import type { Payment, PaymentKind } from "../../types/index.ts";
+import type { DbOrder, Payment, PaymentKind } from "../../types/index.ts";
+import { InvoiceButton } from "./InvoiceButton.tsx";
 
 export interface PaymentsPanelProps {
   orderId: string;
@@ -32,6 +32,7 @@ export interface PaymentsPanelProps {
     channel?: string;
     customerPhone?: string | null;
   } | null;
+  fullOrder?: DbOrder | null;
 }
 
 const PAYMENT_METHODS = ["UPI", "GPay", "PhonePe", "Bank Transfer", "Cash"] as const;
@@ -40,6 +41,7 @@ export function PaymentsPanel({
   orderId,
   orderTotal: initialOrderTotal,
   order,
+  fullOrder,
 }: PaymentsPanelProps) {
   const { data, isLoading } = useOrderPayments(orderId);
   const recordPayment = useRecordPayment(orderId);
@@ -66,6 +68,13 @@ export function PaymentsPanel({
   // Void dialog state
   const [voidingPayment, setVoidingPayment] = useState<Payment | null>(null);
   const [voidReason, setVoidReason] = useState<string>("");
+
+  // High-amount confirmation guard
+  const HIGH_AMOUNT_THRESHOLD = 2000;
+  const [pendingPaymentData, setPendingPaymentData] = useState<{
+    kind: PaymentKind; amount: number; method: string;
+    reference: string | null; note: string | null; markPaidImmediately: boolean;
+  } | null>(null);
 
   const summary = data?.summary;
   const paymentsList = data?.payments ?? [];
@@ -130,7 +139,39 @@ export function PaymentsPanel({
     }
   };
 
-  // Submit add payment
+  // Actually submit the payment (called after optional confirmation)
+  const submitPayment = async (data: {
+    kind: PaymentKind; amount: number; method: string;
+    reference: string | null; note: string | null; markPaidImmediately: boolean;
+  }) => {
+    try {
+      const res = await recordPayment.mutateAsync({
+        kind: data.kind,
+        amount: data.amount,
+        method: data.method,
+        reference: data.reference,
+        note: data.note,
+        markPaidImmediately: data.markPaidImmediately,
+      });
+
+      if (data.markPaidImmediately) {
+        toast.success(`Recorded ₹${data.amount.toLocaleString("en-IN")} received`);
+      } else {
+        toast.success(`Payment request of ₹${data.amount.toLocaleString("en-IN")} recorded as pending`);
+        if (res?.payment) setPaymentForLinkModal(res.payment);
+      }
+
+      setNewAmount("");
+      setNewReference("");
+      setNewNote("");
+      setIsAddFormOpen(false);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to record payment";
+      toast.error(msg);
+    }
+  };
+
+  // Submit add payment — shows confirmation guard for high amounts
   const handleRecordPayment = async (e: React.FormEvent) => {
     e.preventDefault();
     const parsedAmount = parseInt(newAmount, 10);
@@ -139,36 +180,18 @@ export function PaymentsPanel({
       return;
     }
 
-    try {
-      const res = await recordPayment.mutateAsync({
-        kind: newKind,
-        amount: parsedAmount,
-        method: newMethod,
-        reference: newReference.trim() || null,
-        note: newNote.trim() || null,
-        markPaidImmediately,
-      });
+    const data = {
+      kind: newKind, amount: parsedAmount, method: newMethod,
+      reference: newReference.trim() || null, note: newNote.trim() || null,
+      markPaidImmediately,
+    };
 
-      if (markPaidImmediately) {
-        toast.success(`Recorded ₹${parsedAmount.toLocaleString("en-IN")} received`);
-      } else {
-        toast.success(
-          `Payment request of ₹${parsedAmount.toLocaleString("en-IN")} recorded as pending`,
-        );
-        if (res?.payment) {
-          setPaymentForLinkModal(res.payment);
-        }
-      }
-
-      setNewAmount("");
-      setNewReference("");
-      setNewNote("");
-      setMarkPaidImmediately(false);
-      setIsAddFormOpen(false);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Failed to record payment";
-      toast.error(msg);
+    if (parsedAmount >= HIGH_AMOUNT_THRESHOLD) {
+      setPendingPaymentData(data);
+      return;
     }
+
+    await submitPayment(data);
   };
 
   return (
@@ -183,8 +206,12 @@ export function PaymentsPanel({
             </span>
           </div>
 
-          {/* Status Badge Pill */}
-          {paymentState === "fully_paid" ? (
+          <div className="flex items-center gap-2">
+            {fullOrder && (
+              <InvoiceButton order={fullOrder} />
+            )}
+            {/* Status Badge Pill */}
+            {paymentState === "fully_paid" ? (
             <span className="px-2.5 py-0.5 rounded-full text-11 font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 inline-flex items-center gap-1.5 shadow-xs">
               <CheckCircle2 className="w-3 h-3" /> Fully Paid
             </span>
@@ -197,6 +224,7 @@ export function PaymentsPanel({
               <AlertCircle className="w-3 h-3" /> Unpaid
             </span>
           )}
+          </div>
         </div>
 
         {/* 3 Summary Cards */}
@@ -269,9 +297,9 @@ export function PaymentsPanel({
           <button
             type="button"
             onClick={() => {
-              if (!isAddFormOpen && balanceDue > 0 && !newAmount) {
-                setNewAmount(String(balanceDue));
+              if (!isAddFormOpen) {
                 setNewKind(totalPaid > 0 ? "balance" : "advance");
+                if (balanceDue > 0 && !newAmount) setNewAmount(String(balanceDue));
               }
               setIsAddFormOpen(!isAddFormOpen);
             }}
@@ -424,15 +452,7 @@ export function PaymentsPanel({
           <div className="p-4 rounded-xl border border-border bg-surface text-center text-text-muted text-12 animate-pulse">
             Loading payment records...
           </div>
-        ) : paymentsList.length === 0 ? (
-          <div className="rounded-xl border border-border bg-surface p-4">
-            <EmptyState
-              size="compact"
-              title="No payments recorded yet"
-              description="Advance or balance payments recorded by an admin will appear here."
-            />
-          </div>
-        ) : (
+        ) : paymentsList.length === 0 ? null : (
           <div className="rounded-xl border border-border bg-surface divide-y divide-border/60 overflow-hidden shadow-xs">
             {paymentsList.map((p) => {
               const isPaid = p.status === "paid";
@@ -526,7 +546,7 @@ export function PaymentsPanel({
 
                   {/* Right Side: Actions */}
                   <div className="flex items-center gap-1.5 shrink-0 pt-1 sm:pt-0">
-                    {!isVoid && (
+                    {isPending && (
                       <button
                         type="button"
                         onClick={() => setPaymentForLinkModal(p)}
@@ -713,6 +733,63 @@ export function PaymentsPanel({
           </div>
         </div>
       )}
+      {/* ─── High-Amount Confirmation Guard ───────────────────────────────── */}
+      {pendingPaymentData && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+          <div className="w-full max-w-sm rounded-2xl border border-border bg-surface p-5 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-amber-500/15 flex items-center justify-center shrink-0">
+                <AlertCircle className="w-5 h-5 text-amber-500" />
+              </div>
+              <div>
+                <p className="text-14 font-bold text-text">Confirm large payment</p>
+                <p className="text-12 text-text-muted">Please verify the amount before recording</p>
+              </div>
+            </div>
+            <div className="rounded-xl border border-border bg-surface-muted p-3.5 space-y-1.5 text-13">
+              <div className="flex justify-between">
+                <span className="text-text-muted">Amount</span>
+                <span className="font-bold text-text">₹{pendingPaymentData.amount.toLocaleString("en-IN")}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-text-muted">Kind</span>
+                <span className="font-medium text-text capitalize">{pendingPaymentData.kind}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-text-muted">Method</span>
+                <span className="font-medium text-text">{pendingPaymentData.method}</span>
+              </div>
+              {pendingPaymentData.reference && (
+                <div className="flex justify-between">
+                  <span className="text-text-muted">Reference</span>
+                  <span className="font-mono text-text">{pendingPaymentData.reference}</span>
+                </div>
+              )}
+              <div className="flex justify-between">
+                <span className="text-text-muted">Status</span>
+                <span className="font-medium text-text">{pendingPaymentData.markPaidImmediately ? "Mark as paid" : "Pending"}</span>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setPendingPaymentData(null)}
+                className="flex-1 py-2 rounded-xl border border-border bg-surface hover:bg-surface-muted text-13 font-medium text-text cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => { const d = pendingPaymentData; setPendingPaymentData(null); void submitPayment(d); }}
+                className="flex-1 py-2 rounded-xl bg-primary hover:bg-amber-600 text-primary-foreground text-13 font-semibold cursor-pointer"
+              >
+                Yes, record ₹{pendingPaymentData.amount.toLocaleString("en-IN")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ─── Payment Request Link Modal ────────────────────────────────────── */}
       <PaymentRequestModal
         isOpen={Boolean(paymentForLinkModal)}

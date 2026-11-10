@@ -119,29 +119,27 @@ async function handleCustomerMessage(m: InboundCustomerMessage): Promise<void> {
   if (!customer) throw new Error("Could not resolve customer");
 
   // Instagram webhooks only carry the sender's id; look up their name/@username and
-  // profile picture once. The id stays in handleOrPhone because replies are sent to it.
+  // profile picture. Name is fetched once; picture is always refreshed because
+  // Instagram CDN URLs expire after ~24 hours.
   if (m.channelType === "instagram" && isInstagramLive(config)) {
     const needsName = !customer.name || customer.name === customer.handleOrPhone;
-    const needsPic = !customer.profilePicUrl;
 
-    if (needsName || needsPic) {
-      const [displayName, profilePicUrl] = await Promise.all([
-        needsName ? fetchInstagramDisplayName(m.handleOrPhone).catch(() => null) : Promise.resolve(null),
-        needsPic ? fetchCommenterProfilePic(m.handleOrPhone, config.BUSINESS_ID).catch(() => null) : Promise.resolve(null),
-      ]);
+    const [displayName, profilePicUrl] = await Promise.all([
+      needsName ? fetchInstagramDisplayName(m.handleOrPhone).catch(() => null) : Promise.resolve(null),
+      fetchCommenterProfilePic(m.handleOrPhone, config.BUSINESS_ID).catch(() => null),
+    ]);
 
-      const updates: Record<string, unknown> = {};
-      if (displayName) updates.name = displayName;
-      if (profilePicUrl) updates.profilePicUrl = profilePicUrl;
+    const updates: Record<string, unknown> = {};
+    if (displayName) updates.name = displayName;
+    if (profilePicUrl) updates.profilePicUrl = profilePicUrl;
 
-      if (Object.keys(updates).length > 0) {
-        const [updated] = await db
-          .update(customers)
-          .set(updates)
-          .where(eq(customers.id, customer.id))
-          .returning();
-        if (updated) customer = updated;
-      }
+    if (Object.keys(updates).length > 0) {
+      const [updated] = await db
+        .update(customers)
+        .set(updates)
+        .where(eq(customers.id, customer.id))
+        .returning();
+      if (updated) customer = updated;
     }
   }
 

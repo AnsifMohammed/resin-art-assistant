@@ -27,6 +27,7 @@ export default defineConfig({
         ],
       },
       workbox: {
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         globPatterns: ["**/*.{js,css,html,ico,png,svg}"],
         // Adds `push` + `notificationclick` handlers to the generated service worker.
         importScripts: ["/push-sw.js"],
@@ -57,6 +58,7 @@ export default defineConfig({
         codeSplitting: {
           groups: [
             { name: "sentry", test: /node_modules[\\/]@sentry/ },
+            { name: "pdf", test: /node_modules[\\/](@react-pdf|yoga-layout)/ },
             { name: "react", test: /node_modules[\\/](react|react-dom|react-router|react-router-dom|scheduler)[\\/]/ },
             { name: "vendor", test: /node_modules/ },
           ],
