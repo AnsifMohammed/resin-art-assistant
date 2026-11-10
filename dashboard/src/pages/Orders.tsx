@@ -217,7 +217,7 @@ interface OrderCardProps {
   isGrid?: boolean;
 }
 
-function OrderPaymentChip({ summary, orderTotal }: { summary?: PaymentSummary | undefined; orderTotal: number }) {
+function OrderPaymentChip({ summary, orderTotal: _orderTotal }: { summary?: PaymentSummary | undefined; orderTotal?: number }) {
   // No payment made yet — hide the chip entirely
   if (!summary || summary.totalPaid === 0) return null;
 
@@ -410,14 +410,19 @@ function OrderCard({
                     onMoveTo(e.target.value as OrderStatus);
                   }
                 }}
-                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full dark:[color-scheme:dark]"
                 title="Move to another stage"
               >
-                <option value="" disabled>
+                <option value="" disabled className="bg-surface text-text dark:bg-[#111827] dark:text-[#F1F5F9]">
                   Move to stage...
                 </option>
                 {COLUMNS.map((c) => (
-                  <option key={c.id} value={c.id} disabled={c.id === order.status}>
+                  <option
+                    key={c.id}
+                    value={c.id}
+                    disabled={c.id === order.status}
+                    className="bg-surface text-text dark:bg-[#111827] dark:text-[#F1F5F9] disabled:text-text-muted dark:disabled:text-slate-500"
+                  >
                     {c.id === order.status ? `✓ ${c.label} (Current)` : `→ ${c.label}`}
                   </option>
                 ))}
@@ -2616,16 +2621,16 @@ export default function Orders() {
                       setSendNotification(nextIdx >= currentIdx);
                     }
                   }}
-                  className="w-full pl-3 pr-8 py-1.5 appearance-none rounded-lg border border-border bg-surface text-12 text-text focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed transition-opacity"
+                  className="w-full pl-3 pr-8 py-1.5 appearance-none rounded-lg border border-border dark:border-white/10 bg-surface dark:bg-[#111827] text-12 text-text dark:text-[#F1F5F9] focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed transition-opacity dark:[color-scheme:dark]"
                 >
                   {COLUMNS.map((col) => (
-                    <option key={col.id} value={col.id}>
+                    <option key={col.id} value={col.id} className="bg-surface text-text dark:bg-[#111827] dark:text-[#F1F5F9]">
                       {col.label}
                     </option>
                   ))}
-                  <option value="cancelled">Cancelled</option>
+                  <option value="cancelled" className="bg-surface text-text dark:bg-[#111827] dark:text-[#F1F5F9]">Cancelled</option>
                 </select>
-                <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted" aria-hidden />
+                <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted dark:text-slate-400" aria-hidden />
               </div>
             </div>
 

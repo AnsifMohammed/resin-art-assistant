@@ -5,6 +5,7 @@
 
 @layer base {
   :root {
+    color-scheme: light;
     --bg: #FAFAF9;
     --surface: #FFFFFF;
     --surface-muted: #F5F5F4;
@@ -26,6 +27,7 @@
   }
 
   html.dark {
+    color-scheme: dark;
     --bg: #0B1120;
     --surface: #111827;
     --surface-muted: #1A2335;
@@ -60,7 +62,10 @@
     transition: background-color 200ms ease, color 200ms ease;
   }
 
-  h1, h2, h3, .font-display {
+  h1,
+  h2,
+  h3,
+  .font-display {
     font-family: 'Outfit', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   }
 
@@ -146,15 +151,28 @@
   transform: translateY(-2px);
   box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.08), 0 2px 4px -2px rgb(0 0 0 / 0.08);
 }
+
 .saba-card-interactive:active {
   transform: scale(0.98);
 }
 
 /* Animations */
 @keyframes shake {
-  0%, 100% { transform: translateX(0); }
-  20%, 60% { transform: translateX(-6px); }
-  40%, 80% { transform: translateX(6px); }
+
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+
+  20%,
+  60% {
+    transform: translateX(-6px);
+  }
+
+  40%,
+  80% {
+    transform: translateX(6px);
+  }
 }
 
 .animate-shake {
@@ -162,8 +180,13 @@
 }
 
 @keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+  0% {
+    background-position: -200% 0;
+  }
+
+  100% {
+    background-position: 200% 0;
+  }
 }
 
 .animate-shimmer {
@@ -173,8 +196,13 @@
 }
 
 @keyframes stream-flow {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(200%); }
+  0% {
+    transform: translateX(-100%);
+  }
+
+  100% {
+    transform: translateX(200%);
+  }
 }
 
 .animate-stream-flow {
@@ -186,6 +214,7 @@
     opacity: 0;
     transform: translateY(8px);
   }
+
   100% {
     opacity: 1;
     transform: translateY(0);
@@ -208,6 +237,7 @@
 @utility pb-safe {
   padding-bottom: env(safe-area-inset-bottom);
 }
+
 @utility pt-safe {
   padding-top: env(safe-area-inset-top);
 }
@@ -217,16 +247,20 @@
   width: 5px;
   height: 5px;
 }
+
 .custom-scrollbar::-webkit-scrollbar-track {
   background: transparent;
 }
+
 .custom-scrollbar::-webkit-scrollbar-thumb {
   background: var(--border);
   border-radius: 9999px;
 }
+
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: var(--text-muted);
 }
+
 .custom-scrollbar {
   scrollbar-width: thin;
   scrollbar-color: var(--border) transparent;
@@ -298,10 +332,12 @@
     width: auto !important;
     max-width: calc(100vw - 1.5rem) !important;
   }
+
   [data-sonner-toaster][data-x-position='right'] {
     right: 0.75rem !important;
     left: 0.75rem !important;
   }
+
   [data-sonner-toast] {
     width: 100% !important;
     max-width: 100% !important;
