@@ -2,7 +2,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   createOrder,
   deleteOrder,
+  getOrderMessages,
   listOrders,
+  retryOrderNotification,
+  sendProgressUpdate,
   updateOrder,
   updateOrderStatus,
   type ListOrdersQuery,
@@ -11,6 +14,7 @@ import { queryKeys } from "../lib/queryKeys.ts";
 import type {
   CreateOrderRequest,
   OrderListResponse,
+  SendProgressUpdateRequest,
   UpdateOrderRequest,
   UpdateOrderStatusRequest,
 } from "../types/index.ts";
@@ -137,6 +141,41 @@ export function useDeleteOrder() {
         }
       );
       void qc.invalidateQueries({ queryKey: queryKeys.orders.all });
+    },
+  });
+}
+
+export function useOrderMessages(orderId: string | null | undefined, options: { enabled?: boolean } = {}) {
+  const { enabled = true } = options;
+  return useQuery({
+    queryKey: queryKeys.orders.messages(orderId || ""),
+    queryFn: ({ signal }) => getOrderMessages(orderId!, signal),
+    enabled: Boolean(orderId) && enabled,
+    refetchInterval: Boolean(orderId) && enabled ? 5000 : false,
+  });
+}
+
+export function useSendProgressUpdate() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: SendProgressUpdateRequest }) =>
+      sendProgressUpdate(id, data),
+    onSuccess: (_, vars) => {
+      void qc.invalidateQueries({ queryKey: queryKeys.orders.messages(vars.id) });
+      void qc.invalidateQueries({ queryKey: queryKeys.orders.detail(vars.id) });
+      void qc.invalidateQueries({ queryKey: queryKeys.orders.all });
+    },
+  });
+}
+
+export function useRetryOrderNotification() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, messageId }: { id: string; messageId: string }) =>
+      retryOrderNotification(id, messageId),
+    onSuccess: (_, vars) => {
+      void qc.invalidateQueries({ queryKey: queryKeys.orders.messages(vars.id) });
+      void qc.invalidateQueries({ queryKey: queryKeys.orders.detail(vars.id) });
     },
   });
 }

@@ -7,6 +7,7 @@ import { roleHome } from "./guards/roleHome.ts";
 import { useAuth } from "./hooks/useAuth.ts";
 import { usePushNotifications } from "./hooks/usePushNotifications.ts";
 import Login from "./pages/Login.tsx";
+import PublicPaymentPage from "./pages/PublicPaymentPage.tsx";
 import Analytics from "./pages/Analytics.tsx";
 import Inbox from "./pages/Inbox.tsx";
 import Escalations from "./pages/Escalations.tsx";
@@ -54,6 +55,7 @@ export default function App() {
     <Sentry.ErrorBoundary fallback={<ErrorFallback />}>
       <SentryRoutes>
         <Route path="/login" element={<Login />} />
+        <Route path="/pay/:id" element={<PublicPaymentPage />} />
 
         <Route element={<RequireAuth />}>
           <Route element={<AppShell />}>

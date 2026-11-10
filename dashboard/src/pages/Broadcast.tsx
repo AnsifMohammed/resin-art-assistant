@@ -409,6 +409,7 @@ export default function BroadcastPage() {
   const count = audience.data?.count;
   const max = audience.data?.max;
   const audienceTooLarge = count !== undefined && max !== undefined && count > max;
+  const audienceLoading = count === undefined && (audience.isFetching || audience.settling);
   const audienceEmpty = count === 0;
 
   const historyQuery = useBroadcasts({ page: historyPage, limit: HISTORY_PAGE_SIZE });
@@ -444,6 +445,7 @@ export default function BroadcastPage() {
     setMode("now");
     setScheduleAt(defaultScheduleAt());
     clearErrors();
+    setHistoryPage(1);
   };
 
   /** Client-side checks mirroring the server, so most problems show before the request. */
@@ -878,12 +880,12 @@ export default function BroadcastPage() {
                 <div className="p-4 rounded-xl border border-emerald-500/20 bg-emerald-500/5">
                   <div className="max-w-md mx-auto p-3.5 rounded-2xl bg-surface border border-border shadow-md space-y-2 text-13 text-text leading-relaxed">
                     <div className="flex items-center justify-between text-11 text-text-muted pb-1 border-b border-border/40">
-                      <span className="font-semibold text-text">Saba Art · Official WhatsApp</span>
+                      <span className="font-semibold text-text">Official WhatsApp</span>
                       <span>{dayjs().format("h:mm A")}</span>
                     </div>
                     <p className="whitespace-pre-wrap">{previewBody || "Pick a template to preview it."}</p>
                     <div className="flex justify-end text-[10px] text-text-muted">
-                      <span>Preview for “{SAMPLE_CUSTOMER_NAME}”</span>
+                      <span>Preview for "{SAMPLE_CUSTOMER_NAME}"</span>
                     </div>
                   </div>
                 </div>
@@ -988,11 +990,44 @@ export default function BroadcastPage() {
           className={`rounded-xl border border-border bg-surface overflow-x-auto ${historyQuery.isPlaceholderData ? "opacity-60" : ""}`}
         >
           {historyQuery.isPending ? (
-            <div className="p-4 space-y-3" aria-busy="true">
-              {Array.from({ length: 4 }, (_, i) => (
-                <Skeleton key={i} className="h-8 w-full" />
-              ))}
-            </div>
+            <table className="w-full text-left text-13" aria-busy="true">
+              <thead className="bg-surface-muted border-b border-border text-11 uppercase font-semibold text-text-muted">
+                <tr>
+                  <th className="p-3.5">Campaign Name</th>
+                  <th className="p-3.5">Date</th>
+                  <th className="p-3.5">Target Audience</th>
+                  <th className="p-3.5">Recipients</th>
+                  <th className="p-3.5">Sent</th>
+                  <th className="p-3.5">Delivered</th>
+                  <th className="p-3.5">Read</th>
+                  <th className="p-3.5">Failed</th>
+                  <th className="p-3.5 text-right">Status</th>
+                  <th className="p-3.5 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/40">
+                {Array.from({ length: 4 }, (_, i) => (
+                  <tr key={i}>
+                    <td className="p-3.5">
+                      <Skeleton className="h-4 w-36 mb-1" />
+                      <Skeleton className="h-3 w-24" />
+                    </td>
+                    <td className="p-3.5">
+                      <Skeleton className="h-3 w-16 mb-1" />
+                      <Skeleton className="h-4 w-24" />
+                    </td>
+                    <td className="p-3.5"><Skeleton className="h-4 w-28" /></td>
+                    <td className="p-3.5"><Skeleton className="h-4 w-10" /></td>
+                    <td className="p-3.5"><Skeleton className="h-4 w-10" /></td>
+                    <td className="p-3.5"><Skeleton className="h-4 w-10" /></td>
+                    <td className="p-3.5"><Skeleton className="h-4 w-10" /></td>
+                    <td className="p-3.5"><Skeleton className="h-4 w-10" /></td>
+                    <td className="p-3.5 text-right"><Skeleton className="h-5 w-16 ml-auto rounded-full" /></td>
+                    <td className="p-3.5 text-right"><Skeleton className="h-6 w-16 ml-auto rounded-lg" /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           ) : historyQuery.isError ? (
             <div className="p-8 text-center">
               <AlertCircle className="mx-auto mb-2 h-8 w-8 text-danger" aria-hidden />
@@ -1145,8 +1180,13 @@ export default function BroadcastPage() {
                 {mode === "schedule" ? "Confirm Schedule" : "Confirm Broadcast"}
               </h3>
               <p className="text-12 text-text-muted mt-1">
-                “{effectiveName}” will be sent to <strong className="text-text">{count ?? 0}</strong> customer
-                {count === 1 ? "" : "s"} on WhatsApp
+                "{effectiveName}" will be sent to{" "}
+                {audienceLoading ? (
+                  <span className="inline-block w-10 h-3.5 rounded bg-surface-muted animate-pulse align-middle" />
+                ) : (
+                  <strong className="text-text">{count ?? 0}</strong>
+                )}{" "}
+                customer{count === 1 ? "" : "s"} on WhatsApp
                 {mode === "schedule" ? ` on ${formatDateTime(dayjs(scheduleAt).toISOString())}` : " right away"}. The
                 final list is taken when sending starts.
               </p>
@@ -1161,13 +1201,14 @@ export default function BroadcastPage() {
               </button>
               <button
                 type="button"
+                disabled={audienceLoading}
                 onClick={() => {
                   setShowConfirmModal(false);
                   submit(primaryAction);
                 }}
-                className="flex-1 py-2 rounded-lg bg-primary hover:bg-amber-600 text-primary-foreground text-13 font-semibold cursor-pointer shadow-xs"
+                className="flex-1 py-2 rounded-lg bg-primary hover:bg-amber-600 text-primary-foreground text-13 font-semibold cursor-pointer shadow-xs disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Confirm
+                {audienceLoading ? "Loading…" : "Confirm"}
               </button>
             </div>
           </div>
@@ -1198,8 +1239,8 @@ export default function BroadcastPage() {
         title="Cancel this broadcast?"
         description={
           toCancel?.status === "sending"
-            ? `“${toCancel.name}” stops before its next batch; up to 50 more messages may still go out.`
-            : `“${toCancel?.name ?? ""}” will not be sent.`
+            ? `"${toCancel.name}" stops before its next batch; up to 50 more messages may still go out.`
+            : `"${toCancel?.name ?? ""}" will not be sent.`
         }
         confirmLabel="Cancel broadcast"
         cancelLabel="Keep it"
@@ -1221,7 +1262,7 @@ export default function BroadcastPage() {
           });
         }}
         title="Delete this draft?"
-        description={`“${toDelete?.name ?? ""}” will be removed permanently.`}
+        description={`"${toDelete?.name ?? ""}" will be removed permanently.`}
         confirmLabel="Delete draft"
         tone="danger"
       />

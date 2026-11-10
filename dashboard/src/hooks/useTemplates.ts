@@ -2,7 +2,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   createTemplate,
   deleteTemplate,
+  deleteTemplateCategory,
   duplicateTemplate,
+  fetchTemplateCategories,
   listTemplates,
   updateTemplate,
 } from "../api/templates.ts";
@@ -42,6 +44,25 @@ export function useDeleteTemplate() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => deleteTemplate(id),
+    onSettled: () => qc.invalidateQueries({ queryKey: queryKeys.templates.all }),
+  });
+}
+
+/** GET /templates/categories — default + custom categories. */
+export function useTemplateCategories() {
+  return useQuery({
+    queryKey: [...queryKeys.templates.all, "categories"],
+    queryFn: ({ signal }) => fetchTemplateCategories(signal),
+    select: (res) => res.categories,
+    staleTime: 60_000,
+  });
+}
+
+/** Admin only: DELETE /templates/categories/:category — reassigns templates to "general". */
+export function useDeleteTemplateCategory() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (category: string) => deleteTemplateCategory(category),
     onSettled: () => qc.invalidateQueries({ queryKey: queryKeys.templates.all }),
   });
 }

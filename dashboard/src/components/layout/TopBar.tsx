@@ -12,11 +12,13 @@ import {
   Maximize,
   Minimize,
   X,
+  AlertTriangle,
 } from "lucide-react";
 import { cn } from "../../lib/cn.ts";
 import { useAuth } from "../../context/AuthContext.tsx";
 import { useTheme } from "../../context/ThemeContext.tsx";
 import { useEscalations } from "../../hooks/useEscalations.ts";
+import { useOrders } from "../../hooks/useOrders.ts";
 import { usePushNotifications } from "../../hooks/usePushNotifications.ts";
 import { useSocket } from "../../hooks/useSocket.ts";
 import { escalationReasonLabel } from "../../lib/escalationReasons.ts";
@@ -92,6 +94,7 @@ function NotificationsMenu() {
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const escalations = useEscalations();
+  const ordersQuery = useOrders({ status: "in_production" });
   const push = usePushNotifications();
 
   // Close when tapping outside or pressing Escape
@@ -115,6 +118,18 @@ function NotificationsMenu() {
     };
   }, [open]);
 
+  const overdueProductionOrders = useMemo(() => {
+    const list = ordersQuery.data?.orders ?? [];
+    return list
+      .map((o) => {
+        const start = o.productionStartedAt || o.createdAt;
+        const days = Math.max(0, Math.floor((Date.now() - new Date(start).getTime()) / (1000 * 60 * 60 * 24)));
+        return { ...o, calculatedDays: days };
+      })
+      .filter((o) => o.status === "in_production" && o.calculatedDays >= 45)
+      .sort((a, b) => b.calculatedDays - a.calculatedDays);
+  }, [ordersQuery.data?.orders]);
+
   const recent = useMemo(
     () =>
       [...(escalations.data ?? [])]
@@ -122,7 +137,7 @@ function NotificationsMenu() {
         .slice(0, 6),
     [escalations.data],
   );
-  const openCount = escalations.data?.length ?? 0;
+  const openCount = (escalations.data?.length ?? 0) + overdueProductionOrders.length;
 
   return (
     <div className="relative" ref={menuRef}>
@@ -193,14 +208,48 @@ function NotificationsMenu() {
 
             {/* Notifications scrollable list */}
             <div className="mt-2 space-y-1.5 max-h-[min(20rem,calc(100dvh-13rem))] sm:max-h-80 overflow-y-auto custom-scrollbar pr-0.5">
+              {/* Overdue Production Alerts */}
+              {overdueProductionOrders.length > 0 && (
+                <div className="space-y-1 pb-1">
+                  <div className="flex items-center gap-1 px-1 text-[10px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">
+                    <AlertTriangle size={11} />
+                    <span>Production Overdue (≥45 days)</span>
+                  </div>
+                  {overdueProductionOrders.map((o) => (
+                    <button
+                      key={o.id}
+                      type="button"
+                      onClick={() => {
+                        setOpen(false);
+                        navigate(`/orders?focus=${encodeURIComponent(o.id)}`);
+                      }}
+                      className="block w-full text-left p-2.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 active:scale-[0.99] cursor-pointer transition text-xs group"
+                    >
+                      <div className="flex items-center justify-between gap-1.5">
+                        <span className="font-bold text-rose-700 dark:text-rose-300 truncate">
+                          #{o.orderNo} · {o.customerName}
+                        </span>
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-500 text-white shrink-0">
+                          {o.calculatedDays}d
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-text-muted mt-1 truncate">
+                        In production for {o.calculatedDays} days without moving to Ready · Send progress update
+                      </p>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Escalations List */}
               {escalations.isPending ? (
-                <p className="py-6 text-center text-xs text-text-muted">Loading…</p>
+                <p className="py-4 text-center text-xs text-text-muted">Loading…</p>
               ) : escalations.isError ? (
-                <p className="py-6 text-center text-xs text-danger">Couldn't load escalations.</p>
-              ) : recent.length === 0 ? (
+                <p className="py-4 text-center text-xs text-danger">Couldn't load escalations.</p>
+              ) : recent.length === 0 && overdueProductionOrders.length === 0 ? (
                 <div className="py-6 text-center">
-                  <p className="text-xs text-text-muted">No open escalations.</p>
-                  <p className="text-[11px] text-text-muted/70 mt-0.5">The AI is handling everything.</p>
+                  <p className="text-xs text-text-muted">No open alerts.</p>
+                  <p className="text-[11px] text-text-muted/70 mt-0.5">Everything is running smoothly.</p>
                 </div>
               ) : (
                 recent.map((e) => (
@@ -234,16 +283,29 @@ function NotificationsMenu() {
 
             {/* Footer actions */}
             <div className="mt-2.5 pt-2.5 border-t border-border flex items-center justify-between gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setOpen(false);
-                  navigate("/escalations");
-                }}
-                className="text-xs font-semibold text-primary-text hover:underline cursor-pointer"
-              >
-                View all escalations →
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOpen(false);
+                    navigate("/escalations");
+                  }}
+                  className="text-xs font-semibold text-primary-text hover:underline cursor-pointer"
+                >
+                  Escalations →
+                </button>
+                <span className="text-text-muted text-[10px]">·</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOpen(false);
+                    navigate("/orders");
+                  }}
+                  className="text-xs font-semibold text-primary-text hover:underline cursor-pointer"
+                >
+                  Orders →
+                </button>
+              </div>
               {(push.state === "prompt" || push.state === "error") && (
                 <button
                   type="button"

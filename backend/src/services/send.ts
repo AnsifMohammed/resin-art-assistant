@@ -50,7 +50,12 @@ export async function sendMessage(opts: SendMessageOptions): Promise<SendMessage
   const mediaUrls = opts.mediaUrls ?? [];
 
   // Instagram goes live with INSTAGRAM_LIVE=true even while DEMO_MODE=true.
-  if (opts.channelType === "instagram" && isInstagramLive(config)) {
+  // Meta Instagram Graph API strictly requires a numeric Instagram-scoped ID (IGSID, 15+ digits).
+  // In DEMO_MODE, non-numeric handles (e.g. kavi.crafts, usernames, demo phone numbers)
+  // cannot be delivered via Meta's live API and are handled by the DEMO_MODE simulator.
+  const isNumericIgsid = /^\d{15,20}$/.test(opts.recipient.replace(/^\+/, "")) || opts.recipient.startsWith("igsid-");
+
+  if (opts.channelType === "instagram" && isInstagramLive(config) && (isNumericIgsid || !config.DEMO_MODE)) {
     let firstMetaMessageId: string | null = null;
     let partsCount = 0;
 

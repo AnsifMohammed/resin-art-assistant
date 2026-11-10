@@ -34,6 +34,25 @@ const TEMPLATES: TemplateSeed[] = [
     category: "delivery",
     body: "Hi {customerName}, your {product} should have reached you today. We hope you love it! Please share a photo if you can 😊",
   },
+  // production_progress
+  {
+    name: "Production Progress Update",
+    category: "production_progress",
+    channel: "both",
+    body: "Hi {CustomerName}! Your order #{OrderNumber} is currently in production. Our team is carefully working on your {ProductName}. It has been {ProductionDays} days since production started. We appreciate your patience and will keep you updated!",
+  },
+  {
+    name: "Production Delay Notification",
+    category: "production_progress",
+    channel: "both",
+    body: "Hi {CustomerName}! We wanted to update you regarding your order #{OrderNumber}. Your handmade {ProductName} is taking a little longer than expected due to the production process. We sincerely appreciate your patience. We'll keep you informed about the progress.",
+  },
+  {
+    name: "Production Completion Update",
+    category: "production_progress",
+    channel: "both",
+    body: "Hi {CustomerName}! Great news! Your order #{OrderNumber} has completed production and is now ready. Thank you for patiently waiting for your handmade creation!",
+  },
   // payment
   {
     name: "Advance payment request",

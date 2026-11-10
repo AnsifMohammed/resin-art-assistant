@@ -1,4 +1,4 @@
-import type { TemplateCategory, TemplateChannel } from "../types/index.ts";
+import type { TemplateChannel } from "../types/index.ts";
 
 /** Same rules as backend/src/lib/templates.ts: {name} where name is \w+. */
 const VARIABLE_RE = /\{(\w+)\}/g;
@@ -15,6 +15,14 @@ export const AUTO_FILLED_VARIABLES = ["customerName"] as const;
 
 /** Variables offered as quick-insert pills in the template editor. */
 export const COMMON_TEMPLATE_VARIABLES = [
+  "CustomerName",
+  "OrderNumber",
+  "ProductName",
+  "ProductionStartDate",
+  "ExpectedCompletionDate",
+  "ProductionDays",
+  "RemainingDays",
+  "CurrentStatus",
   "customerName",
   "product",
   "amount",
@@ -27,13 +35,23 @@ export const COMMON_TEMPLATE_VARIABLES = [
   "offerEndDate",
 ] as const;
 
-export const templateCategoryLabels: Record<TemplateCategory, string> = {
+const CATEGORY_LABEL_MAP: Record<string, string> = {
   delivery: "Delivery",
   festive: "Festive",
   custom_order: "Custom order",
   payment: "Payment",
   general: "General",
+  production_progress: "Production Progress",
 };
+
+export function categoryLabel(category: string): string {
+  return CATEGORY_LABEL_MAP[category] ??
+    category.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+export const templateCategoryLabels: Record<string, string> = new Proxy(CATEGORY_LABEL_MAP, {
+  get(target, key: string) { return target[key] ?? categoryLabel(key); },
+});
 
 export const templateChannelLabels: Record<TemplateChannel, string> = {
   whatsapp: "WhatsApp",
@@ -56,8 +74,15 @@ export function extractVariables(body: string): string[] {
  */
 export function renderTemplate(body: string, vars: Record<string, string>): { text: string; missing: string[] } {
   const missing: string[] = [];
+  const lowerLookup: Record<string, string> = {};
+  for (const [k, v] of Object.entries(vars)) {
+    lowerLookup[k.toLowerCase()] = v;
+  }
   const text = body.replace(VARIABLE_RE, (placeholder, name: string) => {
-    const value = Object.hasOwn(vars, name) ? vars[name] : undefined;
+    let value = Object.hasOwn(vars, name) ? vars[name] : undefined;
+    if (value === undefined) {
+      value = lowerLookup[name.toLowerCase()];
+    }
     if (value === undefined || value.trim() === "") {
       if (!missing.includes(name)) missing.push(name);
       return placeholder;

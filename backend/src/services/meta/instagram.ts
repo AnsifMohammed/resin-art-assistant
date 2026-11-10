@@ -77,7 +77,8 @@ export function mapMetaError(httpStatus: number, body: unknown): AppError {
   if ((code !== undefined && RATE_LIMIT_CODES.has(code)) || httpStatus === 429) {
     return new AppError(503, "Instagram rate limit reached, try again later", "META_RATE_LIMITED", details);
   }
-  return new AppError(502, "Instagram API request failed", "META_ERROR", details);
+  const metaMsg = str(err.message);
+  return new AppError(502, metaMsg ? `Instagram API request failed: ${metaMsg}` : "Instagram API request failed", "META_ERROR", details);
 }
 
 /** fetch + JSON with a timeout; maps network, timeout and Meta errors to AppError. */

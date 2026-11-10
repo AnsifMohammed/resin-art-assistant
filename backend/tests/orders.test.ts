@@ -1,6 +1,7 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { applyTestEnv } from "./env.ts";
 import { fake, type FakeQuery } from "./fakeDb.ts";
+import { deriveProductionInfo, computeOrderPlaceholders } from "../src/routes/orders.ts";
 
 applyTestEnv();
 
@@ -130,6 +131,25 @@ describe("Orders routes security & functionality", () => {
       expect(body.statusCounts.all).toBe(1);
       expect(body.statusCounts.confirmed).toBe(1);
     });
+
+    it("filters orders by due date range (dueFrom & dueTo)", async () => {
+      fake.tables.orders = [
+        { ...mockOrder, id: "ord-1", expectedDeliveryDate: "2026-11-10" },
+        { ...mockOrder, id: "ord-2", orderNo: "ORD-002", expectedDeliveryDate: "2026-11-25" },
+      ];
+
+      // Inside range
+      const resIn = await call("GET", "/orders?dueFrom=2026-11-01&dueTo=2026-11-15", adminToken);
+      expect(resIn.statusCode).toBe(200);
+      expect(resIn.json().orders).toHaveLength(1);
+      expect(resIn.json().orders[0].id).toBe("ord-1");
+
+      // Second range
+      const resOut = await call("GET", "/orders?dueFrom=2026-11-20&dueTo=2026-11-30", adminToken);
+      expect(resOut.statusCode).toBe(200);
+      expect(resOut.json().orders).toHaveLength(1);
+      expect(resOut.json().orders[0].id).toBe("ord-2");
+    });
   });
 
   describe("GET /orders/:id", () => {
@@ -172,6 +192,88 @@ describe("Orders routes security & functionality", () => {
       const body = res.json();
       expect(body.order).toBeDefined();
       expect(body.order.customerName).toBe("Meera");
+    });
+  });
+
+  describe("Production duration calculation & dynamic placeholders", () => {
+    it("derives normal urgency when under 35 days in production", () => {
+      const twentyDaysAgo = new Date(Date.now() - 20 * 24 * 60 * 60 * 1000);
+      const order = { ...mockOrder, status: "in_production", productionStartedAt: twentyDaysAgo } as any;
+      const info = deriveProductionInfo(order);
+      expect(info.productionDays).toBe(20);
+      expect(info.urgency).toBe("normal");
+    });
+
+    it("derives approaching urgency when between 35 and 44 days", () => {
+      const fortyDaysAgo = new Date(Date.now() - 40 * 24 * 60 * 60 * 1000);
+      const order = { ...mockOrder, status: "in_production", productionStartedAt: fortyDaysAgo } as any;
+      const info = deriveProductionInfo(order);
+      expect(info.productionDays).toBe(40);
+      expect(info.urgency).toBe("approaching");
+    });
+
+    it("derives overdue urgency when at or exceeding 45 days", () => {
+      const fiftyDaysAgo = new Date(Date.now() - 50 * 24 * 60 * 60 * 1000);
+      const order = { ...mockOrder, status: "in_production", productionStartedAt: fiftyDaysAgo } as any;
+      const info = deriveProductionInfo(order);
+      expect(info.productionDays).toBe(50);
+      expect(info.urgency).toBe("overdue");
+    });
+
+    it("computes all required production progress dynamic placeholders", () => {
+      const tenDaysAgo = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000);
+      const order = {
+        ...mockOrder,
+        status: "in_production",
+        productionStartedAt: tenDaysAgo,
+        expectedDeliveryDate: "2026-12-31",
+      } as any;
+      const placeholders = computeOrderPlaceholders(order, [mockItem] as any, "in_production");
+      expect(placeholders.CustomerName).toBe("Meera");
+      expect(placeholders.OrderNumber).toBe("ORD-001");
+      expect(placeholders.ProductName).toBe("Ocean Coaster Set");
+      expect(placeholders.ProductionDays).toBe("10");
+      expect(placeholders.CurrentStatus).toBe("In Production");
+      expect(placeholders.ProductionStartDate).toBeDefined();
+      expect(placeholders.ExpectedCompletionDate).toBeDefined();
+      expect(placeholders.RemainingDays).toBeDefined();
+    });
+  });
+
+  describe("POST /orders/:id/status", () => {
+    it("allows admin to update status and tracks production start when moved to in_production", async () => {
+      const res = await call("POST", "/orders/ord-1/status", adminToken, {
+        status: "in_production",
+        sendNotification: false,
+      });
+      expect(res.statusCode).toBe(200);
+      const body = res.json();
+      expect(body.order.status).toBe("in_production");
+      expect(body.order.productionStartedAt).toBeDefined();
+    });
+  });
+
+  describe("GET /orders/:id/messages", () => {
+    it("allows admin to view communication history for an order", async () => {
+      const res = await call("GET", "/orders/ord-1/messages", adminToken);
+      expect(res.statusCode).toBe(200);
+      const body = res.json();
+      expect(body.orderId).toBe("ord-1");
+      expect(Array.isArray(body.messages)).toBe(true);
+    });
+  });
+
+  describe("POST /orders/:id/progress-update", () => {
+    it("allows sending progress update via the order channel", async () => {
+      const res = await call("POST", "/orders/ord-1/progress-update", adminToken, {
+        text: "Hi Meera! Your order ORD-001 is currently in production.",
+      });
+      expect(res.statusCode).toBe(200);
+      const body = res.json();
+      expect(body.ok).toBe(true);
+      expect(body.deliveryStatus).toBe("sent");
+      expect(body.channel).toBe("whatsapp");
+      expect(body.preview).toContain("ORD-001");
     });
   });
 });

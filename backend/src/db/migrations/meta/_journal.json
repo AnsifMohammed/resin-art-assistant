@@ -85,6 +85,20 @@
       "when": 1793481718283,
       "tag": "0011_clean_cassandra_nova",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1793584800000,
+      "tag": "0012_production_progress_and_orders",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1794165139304,
+      "tag": "0013_wooden_black_cat",
+      "breakpoints": true
     }
   ]
 }

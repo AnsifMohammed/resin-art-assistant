@@ -9,6 +9,7 @@ import {
   Search,
   Trash2,
   AlertCircle,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { ChannelIcon } from "../components/shared/ChannelIcon.tsx";
@@ -21,13 +22,16 @@ import { usePageTitle } from "../components/layout/PageTitle.tsx";
 import {
   useCreateTemplate,
   useDeleteTemplate,
+  useDeleteTemplateCategory,
   useDuplicateTemplate,
+  useTemplateCategories,
   useTemplates,
   useUpdateTemplate,
 } from "../hooks/useTemplates.ts";
 import {
   COMMON_TEMPLATE_VARIABLES,
   TEMPLATE_MAX_LENGTH,
+  categoryLabel,
   extractVariables,
   splitTemplateBody,
   templateCategoryLabels,
@@ -84,9 +88,6 @@ function isFormField(value: string): value is FormField {
   return (FORM_FIELDS as readonly string[]).includes(value);
 }
 
-function isTemplateCategory(value: string): value is TemplateCategory {
-  return (TEMPLATE_CATEGORIES as readonly string[]).includes(value);
-}
 
 function isTemplateChannel(value: string): value is TemplateChannel {
   return (TEMPLATE_CHANNELS as readonly string[]).includes(value);
@@ -168,7 +169,7 @@ function TemplateCard({
 
         <div className="flex flex-wrap items-center gap-1.5 mb-3">
           <span className="px-2 py-0.5 rounded text-11 font-medium bg-primary/10 text-primary-text">
-            {templateCategoryLabels[t.category]}
+            {templateCategoryLabels[t.category] ?? categoryLabel(t.category)}
           </span>
           {!t.isActive && (
             <span className="px-2 py-0.5 rounded text-11 font-medium bg-surface-muted text-text-muted border border-border/60">
@@ -240,16 +241,37 @@ function TemplateCard({
 
 function TemplateCardSkeleton() {
   return (
-    <div className="p-5 rounded-xl border border-border bg-surface space-y-4">
-      <div className="flex items-start justify-between gap-2">
-        <Skeleton className="w-40 h-5" />
-        <Skeleton className="w-20 h-5" />
+    <div className="p-5 rounded-xl border border-border bg-surface flex flex-col justify-between space-y-4">
+      <div>
+        {/* name + channel badge */}
+        <div className="flex items-start justify-between gap-2 mb-1.5">
+          <Skeleton className="w-44 h-5" />
+          <Skeleton className="w-20 h-5 shrink-0" />
+        </div>
+        {/* category badge row */}
+        <div className="flex gap-1.5 mb-3">
+          <Skeleton className="w-20 h-5 rounded" />
+        </div>
+        {/* body block */}
+        <div className="p-3 rounded-lg border border-border/50 bg-surface-muted/60 space-y-1.5">
+          <Skeleton className="w-full h-3" />
+          <Skeleton className="w-5/6 h-3" />
+          <Skeleton className="w-4/6 h-3" />
+        </div>
+        {/* variables row */}
+        <div className="mt-3 flex gap-1.5">
+          <Skeleton className="w-16 h-4 rounded" />
+          <Skeleton className="w-20 h-4 rounded" />
+        </div>
       </div>
-      <Skeleton className="w-24 h-4" />
-      <Skeleton className="w-full h-20 rounded-lg" />
+      {/* footer */}
       <div className="pt-3 border-t border-border/40 flex items-center justify-between">
         <Skeleton className="w-28 h-3" />
-        <Skeleton className="w-20 h-5" />
+        <div className="flex gap-1">
+          <Skeleton className="w-6 h-6 rounded-lg" />
+          <Skeleton className="w-6 h-6 rounded-lg" />
+          <Skeleton className="w-6 h-6 rounded-lg" />
+        </div>
       </div>
     </div>
   );
@@ -283,9 +305,13 @@ function TemplateEditor({
   const createMutation = useCreateTemplate();
   const updateMutation = useUpdateTemplate();
   const isPending = createMutation.isPending || updateMutation.isPending;
+  const categoriesQuery = useTemplateCategories();
+  const availableCategories = categoriesQuery.data ?? TEMPLATE_CATEGORIES;
 
   const [name, setName] = useState(template?.name ?? "");
   const [category, setCategory] = useState<TemplateCategory>(template?.category ?? "general");
+  const [showCustomInput, setShowCustomInput] = useState(false);
+  const [customCategoryInput, setCustomCategoryInput] = useState("");
   const [channel, setChannel] = useState<TemplateChannel>(template?.channel ?? "both");
   const [body, setBody] = useState(template?.body ?? "Hi {customerName}! ");
   const [isActive, setIsActive] = useState(template?.isActive ?? true);
@@ -478,22 +504,59 @@ function TemplateEditor({
           <div className="relative">
             <select
               id="tmpl-category"
-              value={category}
+              value={showCustomInput ? "__new__" : category}
               onChange={(e) => {
                 const v = e.target.value;
-                if (isTemplateCategory(v)) setCategory(v);
-                clearError("category");
+                if (v === "__new__") {
+                  setShowCustomInput(true);
+                  setCustomCategoryInput("");
+                } else {
+                  setShowCustomInput(false);
+                  setCategory(v);
+                  clearError("category");
+                }
               }}
               className={`${inputClass(Boolean(errors.category))} appearance-none pr-8 text-12 font-medium cursor-pointer`}
             >
-              {TEMPLATE_CATEGORIES.map((c) => (
+              {availableCategories.map((c) => (
                 <option key={c} value={c}>
                   {templateCategoryLabels[c]}
                 </option>
               ))}
+              <option value="__new__">+ Add new category…</option>
             </select>
             <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted" aria-hidden />
           </div>
+          {showCustomInput && (
+            <input
+              autoFocus
+              type="text"
+              placeholder="e.g. wholesale, birthday, returns"
+              value={customCategoryInput}
+              onChange={(e) => setCustomCategoryInput(e.target.value)}
+              onBlur={() => {
+                const trimmed = customCategoryInput.trim().toLowerCase().replace(/\s+/g, "_");
+                if (trimmed) {
+                  setCategory(trimmed);
+                  clearError("category");
+                }
+                setShowCustomInput(false);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  (e.target as HTMLInputElement).blur();
+                } else if (e.key === "Escape") {
+                  setShowCustomInput(false);
+                  setCustomCategoryInput("");
+                }
+              }}
+              className="mt-1.5 w-full px-2.5 py-1.5 rounded-lg border border-primary bg-surface text-12 text-text focus:outline-none focus:ring-1 focus:ring-primary"
+            />
+          )}
+          {showCustomInput && (
+            <p className="mt-1 text-11 text-text-muted">Press Enter or click away to confirm</p>
+          )}
           <FieldError message={errors.category} />
         </div>
 
@@ -730,9 +793,11 @@ export default function TemplatesPage() {
   const templatesQuery = useTemplates({ active: "all" });
   const duplicateMutation = useDuplicateTemplate();
   const deleteMutation = useDeleteTemplate();
+  const deleteCategoryMutation = useDeleteTemplateCategory();
 
   const [activeCategory, setActiveCategory] = useState<CategoryFilter>("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [deleteCategoryTarget, setDeleteCategoryTarget] = useState<string | null>(null);
 
   const [editorOpen, setEditorOpen] = useState(false);
   const [editorKey, setEditorKey] = useState(0);
@@ -776,9 +841,17 @@ export default function TemplatesPage() {
     });
   };
 
+  const allCategories = useMemo(() => {
+    const defaults = [...TEMPLATE_CATEGORIES] as string[];
+    const custom = templates
+      .map((t) => t.category)
+      .filter((c) => !defaults.includes(c));
+    return [...defaults, ...new Set(custom)];
+  }, [templates]);
+
   const tabs: Array<{ key: CategoryFilter; label: string }> = [
     { key: "all", label: "All" },
-    ...TEMPLATE_CATEGORIES.map((c) => ({ key: c, label: templateCategoryLabels[c] })),
+    ...allCategories.map((c) => ({ key: c, label: templateCategoryLabels[c] ?? categoryLabel(c) })),
   ];
 
   const duplicatingId = duplicateMutation.isPending ? duplicateMutation.variables : undefined;
@@ -873,20 +946,36 @@ export default function TemplatesPage() {
       {/* ─── Category Tabs & Search ───────────────────────────────────────────── */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 p-3 rounded-xl border border-border bg-surface">
         <div className="flex items-center gap-1.5 overflow-x-auto custom-scrollbar pb-1 text-12 font-medium">
-          {tabs.map((cat) => (
-            <button
-              key={cat.key}
-              type="button"
-              onClick={() => setActiveCategory(cat.key)}
-              className={`px-3 py-1.5 rounded-lg transition-colors shrink-0 cursor-pointer ${
-                activeCategory === cat.key
-                  ? "bg-primary text-primary-foreground font-semibold"
-                  : "bg-surface-muted text-text-muted hover:text-text"
-              }`}
-            >
-              {cat.label}
-            </button>
-          ))}
+          {tabs.map((cat) => {
+            const isCustom = cat.key !== "all" && !(TEMPLATE_CATEGORIES as readonly string[]).includes(cat.key);
+            return (
+              <div key={cat.key} className="relative flex items-center shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setActiveCategory(cat.key)}
+                  className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
+                    isCustom ? "pr-7" : ""
+                  } ${
+                    activeCategory === cat.key
+                      ? "bg-primary text-primary-foreground font-semibold"
+                      : "bg-surface-muted text-text-muted hover:text-text"
+                  }`}
+                >
+                  {cat.label}
+                </button>
+                {isCustom && (
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); setDeleteCategoryTarget(cat.key); }}
+                    className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 rounded text-current opacity-50 hover:opacity-100 cursor-pointer"
+                    title="Delete category"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+            );
+          })}
         </div>
 
         <div className="relative min-w-[240px]">
@@ -925,6 +1014,36 @@ export default function TemplatesPage() {
             : ""
         }
         confirmLabel="Delete"
+        tone="danger"
+      />
+
+      <ConfirmDialog
+        isOpen={deleteCategoryTarget !== null}
+        onClose={() => setDeleteCategoryTarget(null)}
+        onConfirm={() => {
+          if (!deleteCategoryTarget) return;
+          const cat = deleteCategoryTarget;
+          deleteCategoryMutation.mutate(cat, {
+            onSuccess: () => {
+              toast.success(`Category "${categoryLabel(cat)}" deleted`, {
+                description: "Templates in this category were moved to General.",
+              });
+              if (activeCategory === cat) setActiveCategory("all");
+              setDeleteCategoryTarget(null);
+            },
+            onError: (err) => {
+              toast.error("Failed to delete category", { description: String(err) });
+              setDeleteCategoryTarget(null);
+            },
+          });
+        }}
+        title="Delete category?"
+        description={
+          deleteCategoryTarget
+            ? `All templates in "${categoryLabel(deleteCategoryTarget)}" will be moved to General. This cannot be undone.`
+            : ""
+        }
+        confirmLabel="Delete category"
         tone="danger"
       />
     </div>

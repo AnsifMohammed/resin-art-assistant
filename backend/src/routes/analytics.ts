@@ -97,6 +97,10 @@ export const analyticsRoutes: FastifyPluginAsync = async (app: FastifyInstance) 
       if (fromDate.getTime() > toDate.getTime()) {
         throw new AppError(400, "`from` must be before `to`", "VALIDATION_ERROR");
       }
+      const MAX_RANGE_MS = 365 * DAY_MS;
+      if (toDate.getTime() - fromDate.getTime() > MAX_RANGE_MS) {
+        throw new AppError(400, "Date range cannot exceed 365 days", "VALIDATION_ERROR");
+      }
       // Previous period of equal length, ending where this one starts: [prevFrom, from).
       const prevFromDate = new Date(fromDate.getTime() - (toDate.getTime() - fromDate.getTime()));
       const businessId = request.user.businessId;

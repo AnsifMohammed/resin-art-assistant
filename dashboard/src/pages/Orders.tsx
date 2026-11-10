@@ -1,10 +1,12 @@
-import { useState, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useMemo, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import dayjs from "dayjs";
 import {
   LayoutGrid,
   Table as TableIcon,
   Copy,
   Clock,
+  Calendar,
   Truck,
   MessageSquare,
   Search,
@@ -20,21 +22,27 @@ import {
   ChevronRight,
   ChevronDown,
   ArrowRightLeft,
+  Send,
+  RefreshCw,
 } from "lucide-react";
 import { toast } from "sonner";
 import { ChannelIcon } from "../components/shared/ChannelIcon.tsx";
 import { Skeleton } from "../components/shared/Skeleton.tsx";
 import { EmptyState } from "../components/shared/EmptyState.tsx";
 import { PaymentsPanel } from "../components/orders/PaymentsPanel.tsx";
-import type { PaymentSummary } from "../types/index.ts";
+import type { PaymentSummary, DbOrder, DbOrderItem, OrderStatus, OrderMessage } from "../types/index.ts";
 import {
   useOrders,
   useCreateOrder,
   useUpdateOrder,
   useUpdateOrderStatus,
   useDeleteOrder,
+  useOrderMessages,
+  useSendProgressUpdate,
+  useRetryOrderNotification,
 } from "../hooks/useOrders.ts";
-import type { DbOrder, DbOrderItem, OrderStatus } from "../types/index.ts";
+import { useTemplates } from "../hooks/useTemplates.ts";
+import { renderTemplate } from "../lib/templates.ts";
 
 const COLUMNS: Array<{ id: OrderStatus; label: string; color: string }> = [
   { id: "pending", label: "Pending", color: "bg-stone-500" },
@@ -55,6 +63,151 @@ const NEXT_ACTION: Record<OrderStatus, { next: OrderStatus; label: string } | nu
   cancelled: null,
 };
 
+export type DueRangePreset = "all" | "7d" | "15d" | "1m" | "custom";
+
+export interface DueDateRange {
+  preset: DueRangePreset;
+  from?: string | undefined;
+  to?: string | undefined;
+}
+
+export function presetDueRange(preset: "7d" | "15d" | "1m"): DueDateRange {
+  const today = dayjs().format("YYYY-MM-DD");
+  if (preset === "7d") {
+    return {
+      preset,
+      from: today,
+      to: dayjs().add(7, "day").format("YYYY-MM-DD"),
+    };
+  }
+  if (preset === "15d") {
+    return {
+      preset,
+      from: today,
+      to: dayjs().add(15, "day").format("YYYY-MM-DD"),
+    };
+  }
+  return {
+    preset: "1m",
+    from: today,
+    to: dayjs().add(1, "month").format("YYYY-MM-DD"),
+  };
+}
+
+export function calculateProductionDays(order: DbOrder): number {
+  if (order.status !== "in_production") return 0;
+  const start = order.productionStartedAt || order.createdAt;
+  const startTime = new Date(start).getTime();
+  if (isNaN(startTime)) return 0;
+  return Math.max(0, Math.floor((Date.now() - startTime) / (1000 * 60 * 60 * 24)));
+}
+
+export interface DueMilestone {
+  type: "overdue" | "today" | "1d" | "2d" | "7d" | "midpoint";
+  label: string;
+  badgeClass: string;
+  borderClass: string;
+  dotClass: string;
+  pingClass: string;
+}
+
+export function getOrderDueMilestone(order: DbOrder): DueMilestone | null {
+  // ONLY highlight in production!
+  if (order.status !== "in_production") {
+    return null;
+  }
+  if (!order.expectedDeliveryDate || !order.createdAt) {
+    return null;
+  }
+
+  const created = dayjs(order.createdAt).startOf("day");
+  const expected = dayjs(order.expectedDeliveryDate).startOf("day");
+  if (!created.isValid() || !expected.isValid()) {
+    return null;
+  }
+
+  const today = dayjs().startOf("day");
+  const totalDuration = expected.diff(created, "day");
+  const remainingDays = expected.diff(today, "day");
+  const prodDays = calculateProductionDays(order);
+  const elapsedDays = Math.max(prodDays, today.diff(created, "day"));
+  const midpoint = Math.floor(totalDuration / 2);
+
+  // 1. Overdue — static red left border, ping dot on badge only
+  if (remainingDays < 0) {
+    return {
+      type: "overdue",
+      label: `Overdue (${Math.abs(remainingDays)}d)`,
+      badgeClass: "bg-rose-500/15 text-rose-700 dark:text-rose-400 border-rose-500/40",
+      borderClass: "border-border/80 border-l-4 border-l-rose-500 dark:border-l-rose-400 bg-rose-500/[0.04]",
+      dotClass: "bg-rose-500",
+      pingClass: "bg-rose-400",
+    };
+  }
+
+  // 2. Due Today — static red left border, ping dot on badge only
+  if (remainingDays === 0) {
+    return {
+      type: "today",
+      label: "Due Today",
+      badgeClass: "bg-rose-500/15 text-rose-700 dark:text-rose-400 border-rose-500/40",
+      borderClass: "border-border/80 border-l-4 border-l-rose-500 dark:border-l-rose-400 bg-rose-500/[0.04]",
+      dotClass: "bg-rose-500",
+      pingClass: "bg-rose-400",
+    };
+  }
+
+  // 3. 1 Day Remaining — amber left border, ping dot
+  if (remainingDays === 1) {
+    return {
+      type: "1d",
+      label: "1 Day Remaining",
+      badgeClass: "bg-amber-600/15 text-amber-800 dark:text-amber-300 border-amber-600/40",
+      borderClass: "border-border/80 border-l-4 border-l-amber-600 dark:border-l-amber-500 bg-amber-600/[0.04]",
+      dotClass: "bg-amber-600",
+      pingClass: "bg-amber-400",
+    };
+  }
+
+  // 4. 2 Days Remaining — orange left border, ping dot
+  if (remainingDays === 2) {
+    return {
+      type: "2d",
+      label: "2 Days Remaining",
+      badgeClass: "bg-orange-500/15 text-orange-700 dark:text-orange-400 border-orange-500/40",
+      borderClass: "border-border/80 border-l-4 border-l-orange-500 dark:border-l-orange-400 bg-orange-500/[0.03]",
+      dotClass: "bg-orange-500",
+      pingClass: "bg-orange-400",
+    };
+  }
+
+  // 5. 7 Days Remaining — subtle amber left border, no ping
+  if (remainingDays === 7) {
+    return {
+      type: "7d",
+      label: "7 Days Remaining",
+      badgeClass: "bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30",
+      borderClass: "border-border/80 border-l-4 border-l-amber-400 dark:border-l-amber-500",
+      dotClass: "bg-amber-500",
+      pingClass: "",
+    };
+  }
+
+  // 6. Midpoint Reached — subtle blue left border, no ping
+  if (totalDuration >= 3 && elapsedDays === midpoint && midpoint > 0) {
+    return {
+      type: "midpoint",
+      label: "Midpoint Reached",
+      badgeClass: "bg-blue-500/15 text-blue-700 dark:text-blue-400 border-blue-500/30",
+      borderClass: "border-border/80 border-l-4 border-l-blue-400 dark:border-l-blue-500",
+      dotClass: "bg-blue-500",
+      pingClass: "",
+    };
+  }
+
+  return null;
+}
+
 interface OrderCardProps {
   order: DbOrder;
   onSelect: () => void;
@@ -65,26 +218,20 @@ interface OrderCardProps {
 }
 
 function OrderPaymentChip({ summary, orderTotal }: { summary?: PaymentSummary | undefined; orderTotal: number }) {
-  if (!summary || summary.totalPaid === 0) {
-    const bal = summary?.balanceDue ?? orderTotal;
-    return (
-      <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-stone-500/10 text-stone-600 dark:text-stone-400 border border-stone-500/20 tabular-nums">
-        Bal: ₹{bal.toLocaleString("en-IN")}
-      </span>
-    );
-  }
+  // No payment made yet — hide the chip entirely
+  if (!summary || summary.totalPaid === 0) return null;
 
   if (summary.paymentState === "fully_paid") {
     return (
-      <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
+      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 whitespace-nowrap">
         Fully Paid
       </span>
     );
   }
 
   return (
-    <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 tabular-nums">
-      Advance Paid · Bal: ₹{summary.balanceDue.toLocaleString("en-IN")}
+    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 tabular-nums whitespace-nowrap">
+      Adv · Bal: ₹{summary.balanceDue.toLocaleString("en-IN")}
     </span>
   );
 }
@@ -99,20 +246,48 @@ function OrderCard({
 }: OrderCardProps) {
   const next = NEXT_ACTION[order.status];
   const colInfo = COLUMNS.find((c) => c.id === order.status);
+  const prodDays = calculateProductionDays(order);
+  const isOverdue = order.status === "in_production" && prodDays >= 45;
+  const isApproaching = order.status === "in_production" && prodDays >= 35 && prodDays < 45;
+  const milestone = getOrderDueMilestone(order);
+
+  const cardBorderBg = milestone
+    ? milestone.borderClass
+    : isOverdue
+    ? "border-rose-500/70 bg-rose-500/[0.04] ring-1 ring-rose-500/30 shadow-xs animate-pulse"
+    : isApproaching
+    ? "border-amber-500/60 bg-amber-500/[0.03]"
+    : "border-border bg-surface";
 
   return (
     <div
       onClick={onSelect}
-      className={`p-3 rounded-xl border border-border bg-surface hover:border-primary/50 hover:shadow-xs transition-all cursor-pointer flex flex-col justify-between group ${
+      className={`p-3 rounded-xl border ${cardBorderBg} hover:border-primary/50 hover:shadow-xs transition-all cursor-pointer flex flex-col justify-between group ${
         isGrid ? "gap-3 min-h-[185px]" : "gap-2.5"
       }`}
     >
       <div className="space-y-2">
-        {/* Top: Order #, Date, Status */}
+        {/* Top: Order #, Milestone badge (if any), Date */}
         <div className="flex items-center justify-between gap-1.5">
-          <span className="text-12 font-bold font-outfit text-text group-hover:text-primary transition-colors truncate">
-            #{order.orderNo}
-          </span>
+          <div className="flex items-center gap-1.5 min-w-0 overflow-hidden">
+            <span className="text-12 font-bold font-outfit text-text group-hover:text-primary transition-colors truncate shrink-0 max-w-[90px]">
+              #{order.orderNo}
+            </span>
+            {milestone && (
+              <span
+                className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-semibold border shrink-0 ${milestone.badgeClass}`}
+                title={`Production Milestone: ${milestone.label}`}
+              >
+                <span className="relative flex h-1.5 w-1.5 shrink-0">
+                  {milestone.pingClass && (
+                    <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${milestone.pingClass} opacity-75`} />
+                  )}
+                  <span className={`relative inline-flex rounded-full h-1.5 w-1.5 ${milestone.dotClass}`} />
+                </span>
+                <span className="truncate">{milestone.label}</span>
+              </span>
+            )}
+          </div>
           <div className="flex items-center gap-1.5 shrink-0">
             {isGrid && colInfo && (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold capitalize bg-surface-muted text-text-muted border border-border/50">
@@ -132,6 +307,28 @@ function OrderCard({
           <span className="font-semibold text-text truncate min-w-0">{order.customerName}</span>
         </div>
 
+        {/* In Production Duration Badge */}
+        {order.status === "in_production" && (
+          <div className="pt-0.5">
+            {isOverdue ? (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-rose-500 text-white shadow-2xs">
+                <AlertTriangle className="w-3 h-3 shrink-0" />
+                <span>{prodDays}d in prod · Overdue (≥45d)</span>
+              </span>
+            ) : isApproaching ? (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30">
+                <Clock className="w-3 h-3 shrink-0" />
+                <span>{prodDays}d in prod · Approaching 45d</span>
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">
+                <Clock className="w-2.5 h-2.5 shrink-0" />
+                <span>{prodDays} days in production</span>
+              </span>
+            )}
+          </div>
+        )}
+
         {/* Items list */}
         <div className="space-y-1 min-w-0">
           {order.items && order.items.length > 0 ? (
@@ -147,84 +344,87 @@ function OrderCard({
         </div>
       </div>
 
-      <div className="space-y-2 pt-2 border-t border-border/40">
-        {/* Amount & Due date / Tracking */}
+      <div className="space-y-1.5 pt-2 border-t border-border/40">
+        {/* Amount + Payment chip on left, Tracking + Due date on right */}
         <div className="flex items-center justify-between gap-1 min-w-0">
-          <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+          <div className="flex items-center gap-1.5 min-w-0">
             <span className="text-12 sm:text-13 font-bold font-outfit text-text tabular-nums shrink-0">
               ₹{Number(order.totalAmount).toLocaleString("en-IN")}
             </span>
             <OrderPaymentChip summary={order.paymentSummary} orderTotal={Number(order.totalAmount)} />
           </div>
 
-          {order.trackingId ? (
-            <button
-              onClick={(e) => onCopyTracking(order.trackingId!, e)}
-              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-surface-muted text-10 font-mono text-text hover:bg-border transition-colors cursor-pointer shrink-0"
-              title="Click to copy tracking ID"
-            >
-              <Truck className="w-3 h-3 text-teal shrink-0" />
-              <Copy className="w-2.5 h-2.5 shrink-0" />
-            </button>
-          ) : (
-            <span className="text-[10px] text-text-muted flex items-center gap-0.5 shrink-0">
+          <div className="flex items-center gap-1.5 shrink-0">
+            {order.trackingId ? (
+              <button
+                onClick={(e) => onCopyTracking(order.trackingId!, e)}
+                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-surface-muted text-10 font-mono text-text hover:bg-border transition-colors cursor-pointer shrink-0"
+                title="Click to copy tracking ID"
+              >
+                <Truck className="w-3 h-3 text-teal-500 shrink-0" />
+                <Copy className="w-2.5 h-2.5 shrink-0" />
+              </button>
+            ) : null}
+            <span className="text-[10px] text-text-muted flex items-center gap-0.5 shrink-0 whitespace-nowrap">
               <Clock className="w-2.5 h-2.5 shrink-0" /> {formatDueDate(order.expectedDeliveryDate)}
             </span>
-          )}
-        </div>
-
-        {/* Action Buttons: 1-Click Advance + Move To Stage Dropdown */}
-        <div className="flex items-center gap-1.5 pt-0.5 min-w-0">
-          {next && onAdvance ? (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onAdvance(next.next);
-              }}
-              className="flex-1 min-w-0 inline-flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg bg-primary text-primary-foreground text-11 font-semibold hover:brightness-105 active:scale-[0.98] transition-all shadow-2xs cursor-pointer whitespace-nowrap"
-              title={`Advance to ${next.label}`}
-            >
-              <span className="truncate">{next.label}</span>
-              <ChevronRight className="w-3.5 h-3.5 shrink-0" />
-            </button>
-          ) : null}
-
-          <div className={`relative ${next && onAdvance ? "shrink-0" : "w-full"}`}>
-            <button
-              type="button"
-              className={`${
-                next && onAdvance
-                  ? "w-7 h-7 flex items-center justify-center rounded-lg bg-surface-muted hover:bg-border border border-border text-text-muted hover:text-text"
-                  : "w-full inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-surface-muted hover:bg-border border border-border text-text text-11 font-medium"
-              } transition-colors cursor-pointer`}
-              title="Move to another stage"
-            >
-              <ArrowRightLeft className="w-3.5 h-3.5 shrink-0" />
-              {!next && <span>Move Stage</span>}
-            </button>
-            <select
-              onClick={(e) => e.stopPropagation()}
-              value=""
-              onChange={(e) => {
-                if (e.target.value) {
-                  onMoveTo(e.target.value as OrderStatus);
-                }
-              }}
-              className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-              title="Move to another stage"
-            >
-              <option value="" disabled>
-                Move to stage...
-              </option>
-              {COLUMNS.map((c) => (
-                <option key={c.id} value={c.id} disabled={c.id === order.status}>
-                  {c.id === order.status ? `✓ ${c.label} (Current)` : `→ ${c.label}`}
-                </option>
-              ))}
-            </select>
           </div>
         </div>
+
+        {/* Action Buttons: 1-Click Advance + Move To Stage Dropdown (Hidden on delivered tab) */}
+        {order.status !== "delivered" && order.status !== "cancelled" && (
+          <div className="flex items-center gap-1.5 pt-0.5 min-w-0">
+            {next && onAdvance ? (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onAdvance(next.next);
+                }}
+                className="flex-1 min-w-0 inline-flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg bg-primary text-primary-foreground text-11 font-semibold hover:brightness-105 active:scale-[0.98] transition-all shadow-2xs cursor-pointer whitespace-nowrap"
+                title={`Advance to ${next.label}`}
+              >
+                <span className="truncate">{next.label}</span>
+                <ChevronRight className="w-3.5 h-3.5 shrink-0" />
+              </button>
+            ) : null}
+
+            <div className={`relative ${next && onAdvance ? "shrink-0" : "w-full"}`}>
+              <button
+                type="button"
+                className={`${
+                  next && onAdvance
+                    ? "w-7 h-7 flex items-center justify-center rounded-lg bg-surface-muted hover:bg-border border border-border text-text-muted hover:text-text"
+                    : "w-full inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-surface-muted hover:bg-border border border-border text-text text-11 font-medium"
+                } transition-colors cursor-pointer`}
+                title="Move to another stage"
+              >
+                <ArrowRightLeft className="w-3.5 h-3.5 shrink-0" />
+                {!next && <span>Move Stage</span>}
+              </button>
+              <select
+                onClick={(e) => e.stopPropagation()}
+                value=""
+                onChange={(e) => {
+                  if (e.target.value) {
+                    onMoveTo(e.target.value as OrderStatus);
+                  }
+                }}
+                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                title="Move to another stage"
+              >
+                <option value="" disabled>
+                  Move to stage...
+                </option>
+                {COLUMNS.map((c) => (
+                  <option key={c.id} value={c.id} disabled={c.id === order.status}>
+                    {c.id === order.status ? `✓ ${c.label} (Current)` : `→ ${c.label}`}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -290,11 +490,12 @@ function SkeletonOrderCard({ isGrid = false }: { isGrid?: boolean }) {
           <Skeleton className="w-1/2 h-3" />
         </div>
       </div>
-      <div className="pt-2 border-t border-border/40 space-y-2">
+      <div className="pt-2 border-t border-border/40 space-y-1.5">
         <div className="flex items-center justify-between">
           <Skeleton className="w-14 h-4" />
-          <Skeleton className="w-12 h-3 rounded" />
+          <Skeleton className="w-14 h-3 rounded" />
         </div>
+        <Skeleton className="w-24 h-4 rounded" />
         <div className="flex items-center gap-1.5">
           <Skeleton className="flex-1 h-7 rounded-lg" />
           <Skeleton className="w-7 h-7 rounded-lg shrink-0" />
@@ -406,18 +607,398 @@ function OrdersSkeleton({
   );
 }
 
+function SendProgressUpdateModal({
+  order,
+  onClose,
+}: {
+  order: DbOrder | null;
+  onClose: () => void;
+}) {
+  const templatesQuery = useTemplates({ category: "production_progress", active: "true" });
+  const sendMutation = useSendProgressUpdate();
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
+  const [messageText, setMessageText] = useState("");
+
+  const templates = useMemo(() => templatesQuery.data ?? [], [templatesQuery.data]);
+
+  const placeholders = useMemo(() => {
+    if (!order) return {};
+    const prodDays = calculateProductionDays(order);
+    const prodStart = order.productionStartedAt || order.createdAt;
+    const prodStartTime = new Date(prodStart).getTime();
+    const prodStartDateFormatted = !isNaN(prodStartTime)
+      ? new Date(prodStartTime).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
+      : "Recently";
+
+    const expectedCompletionFormatted = order.expectedDeliveryDate
+      ? new Date(order.expectedDeliveryDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
+      : "Soon";
+
+    const remainingDays = order.expectedDeliveryDate
+      ? Math.max(0, Math.ceil((new Date(order.expectedDeliveryDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+      : Math.max(0, 45 - prodDays);
+
+    const productName =
+      order.items && order.items.length > 0
+        ? order.items.map((i) => i.productName).join(", ")
+        : "custom resin art piece";
+
+    return {
+      CustomerName: order.customerName,
+      customerName: order.customerName,
+      OrderNumber: order.orderNo,
+      orderNumber: order.orderNo,
+      orderNo: order.orderNo,
+      ProductName: productName,
+      productName: productName,
+      product: productName,
+      ProductionStartDate: prodStartDateFormatted,
+      productionStartDate: prodStartDateFormatted,
+      ExpectedCompletionDate: expectedCompletionFormatted,
+      expectedCompletionDate: expectedCompletionFormatted,
+      deliveryDate: expectedCompletionFormatted,
+      ProductionDays: String(prodDays),
+      productionDays: String(prodDays),
+      RemainingDays: String(remainingDays),
+      remainingDays: String(remainingDays),
+      CurrentStatus: "In Production",
+      currentStatus: "In Production",
+    };
+  }, [order]);
+
+  useEffect(() => {
+    if (!order || templates.length === 0) return;
+    const prodDays = calculateProductionDays(order);
+    let defaultTpl = templates.find((t) => t.name === "Production Progress Update");
+    if (prodDays >= 45) {
+      const delayTpl = templates.find((t) => t.name === "Production Delay Notification");
+      if (delayTpl) defaultTpl = delayTpl;
+    }
+    if (!defaultTpl) defaultTpl = templates[0];
+
+    if (defaultTpl) {
+      setSelectedTemplateId(defaultTpl.id);
+      const rendered = renderTemplate(defaultTpl.body, placeholders as Record<string, string>);
+      setMessageText(rendered.text);
+    }
+  }, [order, templates, placeholders]);
+
+  const handleSelectTemplate = (templateId: string) => {
+    setSelectedTemplateId(templateId);
+    const tpl = templates.find((t) => t.id === templateId);
+    if (tpl) {
+      const rendered = renderTemplate(tpl.body, placeholders as Record<string, string>);
+      setMessageText(rendered.text);
+    }
+  };
+
+  const handleSend = async () => {
+    if (!order || !messageText.trim()) return;
+    try {
+      const res = await sendMutation.mutateAsync({
+        id: order.id,
+        data: {
+          templateId: selectedTemplateId || undefined,
+          text: messageText.trim(),
+        },
+      });
+
+      const channelLabel = order.channel === "whatsapp" ? "WhatsApp" : "Instagram";
+      if (res.ok) {
+        toast.success("Progress update sent", {
+          description: `Direct message delivered to ${order.customerName} on ${channelLabel}.`,
+        });
+        onClose();
+      } else {
+        toast.error("Message recorded but delivery failed", {
+          description: res.error || `Could not deliver message via ${channelLabel}. You can retry from communication history.`,
+        });
+        onClose();
+      }
+    } catch (err: unknown) {
+      toast.error("Failed to send progress update", {
+        description: err instanceof Error ? err.message : String(err),
+      });
+    }
+  };
+
+  if (!order) return null;
+
+  const prodDays = calculateProductionDays(order);
+  const isOverdue = prodDays >= 45;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-lg rounded-2xl border border-border bg-surface p-6 shadow-2xl space-y-4"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between pb-3 border-b border-border">
+          <div>
+            <h3 className="text-16 font-bold font-outfit text-text flex items-center gap-2">
+              <span>Send Production Progress Update</span>
+              {isOverdue && (
+                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500 text-white">
+                  Overdue ({prodDays}d)
+                </span>
+              )}
+            </h3>
+            <p className="text-12 text-text-muted mt-0.5 flex items-center gap-1.5">
+              <span>Order #{order.orderNo}</span>
+              <span>·</span>
+              <span>{order.customerName}</span>
+              <span>·</span>
+              <span className="inline-flex items-center gap-1 font-medium">
+                <ChannelIcon channel={order.channel || "whatsapp"} size={12} />
+                {order.channel === "whatsapp" ? "WhatsApp" : "Instagram DM"}
+              </span>
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1 rounded-lg text-text-muted hover:text-text cursor-pointer"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Template Selector */}
+        <div>
+          <label className="text-11 font-medium text-text block mb-1">
+            Template (from Message Templates):
+          </label>
+          <div className="relative">
+            <select
+              value={selectedTemplateId}
+              onChange={(e) => handleSelectTemplate(e.target.value)}
+              className="w-full pl-3 pr-8 py-2 appearance-none rounded-lg border border-border bg-surface text-12 text-text focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
+            >
+              <option value="" disabled>Select a template...</option>
+              {templates.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name} {!t.isActive ? "(Inactive)" : ""}
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted" aria-hidden />
+          </div>
+        </div>
+
+        {/* Editable Message Body */}
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between">
+            <label className="text-11 font-medium text-text">
+              Preview & Edit Message Text:
+            </label>
+            <span className={`text-[10px] tabular-nums ${messageText.length > 1000 ? "text-danger font-semibold" : "text-text-muted"}`}>
+              {messageText.length} / 1000
+            </span>
+          </div>
+          <textarea
+            rows={5}
+            value={messageText}
+            onChange={(e) => setMessageText(e.target.value)}
+            className="w-full p-3 rounded-xl border border-border bg-surface-muted text-12 font-mono text-text focus:outline-none focus:ring-1 focus:ring-primary leading-relaxed"
+            placeholder="Type your production update message here..."
+          />
+        </div>
+
+        {/* Dynamic Placeholders Quick-Insert */}
+        <div className="space-y-1">
+          <span className="text-[10px] text-text-muted block">Applied order variables:</span>
+          <div className="flex flex-wrap gap-1 text-[10px]">
+            {Object.keys(placeholders).filter((k) => /^[A-Z]/.test(k)).map((key) => (
+              <span
+                key={key}
+                className="px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-700 dark:text-amber-400 font-mono text-[10px]"
+                title={`Value: ${(placeholders as Record<string, string>)[key]}`}
+              >
+                {`{${key}}`}: <span className="font-semibold text-text">{(placeholders as Record<string, string>)[key]}</span>
+              </span>
+            ))}
+          </div>
+        </div>
+
+        {/* Delivery Info */}
+        <div className="p-3 rounded-xl border border-primary/20 bg-primary/5 flex items-center justify-between text-11 text-text-muted">
+          <div className="flex items-center gap-1.5">
+            <ChannelIcon channel={order.channel || "whatsapp"} size={13} />
+            <span>Sends via <strong>{order.channel === "whatsapp" ? "WhatsApp" : "Instagram Direct Message (DM)"}</strong></span>
+          </div>
+          <span className="text-primary font-semibold">Recorded in communication history</span>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex items-center justify-end gap-2 pt-2 border-t border-border">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 rounded-lg border border-border bg-surface hover:bg-surface-muted text-12 font-medium text-text cursor-pointer"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleSend}
+            disabled={sendMutation.isPending || !messageText.trim() || messageText.length > 1000}
+            className="px-4 py-2 rounded-lg bg-primary hover:bg-amber-600 text-primary-foreground text-12 font-semibold cursor-pointer shadow-xs flex items-center gap-1.5 disabled:opacity-50"
+          >
+            {sendMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+            <span>Send {order.channel === "whatsapp" ? "WhatsApp Message" : "Instagram DM"}</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function OrderCommunicationHistory({
+  order,
+}: {
+  order: DbOrder;
+}) {
+  const { data, isLoading } = useOrderMessages(order.id);
+  const retryMutation = useRetryOrderNotification();
+  const messages = data?.messages ?? [];
+
+  const handleRetry = async (messageId: string) => {
+    try {
+      const res = await retryMutation.mutateAsync({ id: order.id, messageId });
+      const channelLabel = (res.channel || order.channel) === "whatsapp" ? "WhatsApp" : "Instagram";
+      if (res.ok) {
+        toast.success(`Message resent successfully via ${channelLabel}!`);
+      } else {
+        toast.error("Retry failed", { description: res.error });
+      }
+    } catch (err: unknown) {
+      toast.error("Failed to retry message", {
+        description: err instanceof Error ? err.message : String(err),
+      });
+    }
+  };
+
+  return (
+    <div className="rounded-xl border border-border bg-surface p-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1.5">
+          <MessageSquare className="w-4 h-4 text-primary" />
+          <h4 className="text-13 font-bold font-outfit text-text">
+            Communication History ({messages.length})
+          </h4>
+        </div>
+      </div>
+
+      {isLoading ? (
+        <p className="text-11 text-text-muted text-center py-3">Loading communication history...</p>
+      ) : messages.length === 0 ? (
+        <div className="py-4 text-center rounded-lg border border-dashed border-border bg-surface-muted/40">
+          <p className="text-11 text-text-muted">No updates sent for this order yet.</p>
+          <p className="text-[10px] text-text-muted/80 mt-0.5">
+            Status changes and progress updates will be recorded here automatically.
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-2 max-h-60 overflow-y-auto custom-scrollbar pr-1">
+          {messages.map((m: OrderMessage) => {
+            const isFailed = m.deliveryStatus === "failed";
+            const isSent = m.deliveryStatus === "sent" || m.deliveryStatus === "delivered";
+
+            return (
+              <div
+                key={m.id}
+                className={`p-3 rounded-lg border text-12 space-y-1.5 ${
+                  isFailed
+                    ? "border-rose-500/30 bg-rose-500/5 text-text"
+                    : "border-border bg-surface-muted text-text"
+                }`}
+              >
+                <div className="flex items-center justify-between text-10">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="font-semibold px-1.5 py-0.5 rounded bg-surface border border-border flex items-center gap-1">
+                      <ChannelIcon channel={(m.metadata as any)?.channel || order.channel || "whatsapp"} size={11} />
+                      {m.metadata?.templateName || (m.metadata?.channel === "whatsapp" ? "WhatsApp Update" : "Instagram DM")}
+                    </span>
+                    <span className="text-text-muted">
+                      {new Date(m.createdAt).toLocaleString("en-IN", {
+                        day: "numeric",
+                        month: "short",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-1 shrink-0">
+                    {isSent ? (
+                      <span className="px-1.5 py-0.5 rounded font-bold text-[10px] bg-emerald-500/15 text-emerald-600 flex items-center gap-0.5">
+                        <Check className="w-2.5 h-2.5" /> Sent
+                      </span>
+                    ) : isFailed ? (
+                      <span className="px-1.5 py-0.5 rounded font-bold text-[10px] bg-rose-500/15 text-rose-600 flex items-center gap-0.5">
+                        <AlertTriangle className="w-2.5 h-2.5" /> Failed
+                      </span>
+                    ) : (
+                      <span className="px-1.5 py-0.5 rounded font-bold text-[10px] bg-amber-500/15 text-amber-600">
+                        Queued
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <p className="text-11 leading-relaxed whitespace-pre-wrap">{m.content}</p>
+
+                {isFailed && (
+                  <div className="flex items-center justify-between pt-1 border-t border-rose-500/20 text-[10px]">
+                    <span className="text-rose-600 truncate max-w-[220px]">
+                      {m.metadata?.error || "Delivery failed"}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleRetry(m.id)}
+                      disabled={retryMutation.isPending}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-rose-500 text-white font-semibold hover:bg-rose-600 cursor-pointer disabled:opacity-50"
+                    >
+                      {retryMutation.isPending ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : <RefreshCw className="w-2.5 h-2.5" />}
+                      <span>Retry</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Orders() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   // Filters & View State
   const [viewMode, setViewMode] = useState<"board" | "table">("board");
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
 
+  // Due Date Filter State (like Analytics dashboard)
+  const [dueRange, setDueRange] = useState<DueDateRange>({ preset: "all" });
+  const [duePreset, setDuePreset] = useState<DueRangePreset>("all");
+  const [showCustomDuePicker, setShowCustomDuePicker] = useState(false);
+  const [showDueDropdown, setShowDueDropdown] = useState(false);
+  const [customDueStartDate, setCustomDueStartDate] = useState(() => dayjs().format("YYYY-MM-DD"));
+  const [customDueEndDate, setCustomDueEndDate] = useState(() => dayjs().add(7, "day").format("YYYY-MM-DD"));
+
   // Queries & Mutations
   const { data, isLoading } = useOrders({
     status: selectedStatus === "all" ? undefined : selectedStatus,
     search: searchQuery.trim() || undefined,
+    dueFrom: dueRange.from,
+    dueTo: dueRange.to,
   });
 
   const createOrderMutation = useCreateOrder();
@@ -436,6 +1017,10 @@ export default function Orders() {
   const [targetStatus, setTargetStatus] = useState<OrderStatus>("in_production");
   const [statusTrackingId, setStatusTrackingId] = useState("");
   const [statusCourier, setStatusCourier] = useState("");
+  const [sendNotification, setSendNotification] = useState(true);
+
+  // Production Progress Modal State
+  const [progressModalOrder, setProgressModalOrder] = useState<DbOrder | null>(null);
 
   // Create Order Modal State
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -469,6 +1054,37 @@ export default function Orders() {
   // Delete Confirmation State
   const [deletingOrder, setDeletingOrder] = useState<DbOrder | null>(null);
 
+  const handleDuePresetChange = (preset: DueRangePreset) => {
+    setDuePreset(preset);
+    if (preset === "custom") {
+      setShowCustomDuePicker(true);
+    } else {
+      setShowCustomDuePicker(false);
+      if (preset === "all") {
+        setDueRange({ preset: "all" });
+      } else {
+        setDueRange(presetDueRange(preset));
+      }
+    }
+  };
+
+  const applyCustomDueRange = () => {
+    if (!customDueStartDate || !customDueEndDate) {
+      toast.error("Pick a start and end due date");
+      return;
+    }
+    if (dayjs(customDueStartDate).isAfter(dayjs(customDueEndDate))) {
+      toast.error("The start date must be on or before the end date");
+      return;
+    }
+    setDueRange({
+      preset: "custom",
+      from: customDueStartDate,
+      to: customDueEndDate,
+    });
+    setShowCustomDuePicker(false);
+  };
+
   const resetCreateForm = () => {
     setCreateCustomerName("");
     setCreateCustomerPhone("");
@@ -500,6 +1116,27 @@ export default function Orders() {
     return orders.find((o) => o.id === activeOrder.id) ?? activeOrder;
   }, [orders, activeOrder]);
 
+  // Deep-link auto focus via ?focus=id or ?orderId=id
+  useEffect(() => {
+    const focusId = searchParams.get("focus") || searchParams.get("orderId");
+    if (focusId && orders.length > 0) {
+      const target = orders.find((o) => o.id === focusId || o.orderNo === focusId);
+      if (target) {
+        setActiveOrder(target);
+      }
+    }
+  }, [searchParams, orders]);
+
+  useEffect(() => {
+    if (!showDueDropdown) return;
+    const handler = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest("[data-due-dropdown]")) setShowDueDropdown(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [showDueDropdown]);
+
   const copyTracking = (trackingId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     navigator.clipboard.writeText(trackingId);
@@ -512,10 +1149,13 @@ export default function Orders() {
     setTargetStatus(nextStatus);
     setStatusTrackingId(order.trackingId || "");
     setStatusCourier(order.courier || "");
+    const currentIdx = COLUMNS.findIndex((c) => c.id === order.status);
+    const nextIdx = COLUMNS.findIndex((c) => c.id === nextStatus);
+    setSendNotification(nextIdx >= currentIdx);
   };
 
   const confirmStatusUpdate = async () => {
-    if (!updatingOrder) return;
+    if (!updatingOrder || updateOrderStatusMutation.isPending) return;
     try {
       await updateOrderStatusMutation.mutateAsync({
         id: updatingOrder.id,
@@ -523,11 +1163,12 @@ export default function Orders() {
           status: targetStatus,
           trackingId: statusTrackingId.trim() || undefined,
           courier: statusCourier.trim() || undefined,
+          sendNotification,
         },
       });
 
       toast.success("Order status updated", {
-        description: `${updatingOrder.orderNo} moved to ${targetStatus.replace("_", " ")}`,
+        description: `${updatingOrder.orderNo} moved to ${targetStatus.replaceAll("_", " ")}`,
       });
       setUpdatingOrder(null);
     } catch (err: unknown) {
@@ -738,8 +1379,81 @@ export default function Orders() {
           </p>
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex items-center gap-2">
+        {/* Action Buttons & Due Date Filter */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Due Date Filter — compact dropdown */}
+          <div className="relative" data-due-dropdown>
+            <button
+              type="button"
+              onClick={() => setShowDueDropdown((v) => !v)}
+              className={`flex items-center gap-1.5 h-9 px-3 rounded-xl border text-12 font-medium transition-colors cursor-pointer ${
+                duePreset !== "all"
+                  ? "border-primary/50 bg-primary/10 text-primary"
+                  : "border-border bg-surface hover:bg-surface-muted text-text"
+              }`}
+            >
+              <Calendar className="w-3.5 h-3.5 shrink-0" />
+              <span>
+                Due:{" "}
+                {{ all: "All", "7d": "7 days", "15d": "15 days", "1m": "1 month", custom: "Custom" }[duePreset]}
+              </span>
+              <ChevronDown className={`w-3.5 h-3.5 text-text-muted transition-transform ${showDueDropdown ? "rotate-180" : ""}`} />
+            </button>
+
+            {showDueDropdown && (
+              <div className="absolute left-0 top-full mt-1.5 z-50 min-w-[160px] rounded-xl border border-border bg-surface shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
+                {(["all", "7d", "15d", "1m", "custom"] as DueRangePreset[]).map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => {
+                      handleDuePresetChange(preset);
+                      if (preset !== "custom") setShowDueDropdown(false);
+                    }}
+                    className={`w-full text-left px-3.5 py-2 text-12 font-medium transition-colors cursor-pointer flex items-center justify-between ${
+                      duePreset === preset
+                        ? "bg-primary/10 text-primary"
+                        : "text-text hover:bg-surface-muted"
+                    }`}
+                  >
+                    {{ all: "All", "7d": "7 days", "15d": "15 days", "1m": "1 month", custom: "Custom range" }[preset]}
+                    {duePreset === preset && <Check className="w-3.5 h-3.5" />}
+                  </button>
+                ))}
+
+                {/* Custom date inputs shown inline in dropdown */}
+                {showCustomDuePicker && (
+                  <div className="px-3.5 py-3 border-t border-border space-y-2">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="date"
+                        value={customDueStartDate}
+                        max={customDueEndDate || undefined}
+                        onChange={(e) => setCustomDueStartDate(e.target.value)}
+                        className="flex-1 px-2 py-1 text-11 rounded-md border border-border bg-surface-muted text-text focus:outline-none focus:ring-1 focus:ring-primary"
+                      />
+                      <span className="text-text-muted text-11 shrink-0">to</span>
+                      <input
+                        type="date"
+                        value={customDueEndDate}
+                        min={customDueStartDate || undefined}
+                        onChange={(e) => setCustomDueEndDate(e.target.value)}
+                        className="flex-1 px-2 py-1 text-11 rounded-md border border-border bg-surface-muted text-text focus:outline-none focus:ring-1 focus:ring-primary"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => { applyCustomDueRange(); setShowDueDropdown(false); }}
+                      className="w-full px-2.5 py-1.5 rounded-lg bg-primary text-primary-foreground text-12 font-medium hover:bg-amber-600 transition-colors cursor-pointer"
+                    >
+                      Apply
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
           <button
             onClick={handleOpenCreateModal}
             className="px-3.5 py-2 rounded-xl bg-primary hover:bg-amber-600 text-primary-foreground font-semibold text-13 flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
@@ -776,8 +1490,8 @@ export default function Orders() {
         </div>
       </div>
 
-      {/* ─── Search & Status Tabs ─────────────────────────────────────────────── */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 p-3 rounded-xl border border-border bg-surface shrink-0">
+      {/* ─── Search & Status Tabs ───────────────────────────── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-xl border border-border bg-surface shrink-0">
         <div className="flex items-center gap-1.5 overflow-x-auto custom-scrollbar pb-1 text-12 font-medium">
           <button
             onClick={() => setSelectedStatus("all")}
@@ -807,7 +1521,8 @@ export default function Orders() {
           })}
         </div>
 
-        <div className="relative min-w-[240px]">
+        {/* Search Input */}
+        <div className="relative min-w-[200px] sm:min-w-[240px]">
           <Search className="absolute left-3 top-2.5 w-4 h-4 text-text-muted" />
           <input
             type="text"
@@ -942,57 +1657,112 @@ export default function Orders() {
                   <th className="p-3.5">Status</th>
                   <th className="p-3.5">Placed</th>
                   <th className="p-3.5">Tracking / Due</th>
+                  <th className="p-3.5 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/40">
                 {orders.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="p-8 text-center text-text-muted text-13 font-normal">
+                    <td colSpan={8} className="p-8 text-center text-text-muted text-13 font-normal">
                       No orders found matching the filter.
                     </td>
                   </tr>
                 ) : (
-                  orders.map((o) => (
-                    <tr
-                      key={o.id}
-                      onClick={() => setActiveOrder(o)}
-                      className="hover:bg-surface-muted transition-colors cursor-pointer"
-                    >
-                      <td className="p-3.5 font-bold font-outfit text-text">#{o.orderNo}</td>
-                      <td className="p-3.5">
-                        <div className="flex items-center gap-1.5">
-                          <ChannelIcon channel={o.channel} size={13} />
-                          <span className="font-medium text-text">{o.customerName}</span>
-                        </div>
-                      </td>
-                      <td className="p-3.5 text-text-muted max-w-xs truncate">
-                        {o.items?.map((i) => i.productName).join(", ") || "No items"}
-                      </td>
-                      <td className="p-3.5 font-bold font-outfit text-text tabular-nums">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span>₹{Number(o.totalAmount).toLocaleString("en-IN")}</span>
-                          <OrderPaymentChip summary={o.paymentSummary} orderTotal={Number(o.totalAmount)} />
-                        </div>
-                      </td>
-                      <td className="p-3.5">
-                        <span className="px-2 py-0.5 rounded text-11 font-semibold capitalize bg-surface-muted border border-border">
-                          {o.status.replace("_", " ")}
-                        </span>
-                      </td>
-                      <td className="p-3.5 text-text-muted">{formatOrderDate(o.createdAt)}</td>
-                      <td className="p-3.5">
-                        {o.trackingId ? (
-                          <span className="font-mono text-11 text-teal flex items-center gap-1">
-                            <Truck className="w-3.5 h-3.5" /> {o.trackingId}
-                          </span>
-                        ) : (
-                          <span className="text-12 text-text-muted">
-                            {formatDueDate(o.expectedDeliveryDate)}
-                          </span>
-                        )}
-                      </td>
-                    </tr>
-                  ))
+                  orders.map((o) => {
+                    const prodDays = calculateProductionDays(o);
+                    const isOverdue = o.status === "in_production" && prodDays >= 45;
+                    const isApproaching = o.status === "in_production" && prodDays >= 35 && prodDays < 45;
+
+                    return (
+                      <tr
+                        key={o.id}
+                        onClick={() => setActiveOrder(o)}
+                        className={`hover:bg-surface-muted transition-colors cursor-pointer ${
+                          isOverdue ? "bg-rose-500/[0.03]" : isApproaching ? "bg-amber-500/[0.02]" : ""
+                        }`}
+                      >
+                        <td className="p-3.5 font-bold font-outfit text-text">#{o.orderNo}</td>
+                        <td className="p-3.5">
+                          <div className="flex items-center gap-1.5">
+                            <ChannelIcon channel={o.channel} size={13} />
+                            <span className="font-medium text-text">{o.customerName}</span>
+                          </div>
+                        </td>
+                        <td className="p-3.5 text-text-muted max-w-xs truncate">
+                          {o.items?.map((i) => i.productName).join(", ") || "No items"}
+                        </td>
+                        <td className="p-3.5 font-bold font-outfit text-text tabular-nums">
+                          <div className="flex items-center gap-1.5 whitespace-nowrap">
+                            <span>₹{Number(o.totalAmount).toLocaleString("en-IN")}</span>
+                            <OrderPaymentChip summary={o.paymentSummary} orderTotal={Number(o.totalAmount)} />
+                          </div>
+                        </td>
+                        <td className="p-3.5">
+                          <div className="flex flex-col gap-1 items-start">
+                            <span className="px-2 py-0.5 rounded text-11 font-semibold capitalize bg-surface-muted border border-border">
+                              {o.status.replaceAll("_", " ")}
+                            </span>
+                            {o.status === "in_production" && (
+                              isOverdue ? (
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-500 text-white shadow-2xs">
+                                  <AlertTriangle className="w-2.5 h-2.5 shrink-0" />
+                                  <span>{prodDays}d · Overdue (≥45d)</span>
+                                </span>
+                              ) : isApproaching ? (
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30">
+                                  <Clock className="w-2.5 h-2.5 shrink-0" />
+                                  <span>{prodDays}d · Approaching 45d</span>
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">
+                                  <Clock className="w-2.5 h-2.5 shrink-0" />
+                                  <span>{prodDays}d in prod</span>
+                                </span>
+                              )
+                            )}
+                          </div>
+                        </td>
+                        <td className="p-3.5 text-text-muted">{formatOrderDate(o.createdAt)}</td>
+                        <td className="p-3.5">
+                          {o.trackingId ? (
+                            <span className="font-mono text-11 text-teal-500 flex items-center gap-1">
+                              <Truck className="w-3.5 h-3.5" /> {o.trackingId}
+                            </span>
+                          ) : (
+                            <div className="flex flex-col gap-1 items-start">
+                              <span className="text-12 text-text-muted">
+                                {formatDueDate(o.expectedDeliveryDate)}
+                              </span>
+                              {(() => {
+                                const ms = getOrderDueMilestone(o);
+                                if (!ms) return null;
+                                return (
+                                  <span
+                                    className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold border ${ms.badgeClass}`}
+                                    title={`Milestone: ${ms.label}`}
+                                  >
+                                    <Calendar className="w-2.5 h-2.5 shrink-0" />
+                                    <span>{ms.label}</span>
+                                  </span>
+                                );
+                              })()}
+                            </div>
+                          )}
+                        </td>
+                        <td className="p-3.5 text-right">
+                          <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
+                            <button
+                              type="button"
+                              onClick={() => setActiveOrder(o)}
+                              className="px-2.5 py-1 rounded-lg border border-border bg-surface hover:bg-surface-muted text-11 font-medium text-text cursor-pointer transition-colors"
+                            >
+                              View
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
@@ -1037,7 +1807,7 @@ export default function Orders() {
                       placeholder="e.g. Divya Subramanian"
                       value={createCustomerName}
                       onChange={(e) => setCreateCustomerName(e.target.value)}
-                      className="mt-1 w-full px-3 py-1.5 rounded-lg border border-border bg-surface text-12 text-text focus:outline-none focus:ring-1 focus:ring-primary"
+                      className="mt-1 w-full px-3 py-2 rounded-lg border border-border bg-surface text-13 text-text focus:outline-none focus:ring-1 focus:ring-primary"
                     />
                   </div>
                   <div>
@@ -1046,7 +1816,7 @@ export default function Orders() {
                       <select
                         value={createChannel}
                         onChange={(e) => setCreateChannel(e.target.value as "whatsapp" | "instagram")}
-                        className="w-full pl-3 pr-8 py-1.5 appearance-none rounded-lg border border-border bg-surface text-12 text-text focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
+                        className="w-full pl-3 pr-8 py-2 appearance-none rounded-lg border border-border bg-surface text-13 text-text focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
                       >
                         <option value="whatsapp">WhatsApp</option>
                         <option value="instagram">Instagram</option>
@@ -1061,7 +1831,7 @@ export default function Orders() {
                       placeholder="+91 98401 23456"
                       value={createCustomerPhone}
                       onChange={(e) => setCreateCustomerPhone(e.target.value)}
-                      className="mt-1 w-full px-3 py-1.5 rounded-lg border border-border bg-surface text-12 text-text focus:outline-none focus:ring-1 focus:ring-primary"
+                      className="mt-1 w-full px-3 py-2 rounded-lg border border-border bg-surface text-13 text-text focus:outline-none focus:ring-1 focus:ring-primary"
                     />
                   </div>
                   <div>
@@ -1071,7 +1841,7 @@ export default function Orders() {
                       placeholder="customer@gmail.com"
                       value={createCustomerEmail}
                       onChange={(e) => setCreateCustomerEmail(e.target.value)}
-                      className="mt-1 w-full px-3 py-1.5 rounded-lg border border-border bg-surface text-12 text-text focus:outline-none focus:ring-1 focus:ring-primary"
+                      className="mt-1 w-full px-3 py-2 rounded-lg border border-border bg-surface text-13 text-text focus:outline-none focus:ring-1 focus:ring-primary"
                     />
                   </div>
                 </div>
@@ -1109,7 +1879,7 @@ export default function Orders() {
                           placeholder="Product Name (e.g. Ocean Coaster Set of 4)"
                           value={item.productName}
                           onChange={(e) => handleItemChange(idx, "productName", e.target.value)}
-                          className="w-full px-2.5 py-1 rounded-md border border-border bg-surface text-12 text-text focus:outline-none focus:ring-1 focus:ring-primary"
+                          className="w-full px-3 py-1.5 rounded-md border border-border bg-surface text-13 text-text focus:outline-none focus:ring-1 focus:ring-primary"
                         />
                       </div>
                       <div className="grid grid-cols-3 gap-2">
@@ -1121,7 +1891,7 @@ export default function Orders() {
                             placeholder="1"
                             value={item.quantity}
                             onChange={(e) => handleItemChange(idx, "quantity", e.target.value)}
-                            className="w-full px-2 py-1 rounded-md border border-border bg-surface text-12 text-text focus:outline-none focus:ring-1 focus:ring-primary"
+                            className="w-full px-2.5 py-1.5 rounded-md border border-border bg-surface text-13 text-text focus:outline-none focus:ring-1 focus:ring-primary"
                           />
                         </div>
                         <div className="col-span-1">
@@ -1133,12 +1903,12 @@ export default function Orders() {
                             placeholder="0.00"
                             value={item.unitPrice}
                             onChange={(e) => handleItemChange(idx, "unitPrice", e.target.value)}
-                            className="w-full px-2 py-1 rounded-md border border-border bg-surface text-12 text-text focus:outline-none focus:ring-1 focus:ring-primary"
+                            className="w-full px-2.5 py-1.5 rounded-md border border-border bg-surface text-13 text-text focus:outline-none focus:ring-1 focus:ring-primary"
                           />
                         </div>
                         <div className="col-span-1 flex flex-col justify-end">
                           <label className="text-[10px] text-text-muted">Line Total</label>
-                          <span className="text-12 font-bold font-outfit text-text py-1">
+                          <span className="text-13 font-bold font-outfit text-text py-1.5">
                             ₹{((parseInt(String(item.quantity), 10) || 0) * (parseFloat(String(item.unitPrice)) || 0)).toLocaleString("en-IN")}
                           </span>
                         </div>
@@ -1149,7 +1919,7 @@ export default function Orders() {
                           placeholder="Customizations (e.g. Gold foil, Roman numerals)"
                           value={item.productDescription}
                           onChange={(e) => handleItemChange(idx, "productDescription", e.target.value)}
-                          className="w-full px-2.5 py-1 rounded-md border border-border bg-surface text-11 text-text-muted focus:outline-none"
+                          className="w-full px-3 py-1.5 rounded-md border border-border bg-surface text-12 text-text-muted focus:outline-none"
                         />
                       </div>
                     </div>
@@ -1201,7 +1971,7 @@ export default function Orders() {
                     placeholder="Street, Area, City, Pin Code"
                     value={createShippingAddress}
                     onChange={(e) => setCreateShippingAddress(e.target.value)}
-                    className="mt-1 w-full px-3 py-1.5 rounded-lg border border-border bg-surface text-12 text-text focus:outline-none focus:ring-1 focus:ring-primary"
+                    className="mt-1 w-full px-3 py-2 rounded-lg border border-border bg-surface text-13 text-text focus:outline-none focus:ring-1 focus:ring-primary"
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
@@ -1212,7 +1982,7 @@ export default function Orders() {
                       placeholder="e.g. Shiprocket (DTDC)"
                       value={createCourier}
                       onChange={(e) => setCreateCourier(e.target.value)}
-                      className="mt-1 w-full px-3 py-1.5 rounded-lg border border-border bg-surface text-12 text-text focus:outline-none focus:ring-1 focus:ring-primary"
+                      className="mt-1 w-full px-3 py-2 rounded-lg border border-border bg-surface text-13 text-text focus:outline-none focus:ring-1 focus:ring-primary"
                     />
                   </div>
                   <div>
@@ -1221,7 +1991,7 @@ export default function Orders() {
                       type="date"
                       value={createExpectedDate}
                       onChange={(e) => setCreateExpectedDate(e.target.value)}
-                      className="mt-1 w-full px-3 py-1.5 rounded-lg border border-border bg-surface text-12 text-text focus:outline-none focus:ring-1 focus:ring-primary"
+                      className="mt-1 w-full px-3 py-2 rounded-lg border border-border bg-surface text-13 text-text focus:outline-none focus:ring-1 focus:ring-primary"
                     />
                   </div>
                 </div>
@@ -1232,7 +2002,7 @@ export default function Orders() {
                     placeholder="Special requests or packaging instructions"
                     value={createCustomerNotes}
                     onChange={(e) => setCreateCustomerNotes(e.target.value)}
-                    className="mt-1 w-full px-3 py-1.5 rounded-lg border border-border bg-surface text-12 text-text focus:outline-none focus:ring-1 focus:ring-primary"
+                    className="mt-1 w-full px-3 py-2 rounded-lg border border-border bg-surface text-13 text-text focus:outline-none focus:ring-1 focus:ring-primary"
                   />
                 </div>
               </div>
@@ -1266,6 +2036,8 @@ export default function Orders() {
           onClick={() => {
             setActiveOrder(null);
             setIsEditingDetails(false);
+            setUpdatingOrder(null);
+            setProgressModalOrder(null);
           }}
         >
           <div
@@ -1280,20 +2052,13 @@ export default function Orders() {
                 <p className="text-12 text-text-muted">Placed {formatOrderDate(liveActiveOrder.createdAt)}</p>
               </div>
               <div className="flex items-center gap-1.5">
-                {!isEditingDetails && (
-                  <button
-                    type="button"
-                    onClick={() => handleStartEditing(liveActiveOrder)}
-                    className="px-2.5 py-1 rounded-lg border border-border bg-surface hover:bg-surface-muted text-11 font-semibold text-primary flex items-center gap-1 cursor-pointer transition-colors"
-                  >
-                    <Edit2 className="w-3 h-3" /> Edit Order
-                  </button>
-                )}
                 <button
                   type="button"
                   onClick={() => {
                     setActiveOrder(null);
                     setIsEditingDetails(false);
+                    setUpdatingOrder(null);
+                    setProgressModalOrder(null);
                   }}
                   className="p-1 rounded-lg text-text-muted hover:text-text cursor-pointer"
                 >
@@ -1336,241 +2101,121 @@ export default function Orders() {
               </div>
             </div>
 
-            {/* Customer & Chat Card */}
-            <div className="p-4 rounded-xl border border-border bg-surface space-y-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  {!isEditingDetails ? (
-                    <h4 className="font-semibold text-text">{liveActiveOrder.customerName}</h4>
-                  ) : (
+            {/* In Production Follow-Up Banner */}
+            {liveActiveOrder.status === "in_production" && (() => {
+              const prodDays = calculateProductionDays(liveActiveOrder);
+              const isOverdue = prodDays >= 45;
+              const isApproaching = prodDays >= 35 && prodDays < 45;
+
+              return (
+                <div
+                  className={`p-4 rounded-xl border space-y-3 ${
+                    isOverdue
+                      ? "border-rose-500/50 bg-rose-500/[0.06] ring-1 ring-rose-500/30"
+                      : isApproaching
+                      ? "border-amber-500/40 bg-amber-500/[0.04]"
+                      : "border-border bg-surface-muted"
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-2.5">
+                      <div
+                        className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                          isOverdue
+                            ? "bg-rose-500 text-white"
+                            : isApproaching
+                            ? "bg-amber-500/20 text-amber-600 dark:text-amber-400"
+                            : "bg-primary/10 text-primary"
+                        }`}
+                      >
+                        {isOverdue ? (
+                          <AlertTriangle className="w-4 h-4" />
+                        ) : (
+                          <Clock className="w-4 h-4" />
+                        )}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h4 className="text-13 font-bold font-outfit text-text">
+                            {prodDays} Days in Production
+                          </h4>
+                          {isOverdue ? (
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-500 text-white shadow-2xs">
+                              Overdue (≥45d)
+                            </span>
+                          ) : isApproaching ? (
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-500/30">
+                              Approaching 45d
+                            </span>
+                          ) : null}
+                        </div>
+                        <p className="text-11 text-text-muted mt-0.5 leading-relaxed">
+                          {isOverdue
+                            ? "This order has exceeded the 45-day Saba Art handcrafted resin curing and production timeline without moving to Ready."
+                            : isApproaching
+                            ? "Handmade production duration is nearing the 45-day threshold (35–44 days)."
+                            : "Crafted by hand in Saba Art studio. Production timeline is within normal bounds."}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {isEditingDetails ? (
+              /* ── Edit Order Form (same style as Create Order) ── */
+              <form onSubmit={(e) => { e.preventDefault(); handleSaveOrderEdits(); }} className="space-y-4">
+                {/* Customer Information */}
+                <div className="space-y-3 p-4 rounded-xl border border-border bg-surface-muted">
+                  <p className="text-11 font-semibold uppercase tracking-wider text-text-muted">Customer Information</p>
+                  <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-12 font-medium text-text-muted mb-1">Customer Name</label>
+                      <label className="text-11 font-medium text-text">Customer Name *</label>
                       <input
                         type="text"
+                        required
+                        placeholder="e.g. Divya Subramanian"
                         value={editCustomerName}
                         onChange={(e) => setEditCustomerName(e.target.value)}
-                        className="w-full h-10 px-3 rounded-lg border border-border bg-surface text-14 text-text font-semibold focus:outline-none focus:border-primary"
+                        className="mt-1 w-full px-3 py-2 rounded-lg border border-border bg-surface text-13 text-text focus:outline-none focus:ring-1 focus:ring-primary"
                       />
                     </div>
-                  )}
-                  <div className="flex items-center gap-1.5 text-12 text-text-muted mt-0.5">
-                    <ChannelIcon channel={liveActiveOrder.channel} size={13} />
-                    {!isEditingDetails ? (
-                      <span>{liveActiveOrder.customerPhone || "Direct Customer"}</span>
-                    ) : (
+                    <div>
+                      <label className="text-11 font-medium text-text">Channel</label>
+                      <div className="mt-1 flex items-center gap-2 h-[34px] px-3 rounded-lg border border-border bg-surface-muted text-13 text-text-muted">
+                        <ChannelIcon channel={liveActiveOrder.channel} size={13} />
+                        <span className="capitalize">{liveActiveOrder.channel}</span>
+                      </div>
+                    </div>
+                    <div className="col-span-2">
+                      <label className="text-11 font-medium text-text">Phone / Handle</label>
                       <input
                         type="text"
-                        placeholder="Phone / Handle"
+                        placeholder="+91 98401 23456"
                         value={editCustomerPhone}
                         onChange={(e) => setEditCustomerPhone(e.target.value)}
-                        className="h-9 px-3 rounded-lg border border-border bg-surface text-13 text-text focus:outline-none focus:border-primary"
+                        className="mt-1 w-full px-3 py-2 rounded-lg border border-border bg-surface text-13 text-text focus:outline-none focus:ring-1 focus:ring-primary"
                       />
-                    )}
+                    </div>
                   </div>
                 </div>
-                {!isEditingDetails && (
-                  <button
-                    type="button"
-                    onClick={() => navigate(`/inbox`)}
-                    className="px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-12 font-semibold inline-flex items-center gap-1 cursor-pointer"
-                  >
-                    <MessageSquare className="w-3.5 h-3.5" />
-                    <span>Open chat</span>
-                  </button>
-                )}
-              </div>
 
-              {/* Delivery Info / Editable Form */}
-              <div className="text-12 text-text-muted pt-2 border-t border-border/40 space-y-2">
-                <div className="flex items-center justify-between">
-                  <p className="font-medium text-text">Shipping & Logistics:</p>
-                  {!isEditingDetails ? (
+                {/* Order Items */}
+                <div className="space-y-3 p-4 rounded-xl border border-border bg-surface">
+                  <div className="flex items-center justify-between">
+                    <p className="text-11 font-semibold uppercase tracking-wider text-text-muted">Order Items</p>
                     <button
                       type="button"
-                      onClick={() => handleStartEditing(liveActiveOrder)}
-                      className="text-11 font-medium text-primary hover:text-amber-600 flex items-center gap-1 cursor-pointer"
+                      onClick={handleEditAddItem}
+                      className="text-11 font-semibold text-primary hover:text-amber-600 flex items-center gap-1 cursor-pointer"
                     >
-                      <Edit2 className="w-3 h-3" /> Edit Order & Prices
+                      <Plus className="w-3.5 h-3.5" /> Add Item
                     </button>
-                  ) : (
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setIsEditingDetails(false)}
-                        className="text-11 text-text-muted hover:text-text cursor-pointer"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleSaveOrderEdits}
-                        disabled={updateOrderMutation.isPending}
-                        className="text-11 font-semibold text-emerald-600 hover:text-emerald-700 flex items-center gap-0.5 cursor-pointer disabled:opacity-50"
-                      >
-                        {updateOrderMutation.isPending ? (
-                          <Loader2 className="w-3 h-3 animate-spin" />
-                        ) : (
-                          <Check className="w-3.5 h-3.5" />
-                        )}
-                        <span>Save Changes</span>
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                {!isEditingDetails ? (
-                  <>
-                    <p className="text-text mt-0.5">
-                      {liveActiveOrder.shippingAddress || "No shipping address provided"}
-                    </p>
-                    <div className="flex items-center justify-between pt-1">
-                      <span className="font-mono text-11 text-teal">
-                        Courier: {liveActiveOrder.courier || "Pending"}
-                      </span>
-                      {liveActiveOrder.trackingId && (
-                        <button
-                          type="button"
-                          onClick={(e) => copyTracking(liveActiveOrder.trackingId!, e)}
-                          className="font-mono text-11 text-teal hover:underline flex items-center gap-1 cursor-pointer"
-                        >
-                          {liveActiveOrder.trackingId} <Copy className="w-2.5 h-2.5" />
-                        </button>
-                      )}
-                    </div>
-                    {liveActiveOrder.expectedDeliveryDate && (
-                      <p className="text-11 text-text-muted flex items-center gap-1">
-                        <Clock className="w-3 h-3" /> Due: {formatDueDate(liveActiveOrder.expectedDeliveryDate)} ({liveActiveOrder.expectedDeliveryDate})
-                      </p>
-                    )}
-                    {liveActiveOrder.customerNotes && (
-                      <p className="text-11 italic text-text-muted pt-1">
-                        Notes: {liveActiveOrder.customerNotes}
-                      </p>
-                    )}
-                  </>
-                ) : (
-                  /* Editable Shipping Inputs */
-                  <div className="space-y-3 pt-1">
-                    <div>
-                      <label className="block text-12 font-medium text-text-muted mb-1">Shipping Address</label>
-                      <textarea
-                        rows={2}
-                        value={editShippingAddress}
-                        onChange={(e) => setEditShippingAddress(e.target.value)}
-                        className="w-full px-3 py-2 rounded-lg border border-border bg-surface text-14 text-text focus:outline-none focus:border-primary"
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-12 font-medium text-text-muted mb-1">Courier</label>
-                        <input
-                          type="text"
-                          placeholder="e.g. Shiprocket (DTDC)"
-                          value={editCourier}
-                          onChange={(e) => setEditCourier(e.target.value)}
-                          className="w-full h-10 px-3 rounded-lg border border-border bg-surface text-14 text-text focus:outline-none focus:border-primary"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-12 font-medium text-text-muted mb-1">Tracking ID</label>
-                        <input
-                          type="text"
-                          value={editTrackingId}
-                          onChange={(e) => setEditTrackingId(e.target.value)}
-                          className="w-full h-10 px-3 rounded-lg border border-border bg-surface text-14 text-text focus:outline-none focus:border-primary"
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-12 font-medium text-text-muted mb-1">Expected Delivery Date</label>
-                      <input
-                        type="date"
-                        value={editExpectedDate}
-                        onChange={(e) => setEditExpectedDate(e.target.value)}
-                        className="w-full h-10 px-3 rounded-lg border border-border bg-surface text-14 text-text focus:outline-none focus:border-primary"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-12 font-medium text-text-muted mb-1">Customer Notes</label>
-                      <input
-                        type="text"
-                        value={editCustomerNotes}
-                        onChange={(e) => setEditCustomerNotes(e.target.value)}
-                        className="w-full h-10 px-3 rounded-lg border border-border bg-surface text-14 text-text focus:outline-none focus:border-primary"
-                      />
-                    </div>
                   </div>
-                )}
-              </div>
-            </div>
-
-            {/* Items Breakdown & Price Editor */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <p className="text-12 font-semibold uppercase tracking-wider text-text-muted">
-                  Items ({!isEditingDetails ? liveActiveOrder.items?.length || 0 : editItems.length})
-                </p>
-                {isEditingDetails && (
-                  <button
-                    type="button"
-                    onClick={handleEditAddItem}
-                    className="text-11 font-semibold text-primary hover:text-amber-600 flex items-center gap-1 cursor-pointer"
-                  >
-                    <Plus className="w-3.5 h-3.5" /> Add Product
-                  </button>
-                )}
-              </div>
-
-              {!isEditingDetails ? (
-                /* Read-Only Items Breakdown */
-                <div className="divide-y divide-border/40 rounded-xl border border-border bg-surface p-3 space-y-2">
-                  {liveActiveOrder.items?.map((it: DbOrderItem, idx: number) => (
-                    <div key={it.id || idx} className="pt-2 first:pt-0 flex items-center justify-between">
-                      <div>
-                        <p className="font-medium text-text text-13">{it.productName}</p>
-                        <p className="text-11 text-text-muted">
-                          Qty: {it.quantity} × ₹{Number(it.unitPrice).toLocaleString("en-IN")}
-                        </p>
-                        {it.productDescription && (
-                          <p className="text-[11px] text-text-muted italic">{it.productDescription}</p>
-                        )}
-                      </div>
-                      <p className="font-bold font-outfit text-text tabular-nums text-13">
-                        ₹{(it.quantity * Number(it.unitPrice)).toLocaleString("en-IN")}
-                      </p>
-                    </div>
-                  ))}
-                  <div className="pt-2 space-y-1 text-12 text-text-muted">
-                    <div className="flex justify-between">
-                      <span>Subtotal:</span>
-                      <span>₹{Number(liveActiveOrder.subtotal).toLocaleString("en-IN")}</span>
-                    </div>
-                    {Number(liveActiveOrder.deliveryCharge) > 0 && (
-                      <div className="flex justify-between">
-                        <span>Delivery Charge:</span>
-                        <span>₹{Number(liveActiveOrder.deliveryCharge).toLocaleString("en-IN")}</span>
-                      </div>
-                    )}
-                    {Number(liveActiveOrder.discountAmount) > 0 && (
-                      <div className="flex justify-between text-emerald-600">
-                        <span>Discount:</span>
-                        <span>-₹{Number(liveActiveOrder.discountAmount).toLocaleString("en-IN")}</span>
-                      </div>
-                    )}
-                  </div>
-                  <div className="pt-3 flex items-center justify-between font-bold text-15 border-t border-border text-text">
-                    <span>Grand Total</span>
-                    <span className="text-primary tabular-nums">
-                      ₹{Number(liveActiveOrder.totalAmount).toLocaleString("en-IN")}
-                    </span>
-                  </div>
-                </div>
-              ) : (
-                /* Editable Items & Pricing Form */
-                <div className="rounded-xl border border-primary/30 bg-surface p-3 space-y-3">
                   <div className="space-y-2.5">
                     {editItems.map((item, idx) => (
-                      <div key={idx} className="p-2.5 rounded-lg border border-border bg-surface-muted space-y-2 relative">
+                      <div key={idx} className="p-3 rounded-lg border border-border/70 bg-surface-muted space-y-2 relative">
                         {editItems.length > 1 && (
                           <button
                             type="button"
@@ -1581,30 +2226,29 @@ export default function Orders() {
                           </button>
                         )}
                         <div>
-                          <label className="block text-12 font-medium text-text-muted mb-1">Product Name</label>
                           <input
                             type="text"
                             required
-                            placeholder="Product Name"
+                            placeholder="Product Name (e.g. Ocean Coaster Set of 4)"
                             value={item.productName}
                             onChange={(e) => handleEditItemChange(idx, "productName", e.target.value)}
-                            className="w-full h-10 px-3 rounded-lg border border-border bg-surface text-14 text-text font-medium focus:outline-none focus:border-primary"
+                            className="w-full px-3 py-1.5 rounded-md border border-border bg-surface text-13 text-text focus:outline-none focus:ring-1 focus:ring-primary"
                           />
                         </div>
-                        <div className="grid grid-cols-3 gap-3">
-                          <div>
-                            <label className="block text-12 font-medium text-text-muted mb-1">Quantity</label>
+                        <div className="grid grid-cols-3 gap-2">
+                          <div className="col-span-1">
+                            <label className="text-[10px] text-text-muted">Quantity</label>
                             <input
                               type="number"
                               min="1"
                               placeholder="1"
                               value={item.quantity}
                               onChange={(e) => handleEditItemChange(idx, "quantity", e.target.value)}
-                              className="w-full h-10 px-3 rounded-lg border border-border bg-surface text-14 text-text focus:outline-none focus:border-primary"
+                              className="w-full px-2.5 py-1.5 rounded-md border border-border bg-surface text-13 text-text focus:outline-none focus:ring-1 focus:ring-primary"
                             />
                           </div>
-                          <div>
-                            <label className="block text-12 font-medium text-text-muted mb-1">Unit Price (₹)</label>
+                          <div className="col-span-1">
+                            <label className="text-[10px] text-text-muted">Unit Price (₹)</label>
                             <input
                               type="number"
                               min="0"
@@ -1612,12 +2256,12 @@ export default function Orders() {
                               placeholder="0.00"
                               value={item.unitPrice}
                               onChange={(e) => handleEditItemChange(idx, "unitPrice", e.target.value)}
-                              className="w-full h-10 px-3 rounded-lg border border-border bg-surface text-14 text-text focus:outline-none focus:border-primary"
+                              className="w-full px-2.5 py-1.5 rounded-md border border-border bg-surface text-13 text-text focus:outline-none focus:ring-1 focus:ring-primary"
                             />
                           </div>
-                          <div className="flex flex-col justify-end">
-                            <label className="block text-12 font-medium text-text-muted mb-1">Line Total</label>
-                            <span className="h-10 flex items-center text-14 font-bold font-outfit text-text">
+                          <div className="col-span-1 flex flex-col justify-end">
+                            <label className="text-[10px] text-text-muted">Line Total</label>
+                            <span className="text-13 font-bold font-outfit text-text py-1.5">
                               ₹{((parseInt(String(item.quantity), 10) || 0) * (parseFloat(String(item.unitPrice)) || 0)).toLocaleString("en-IN")}
                             </span>
                           </div>
@@ -1625,59 +2269,253 @@ export default function Orders() {
                         <div>
                           <input
                             type="text"
-                            placeholder="Customizations (optional)"
+                            placeholder="Customizations (e.g. Gold foil, Roman numerals)"
                             value={item.productDescription}
                             onChange={(e) => handleEditItemChange(idx, "productDescription", e.target.value)}
-                            className="w-full h-9 px-3 rounded-lg border border-border bg-surface text-13 text-text-muted focus:outline-none focus:border-primary"
+                            className="w-full px-3 py-1.5 rounded-md border border-border bg-surface text-12 text-text-muted focus:outline-none"
                           />
                         </div>
                       </div>
                     ))}
                   </div>
-
-                  {/* Pricing Inputs in Edit Mode */}
-                  <div className="pt-2 border-t border-border space-y-2 text-12">
+                  <div className="pt-2 border-t border-border/50 space-y-1.5 text-12">
                     <div className="flex justify-between text-text-muted">
                       <span>Subtotal:</span>
                       <span>₹{editSubtotal.toLocaleString("en-IN")}</span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-text-muted">Delivery Charge (₹):</span>
+                      <span className="text-text-muted">Delivery Charge:</span>
                       <input
                         type="number"
                         min="0"
                         placeholder="0"
                         value={editDeliveryCharge}
                         onChange={(e) => setEditDeliveryCharge(e.target.value)}
-                        className="w-28 h-9 px-3 rounded-lg border border-border bg-surface text-right text-14 text-text focus:outline-none focus:border-primary"
+                        className="w-20 px-2 py-0.5 rounded border border-border bg-surface text-right text-12"
                       />
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-text-muted">Discount Amount (₹):</span>
+                      <span className="text-text-muted">Discount Amount:</span>
                       <input
                         type="number"
                         min="0"
                         placeholder="0"
                         value={editDiscountAmount}
                         onChange={(e) => setEditDiscountAmount(e.target.value)}
-                        className="w-28 h-9 px-3 rounded-lg border border-border bg-surface text-right text-14 text-text focus:outline-none focus:border-primary"
+                        className="w-20 px-2 py-0.5 rounded border border-border bg-surface text-right text-12"
                       />
                     </div>
-                    <div className="flex justify-between text-14 font-bold text-text pt-2 border-t border-border">
-                      <span>New Grand Total:</span>
-                      <span className="text-primary font-outfit text-16">
-                        ₹{editTotal.toLocaleString("en-IN")}
+                    <div className="flex justify-between text-14 font-bold text-text pt-1 border-t border-border">
+                      <span>Grand Total:</span>
+                      <span className="text-primary font-outfit text-16">₹{editTotal.toLocaleString("en-IN")}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Delivery & Logistics */}
+                <div className="space-y-3 p-4 rounded-xl border border-border bg-surface-muted">
+                  <p className="text-11 font-semibold uppercase tracking-wider text-text-muted">Delivery & Logistics</p>
+                  <div>
+                    <label className="text-11 font-medium text-text">Shipping Address</label>
+                    <textarea
+                      rows={2}
+                      placeholder="Street, Area, City, Pin Code"
+                      value={editShippingAddress}
+                      onChange={(e) => setEditShippingAddress(e.target.value)}
+                      className="mt-1 w-full px-3 py-2 rounded-lg border border-border bg-surface text-13 text-text focus:outline-none focus:ring-1 focus:ring-primary"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-11 font-medium text-text">Courier Partner</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Shiprocket (DTDC)"
+                        value={editCourier}
+                        onChange={(e) => setEditCourier(e.target.value)}
+                        className="mt-1 w-full px-3 py-2 rounded-lg border border-border bg-surface text-13 text-text focus:outline-none focus:ring-1 focus:ring-primary"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-11 font-medium text-text">Expected Delivery Date</label>
+                      <input
+                        type="date"
+                        value={editExpectedDate}
+                        onChange={(e) => setEditExpectedDate(e.target.value)}
+                        className="mt-1 w-full px-3 py-2 rounded-lg border border-border bg-surface text-13 text-text focus:outline-none focus:ring-1 focus:ring-primary"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-11 font-medium text-text">Tracking ID</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. DTDC1234567890"
+                      value={editTrackingId}
+                      onChange={(e) => setEditTrackingId(e.target.value)}
+                      className="mt-1 w-full px-3 py-2 rounded-lg border border-border bg-surface text-13 text-text focus:outline-none focus:ring-1 focus:ring-primary"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-11 font-medium text-text">Customer Notes</label>
+                    <input
+                      type="text"
+                      placeholder="Special requests or packaging instructions"
+                      value={editCustomerNotes}
+                      onChange={(e) => setEditCustomerNotes(e.target.value)}
+                      className="mt-1 w-full px-3 py-2 rounded-lg border border-border bg-surface text-13 text-text focus:outline-none focus:ring-1 focus:ring-primary"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingDetails(false)}
+                    className="px-4 py-2 rounded-lg border border-border bg-surface hover:bg-surface-muted text-13 font-medium text-text cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={updateOrderMutation.isPending}
+                    className="px-4 py-2 rounded-lg bg-primary hover:bg-amber-600 text-primary-foreground text-13 font-semibold flex items-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-50"
+                  >
+                    {updateOrderMutation.isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                    <span>Save Changes</span>
+                  </button>
+                </div>
+              </form>
+            ) : (
+              /* ── View Mode ── */
+              <>
+                {/* Customer & Chat Card */}
+                <div className="p-4 rounded-xl border border-border bg-surface space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="font-semibold text-text">{liveActiveOrder.customerName}</h4>
+                      <div className="flex items-center gap-1.5 text-12 text-text-muted mt-0.5">
+                        <ChannelIcon channel={liveActiveOrder.channel} size={13} />
+                        <span className="truncate">{liveActiveOrder.customerPhone || "Direct Customer"}</span>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/inbox`)}
+                      className="px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-12 font-semibold inline-flex items-center gap-1 cursor-pointer"
+                    >
+                      <MessageSquare className="w-3.5 h-3.5" />
+                      <span>Open chat</span>
+                    </button>
+                  </div>
+
+                  <div className="text-12 text-text-muted pt-2 border-t border-border/40 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <p className="font-medium text-text">Shipping & Logistics:</p>
+                      <button
+                        type="button"
+                        onClick={() => handleStartEditing(liveActiveOrder)}
+                        className="text-11 font-medium text-primary hover:text-amber-600 flex items-center gap-1 cursor-pointer"
+                      >
+                        <Edit2 className="w-3 h-3" /> Edit Order & Prices
+                      </button>
+                    </div>
+                    <p className="text-text mt-0.5">
+                      {liveActiveOrder.shippingAddress || "No shipping address provided"}
+                    </p>
+                    <div className="flex items-center justify-between pt-1">
+                      <span className="font-mono text-11 text-teal-500">
+                        Courier: {liveActiveOrder.courier || "Pending"}
+                      </span>
+                      {liveActiveOrder.trackingId && (
+                        <button
+                          type="button"
+                          onClick={(e) => copyTracking(liveActiveOrder.trackingId!, e)}
+                          className="font-mono text-11 text-teal-500 hover:underline flex items-center gap-1 cursor-pointer"
+                        >
+                          {liveActiveOrder.trackingId} <Copy className="w-2.5 h-2.5" />
+                        </button>
+                      )}
+                    </div>
+                    {liveActiveOrder.expectedDeliveryDate && (
+                      <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                        <p className="text-11 text-text-muted flex items-center gap-1">
+                          <Clock className="w-3 h-3" /> Due: {formatDueDate(liveActiveOrder.expectedDeliveryDate)} ({liveActiveOrder.expectedDeliveryDate})
+                        </p>
+                        {(() => {
+                          const ms = getOrderDueMilestone(liveActiveOrder);
+                          if (!ms) return null;
+                          return (
+                            <span
+                              className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold border ${ms.badgeClass}`}
+                              title={`Milestone: ${ms.label}`}
+                            >
+                              <Calendar className="w-2.5 h-2.5 shrink-0" />
+                              <span>{ms.label}</span>
+                            </span>
+                          );
+                        })()}
+                      </div>
+                    )}
+                    {liveActiveOrder.customerNotes && (
+                      <p className="text-11 italic text-text-muted pt-1">
+                        Notes: {liveActiveOrder.customerNotes}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Items Breakdown */}
+                <div className="space-y-2">
+                  <p className="text-12 font-semibold uppercase tracking-wider text-text-muted">
+                    Items ({liveActiveOrder.items?.length || 0})
+                  </p>
+                  <div className="divide-y divide-border/40 rounded-xl border border-border bg-surface p-3 space-y-2">
+                    {liveActiveOrder.items?.map((it: DbOrderItem, idx: number) => (
+                      <div key={it.id || idx} className="pt-2 first:pt-0 flex items-center justify-between">
+                        <div>
+                          <p className="font-medium text-text text-13">{it.productName}</p>
+                          <p className="text-11 text-text-muted">
+                            Qty: {it.quantity} × ₹{Number(it.unitPrice).toLocaleString("en-IN")}
+                          </p>
+                          {it.productDescription && (
+                            <p className="text-[11px] text-text-muted italic">{it.productDescription}</p>
+                          )}
+                        </div>
+                        <p className="font-bold font-outfit text-text tabular-nums text-13">
+                          ₹{(it.quantity * Number(it.unitPrice)).toLocaleString("en-IN")}
+                        </p>
+                      </div>
+                    ))}
+                    <div className="pt-2 space-y-1 text-12 text-text-muted">
+                      <div className="flex justify-between">
+                        <span>Subtotal:</span>
+                        <span>₹{Number(liveActiveOrder.subtotal).toLocaleString("en-IN")}</span>
+                      </div>
+                      {Number(liveActiveOrder.deliveryCharge) > 0 && (
+                        <div className="flex justify-between">
+                          <span>Delivery Charge:</span>
+                          <span>₹{Number(liveActiveOrder.deliveryCharge).toLocaleString("en-IN")}</span>
+                        </div>
+                      )}
+                      {Number(liveActiveOrder.discountAmount) > 0 && (
+                        <div className="flex justify-between text-emerald-600">
+                          <span>Discount:</span>
+                          <span>-₹{Number(liveActiveOrder.discountAmount).toLocaleString("en-IN")}</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="pt-3 flex items-center justify-between font-bold text-15 border-t border-border text-text">
+                      <span>Grand Total</span>
+                      <span className="text-primary tabular-nums">
+                        ₹{Number(liveActiveOrder.totalAmount).toLocaleString("en-IN")}
                       </span>
                     </div>
                   </div>
                 </div>
-              )}
-            </div>
 
-            {/* Actions Footer */}
-            <div className="pt-4 border-t border-border flex items-center justify-between">
-              {!isEditingDetails ? (
-                <>
+                {/* Actions Footer */}
+                <div className="pt-4 border-t border-border flex items-center justify-between">
                   <button
                     type="button"
                     onClick={() => setDeletingOrder(liveActiveOrder)}
@@ -1695,6 +2533,15 @@ export default function Orders() {
                     </button>
                     <button
                       type="button"
+                      onClick={() => setProgressModalOrder(liveActiveOrder)}
+                      className="px-3 py-1.5 rounded-lg border border-border bg-surface hover:bg-surface-muted text-12 font-medium text-text flex items-center gap-1.5 cursor-pointer transition-colors"
+                      title="Send WhatsApp / Instagram update to customer"
+                    >
+                      <Send className="w-3.5 h-3.5" />
+                      <span>Send Update</span>
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => handleStartEditing(liveActiveOrder)}
                       className="px-4 py-1.5 rounded-lg bg-primary hover:bg-amber-600 text-12 font-semibold text-primary-foreground flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors"
                     >
@@ -1702,36 +2549,24 @@ export default function Orders() {
                       <span>Edit Order</span>
                     </button>
                   </div>
-                </>
-              ) : (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => setIsEditingDetails(false)}
-                    className="px-3 py-1.5 rounded-lg border border-border bg-surface hover:bg-surface-muted text-12 font-medium text-text-muted hover:text-text cursor-pointer transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleSaveOrderEdits}
-                    disabled={updateOrderMutation.isPending}
-                    className="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-12 font-semibold text-white flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors disabled:opacity-50"
-                  >
-                    {updateOrderMutation.isPending ? (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    ) : (
-                      <Check className="w-3.5 h-3.5" />
-                    )}
-                    <span>Save Order</span>
-                  </button>
-                </>
-              )}
-            </div>
+                </div>
+              </>
+            )}
 
             {/* Payments & Invoicing Panel */}
             <div className="pt-2 border-t border-border/40">
-              <PaymentsPanel orderId={liveActiveOrder.id} orderTotal={Number(liveActiveOrder.totalAmount)} />
+              <PaymentsPanel
+                orderId={liveActiveOrder.id}
+                orderTotal={Number(liveActiveOrder.totalAmount)}
+                order={liveActiveOrder}
+              />
+            </div>
+
+            {/* Communication History (Instagram DM Updates) */}
+            <div className="pt-2 border-t border-border/40">
+              <OrderCommunicationHistory
+                order={liveActiveOrder}
+              />
             </div>
           </div>
         </div>
@@ -1750,7 +2585,7 @@ export default function Orders() {
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-16 font-bold font-outfit text-text">
-                  Update Order Status: {targetStatus.replace("_", " ")}
+                  Update Order Status: {targetStatus.replaceAll("_", " ")}
                 </h3>
                 <p className="text-12 text-text-muted">
                   Order #{updatingOrder.orderNo} · {updatingOrder.customerName}
@@ -1770,9 +2605,18 @@ export default function Orders() {
               <label className="text-11 font-medium text-text">Change status to:</label>
               <div className="relative mt-1">
                 <select
+                  disabled={updateOrderStatusMutation.isPending}
                   value={targetStatus}
-                  onChange={(e) => setTargetStatus(e.target.value as OrderStatus)}
-                  className="w-full pl-3 pr-8 py-1.5 appearance-none rounded-lg border border-border bg-surface text-12 text-text focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
+                  onChange={(e) => {
+                    const next = e.target.value as OrderStatus;
+                    setTargetStatus(next);
+                    if (updatingOrder) {
+                      const currentIdx = COLUMNS.findIndex((c) => c.id === updatingOrder.status);
+                      const nextIdx = COLUMNS.findIndex((c) => c.id === next);
+                      setSendNotification(nextIdx >= currentIdx);
+                    }
+                  }}
+                  className="w-full pl-3 pr-8 py-1.5 appearance-none rounded-lg border border-border bg-surface text-12 text-text focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed transition-opacity"
                 >
                   {COLUMNS.map((col) => (
                     <option key={col.id} value={col.id}>
@@ -1792,62 +2636,67 @@ export default function Orders() {
                   <label className="text-11 font-medium text-text">Tracking ID</label>
                   <input
                     type="text"
+                    disabled={updateOrderStatusMutation.isPending}
                     placeholder="e.g. SHP98421039IN"
                     value={statusTrackingId}
                     onChange={(e) => setStatusTrackingId(e.target.value)}
-                    className="mt-1 w-full px-2.5 py-1.5 rounded-lg border border-border bg-surface text-12 text-text focus:outline-none focus:ring-1 focus:ring-teal"
+                    className="mt-1 w-full px-2.5 py-1.5 rounded-lg border border-border bg-surface text-12 text-text focus:outline-none focus:ring-1 focus:ring-teal disabled:opacity-60 disabled:cursor-not-allowed"
                   />
                 </div>
                 <div>
                   <label className="text-11 font-medium text-text">Courier Partner</label>
                   <input
                     type="text"
+                    disabled={updateOrderStatusMutation.isPending}
                     placeholder="e.g. Shiprocket (DTDC)"
                     value={statusCourier}
                     onChange={(e) => setStatusCourier(e.target.value)}
-                    className="mt-1 w-full px-2.5 py-1.5 rounded-lg border border-border bg-surface text-12 text-text focus:outline-none focus:ring-1 focus:ring-teal"
+                    className="mt-1 w-full px-2.5 py-1.5 rounded-lg border border-border bg-surface text-12 text-text focus:outline-none focus:ring-1 focus:ring-teal disabled:opacity-60 disabled:cursor-not-allowed"
                   />
                 </div>
               </div>
             )}
 
-            {/* Status message preview (the backend does not send this automatically) */}
-            <div className="p-4 rounded-xl border border-emerald-500/30 bg-emerald-500/5 space-y-2">
-              <div className="flex items-center justify-between text-11 font-semibold text-emerald-600 dark:text-emerald-400">
-                <span className="flex items-center gap-1">
-                  <Phone className="w-3.5 h-3.5" /> Status message preview
+            {/* Notify customer toggle */}
+            <div className={`p-3 rounded-xl border ${sendNotification ? "border-emerald-500/30 bg-emerald-500/5" : "border-border bg-surface-muted"}`}>
+              <label className="flex items-center justify-between cursor-pointer select-none gap-3">
+                <span className="flex items-center gap-2 text-12 font-semibold text-text">
+                  <Phone className="w-3.5 h-3.5 text-text-muted shrink-0" />
+                  Notify customer via WhatsApp / Instagram
                 </span>
-                <span className="font-medium text-text-muted">Not sent automatically</span>
-              </div>
-
-              <div className="p-3 rounded-lg bg-surface border border-border shadow-xs text-12 text-text leading-relaxed">
-                <p>
-                  Hi <strong>{updatingOrder.customerName}</strong>! 🎉
-                </p>
-                <p className="mt-1">
-                  Your order <strong>#{updatingOrder.orderNo}</strong> has been updated to{" "}
-                  <strong className="text-primary capitalize">
-                    {targetStatus.replace("_", " ")}
-                  </strong>
-                  .
-                </p>
-                {targetStatus === "dispatched" && (
-                  <p className="mt-1 text-teal font-medium">
-                    Tracking ID: <strong>{statusTrackingId.trim() || "—"}</strong>
-                    {statusCourier.trim() && <> (via {statusCourier.trim()})</>}
+                <button
+                  type="button"
+                  onClick={() => setSendNotification((v) => !v)}
+                  className={`relative inline-flex h-5 w-9 shrink-0 rounded-full transition-colors cursor-pointer ${sendNotification ? "bg-emerald-500" : "bg-border"}`}
+                >
+                  <span className={`absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${sendNotification ? "translate-x-4" : "translate-x-0"}`} />
+                </button>
+              </label>
+              {sendNotification && (
+                <div className="mt-3 p-3 rounded-lg bg-surface border border-border shadow-xs text-12 text-text leading-relaxed">
+                  <p>Hi <strong>{updatingOrder.customerName}</strong>! 🎉</p>
+                  <p className="mt-1">
+                    Your order <strong>#{updatingOrder.orderNo}</strong> has been updated to{" "}
+                    <strong className="text-primary capitalize">{targetStatus.replaceAll("_", " ")}</strong>.
                   </p>
-                )}
-                <p className="mt-1 text-11 text-text-muted">
-                  Thank you for supporting handcrafted resin art! — Saba Art, Coimbatore
-                </p>
-              </div>
+                  {targetStatus === "dispatched" && (
+                    <p className="mt-1 text-teal-500 font-medium">
+                      Tracking ID: <strong>{statusTrackingId.trim() || "—"}</strong>
+                      {statusCourier.trim() && <> (via {statusCourier.trim()})</>}
+                    </p>
+                  )}
+                  <p className="mt-1 text-11 text-text-muted">
+                    Thank you for supporting handcrafted resin art! — Saba Art, Coimbatore
+                  </p>
+                </div>
+              )}
             </div>
 
             <div className="flex items-center justify-end gap-2 pt-3 border-t border-border">
               <button
                 type="button"
                 onClick={() => setUpdatingOrder(null)}
-                className="px-4 py-2 rounded-lg border border-border bg-surface hover:bg-surface-muted text-13 font-medium text-text cursor-pointer"
+                className="px-4 py-2 rounded-lg border border-border bg-surface hover:bg-surface-muted text-13 font-medium text-text cursor-pointer transition-colors"
               >
                 Cancel
               </button>
@@ -1855,11 +2704,26 @@ export default function Orders() {
                 type="button"
                 onClick={confirmStatusUpdate}
                 disabled={updateOrderStatusMutation.isPending}
-                className="px-4 py-2 rounded-lg bg-primary hover:bg-amber-600 text-primary-foreground text-13 font-semibold cursor-pointer shadow-xs flex items-center gap-1.5 disabled:opacity-50"
+                className="px-4 py-2 rounded-lg bg-primary hover:bg-amber-600 text-primary-foreground text-13 font-semibold cursor-pointer shadow-xs flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
               >
-                {updateOrderStatusMutation.isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                <span>Confirm Update</span>
+                {updateOrderStatusMutation.isPending && <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />}
+                <span>{sendNotification ? "Update & Notify" : "Update Only"}</span>
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Screen Freeze Loader Overlay while Saving ──────────────────────── */}
+      {(updateOrderStatusMutation.isPending || updateOrderMutation.isPending) && (
+        <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-xs flex flex-col items-center justify-center p-4 animate-in fade-in duration-150 select-none cursor-wait">
+          <div className="p-6 rounded-2xl bg-surface border border-border shadow-2xl flex flex-col items-center gap-3 min-w-[220px]">
+            <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            <div className="text-center">
+              <p className="text-14 font-bold text-text">
+                {updateOrderStatusMutation.isPending ? "Updating Order Status..." : "Saving Order Changes..."}
+              </p>
+              <p className="text-11 text-text-muted mt-0.5">Please wait a moment</p>
             </div>
           </div>
         </div>
@@ -1909,6 +2773,11 @@ export default function Orders() {
           </div>
         </div>
       )}
+      {/* ─── Production Progress Update Modal ─────────────────────────────── */}
+      <SendProgressUpdateModal
+        order={progressModalOrder}
+        onClose={() => setProgressModalOrder(null)}
+      />
     </div>
   );
 }

@@ -80,11 +80,11 @@ export const userRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
       const normalizedEmail = email.toLowerCase().trim();
       const businessId = request.user.businessId;
 
-      // Check unique email across users
+      // Check unique email within this business
       const [existing] = await db
         .select()
         .from(users)
-        .where(eq(users.email, normalizedEmail));
+        .where(and(eq(users.email, normalizedEmail), eq(users.businessId, businessId)));
 
       if (existing) {
         throw new AppError(409, "User with this email already exists", "EMAIL_TAKEN");
