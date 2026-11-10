@@ -1,6 +1,7 @@
-import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, AlertTriangle, CheckCircle2, PauseCircle, PlayCircle } from "lucide-react";
+import { ArrowLeft, AlertTriangle, CheckCircle2, PauseCircle, PlayCircle, ShoppingBag } from "lucide-react";
 import { escalationReasonLabel } from "../../lib/escalationReasons.ts";
 import { ChannelIcon } from "../shared/ChannelIcon.tsx";
 import { ConfirmDialog } from "../shared/ConfirmDialog.tsx";
@@ -104,6 +105,7 @@ function PauseResumeButton({ conversation }: { conversation: ConversationDetail 
 export function ChatView({ conversation, onBack, backOnlyOnMobile = false, onResolved, headerActions }: ChatViewProps) {
   const { user } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const qc = useQueryClient();
   const reply = useReply(conversation.id);
   const sendCatalogue = useSendCatalogue(conversation.id);
@@ -200,6 +202,17 @@ export function ChatView({ conversation, onBack, backOnlyOnMobile = false, onRes
 
   const name = customerLabel(conversation.customer);
 
+  const handleCreateOrder = useCallback(() => {
+    const params = new URLSearchParams({
+      createOrder: "1",
+      customerName: conversation.customer.name ?? conversation.customer.handleOrPhone ?? "",
+      customerPhone: conversation.customer.handleOrPhone ?? "",
+      channel: conversation.channelType,
+      customerId: conversation.customerId,
+    });
+    navigate(`/orders?${params.toString()}`);
+  }, [conversation, navigate]);
+
   return (
     <section className="flex h-full min-h-0 flex-col bg-surface-muted/30" aria-label={`Conversation with ${name}`}>
       {/* Header */}
@@ -268,6 +281,17 @@ export function ChatView({ conversation, onBack, backOnlyOnMobile = false, onRes
           </div>
 
           <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={handleCreateOrder}
+                className={headerButton}
+                title="Create an order for this customer"
+              >
+                <ShoppingBag className="h-3.5 w-3.5 shrink-0 text-amber-500" aria-hidden />
+                <span className="hidden sm:inline">Create Order</span>
+              </button>
+            )}
             {isAdmin && <PauseResumeButton conversation={conversation} />}
             {canResolve && (
               <button
