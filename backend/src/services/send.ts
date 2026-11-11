@@ -15,8 +15,11 @@ export interface InteractiveProduct {
   name: string;
   price: string;
   imageUrl?: string | undefined;
+  images?: string[] | undefined;
   leadTime: number;
   description?: string | undefined;
+  customizable?: boolean | undefined;
+  customOptions?: string[] | undefined;
 }
 
 export interface InteractiveOptions {
@@ -118,28 +121,33 @@ export async function sendMessage(opts: SendMessageOptions): Promise<SendMessage
     let partsCount = 0;
 
     if (opts.interactive && opts.interactive.products.length > 0) {
-      if (opts.interactive.products.length === 1 || opts.interactive.type === "catalogue_card") {
-        const prod = opts.interactive.products[0]!;
+      const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+      const productsToSend = opts.interactive.products.slice(0, 10);
+
+      for (let i = 0; i < productsToSend.length; i++) {
+        const prod = productsToSend[i]!;
+        const specsText =
+          productsToSend.length === 1 && messageText
+            ? messageText
+            : `✨ *${prod.name}*\n💰 ${prod.price}\n⏱️ Lead time: ~${prod.leadTime} days${prod.description ? `\n\n${prod.description}` : ""}`;
+
         const cardResult = await sendWhatsAppInteractiveCard({
           recipientPhone: opts.recipient,
           slug: prod.slug,
           title: prod.name,
-          specsText: messageText || `${prod.name}\n${prod.price}\nLead time: ${prod.leadTime} days`,
+          specsText,
           imageUrl: prod.imageUrl,
           businessId: opts.businessId,
         });
-        firstMetaMessageId = cardResult.metaMessageId;
-        partsCount = 1;
-      } else {
-        const listResult = await sendWhatsAppInteractiveList({
-          recipientPhone: opts.recipient,
-          headerText: "Our Resin Collection",
-          bodyText: messageText || "Browse and select any product to enquire:",
-          products: opts.interactive.products,
-          businessId: opts.businessId,
-        });
-        firstMetaMessageId = listResult.metaMessageId;
-        partsCount = 1;
+
+        if (!firstMetaMessageId) {
+          firstMetaMessageId = cardResult.metaMessageId;
+        }
+        partsCount++;
+
+        if (i < productsToSend.length - 1) {
+          await delay(150);
+        }
       }
     } else if (mediaUrls.length > 0) {
       for (let i = 0; i < mediaUrls.length; i++) {

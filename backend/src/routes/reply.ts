@@ -410,7 +410,8 @@ export const replyRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
               : `₹${minPrice.toLocaleString("en-IN")}`;
 
         const images = Array.isArray(p.images) ? p.images : [];
-        const firstImg = typeof images[0] === "string" ? images[0] : undefined;
+        const validImages = images.filter((img): img is string => typeof img === "string" && img.trim().length > 0);
+        const firstImg = typeof validImages[0] === "string" ? validImages[0] : undefined;
 
         return {
           id: p.id,
@@ -418,8 +419,11 @@ export const replyRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
           name: p.name,
           price: priceStr,
           imageUrl: firstImg,
+          images: validImages,
           leadTime: p.leadTimeDays,
           description: p.description ?? undefined,
+          customizable: p.customizable,
+          customOptions: p.customOptions ?? [],
         };
       });
 

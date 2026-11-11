@@ -460,7 +460,8 @@ function resolveProductName(slug: string, rawTitle?: string): string {
     Boolean(rawTitle) &&
     (/sizes?\s*&?\s*price/i.test(rawTitle!) ||
       /customiz/i.test(rawTitle!) ||
-      /book\s*\/?\s*order/i.test(rawTitle!));
+      /book\s*\/?\s*order/i.test(rawTitle!) ||
+      /enquir/i.test(rawTitle!));
 
   if (rawTitle && !isButtonTitle && rawTitle.trim().length > 0) {
     return rawTitle.trim();
@@ -477,6 +478,15 @@ function parseProductAction(
   actionId: string,
   rawTitle?: string,
 ): { text: string; metadata: Record<string, unknown> } | null {
+  if (actionId.startsWith("action:enquire:")) {
+    const rawSlug = actionId.slice("action:enquire:".length);
+    const slug = rawSlug.split(":")[0] || rawSlug;
+    const prodName = resolveProductName(slug, rawTitle);
+    return {
+      text: `Hi, I'm interested in the ${prodName}. Could you share the available sizes, prices, colors, and customization options?`,
+      metadata: { kind: "product_enquiry", intent: "product_info", slug, productName: prodName },
+    };
+  }
   if (actionId.startsWith("action:sizes:")) {
     const slug = actionId.slice("action:sizes:".length);
     const prodName = resolveProductName(slug, rawTitle);

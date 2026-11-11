@@ -3,18 +3,19 @@ import { createPortal } from "react-dom";
 import {
   AlertTriangle,
   CheckSquare,
+  ChevronLeft,
+  ChevronRight,
   Clock,
   Layers,
   Loader2,
+  MessageSquare,
   MinusSquare,
   Package,
   Plus,
   Search,
   Send,
-  ShoppingBag,
   Sparkles,
   Square,
-  Tag,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -46,6 +47,96 @@ function formatPriceRange(product: Product): string {
     return `₹${min.toLocaleString("en-IN")}`;
   }
   return `₹${min.toLocaleString("en-IN")} – ₹${max.toLocaleString("en-IN")}`;
+}
+
+function PreviewImageCarousel({
+  images,
+  alt,
+  leadTime,
+}: {
+  images?: string[] | undefined;
+  alt: string;
+  leadTime?: number | undefined;
+}) {
+  const allImages =
+    Array.isArray(images) && images.length > 0
+      ? images.filter((img): img is string => typeof img === "string" && img.trim().length > 0)
+      : [];
+
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  if (allImages.length === 0) {
+    return (
+      <div className="flex h-28 sm:h-32 w-full items-center justify-center bg-surface-muted text-text-muted">
+        <Package className="h-7 w-7 opacity-30" />
+      </div>
+    );
+  }
+
+  const currentImage = allImages[currentIndex] || allImages[0]!;
+
+  return (
+    <div className="relative h-28 sm:h-32 w-full overflow-hidden bg-black/5 select-none group">
+      <img
+        src={currentImage}
+        alt={`${alt} preview ${currentIndex + 1}`}
+        className="h-full w-full object-cover transition-all duration-300"
+      />
+
+      {leadTime !== undefined && (
+        <div className="absolute top-2 right-2 pointer-events-none z-10">
+          <span className="rounded-md bg-black/60 px-1.5 py-0.5 text-10 font-medium text-white backdrop-blur-xs">
+            ⏱️ ~{leadTime}d
+          </span>
+        </div>
+      )}
+
+      {allImages.length > 1 && (
+        <>
+          <div className="absolute top-2 left-2 pointer-events-none z-10">
+            <span className="rounded-md bg-black/60 px-1.5 py-0.5 text-10 font-semibold text-white backdrop-blur-xs">
+              {currentIndex + 1}/{allImages.length}
+            </span>
+          </div>
+
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setCurrentIndex((prev) => (prev === 0 ? allImages.length - 1 : prev - 1));
+            }}
+            className="absolute left-1.5 top-1/2 -translate-y-1/2 h-6 w-6 rounded-full bg-black/55 text-white flex items-center justify-center opacity-85 hover:opacity-100 transition-opacity z-10 cursor-pointer shadow-xs"
+            aria-label="Previous photo"
+          >
+            <ChevronLeft className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setCurrentIndex((prev) => (prev === allImages.length - 1 ? 0 : prev + 1));
+            }}
+            className="absolute right-1.5 top-1/2 -translate-y-1/2 h-6 w-6 rounded-full bg-black/55 text-white flex items-center justify-center opacity-85 hover:opacity-100 transition-opacity z-10 cursor-pointer shadow-xs"
+            aria-label="Next photo"
+          >
+            <ChevronRight className="h-3.5 w-3.5" />
+          </button>
+
+          <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 flex items-center gap-1 z-10 pointer-events-none">
+            {allImages.map((_, i) => (
+              <span
+                key={i}
+                className={cn(
+                  "h-1 rounded-full transition-all duration-200",
+                  i === currentIndex ? "w-3 bg-white" : "w-1 bg-white/50",
+                )}
+              />
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
 }
 
 export function CataloguePicker({
@@ -477,25 +568,19 @@ export function CataloguePicker({
                 ) : selectedProducts.length === 1 ? (
                   /* Single Product Card Preview */
                   <div className="overflow-hidden rounded-xl border border-border bg-surface-muted/30 shadow-xs max-w-sm mx-auto">
-                    {selectedProducts[0]!.images?.[0] ? (
-                      <img
-                        src={selectedProducts[0]!.images[0]}
-                        alt={selectedProducts[0]!.name}
-                        className="h-44 w-full object-cover"
-                      />
-                    ) : (
-                      <div className="flex h-36 w-full items-center justify-center bg-surface-muted text-text-muted">
-                        <Package className="h-10 w-10 opacity-30" />
-                      </div>
-                    )}
-                    <div className="p-3">
+                    <PreviewImageCarousel
+                      images={selectedProducts[0]!.images}
+                      alt={selectedProducts[0]!.name}
+                      leadTime={selectedProducts[0]!.leadTimeDays}
+                    />
+                    <div className="p-2.5">
                       {customNote.trim() && (
                         <p className="mb-2 text-12 text-text font-medium border-b border-border/40 pb-1.5">
                           {customNote.trim()}
                         </p>
                       )}
-                      <p className="text-14 font-bold text-text">{selectedProducts[0]!.name}</p>
-                      <p className="text-13 font-bold text-primary mt-0.5">
+                      <p className="text-13 font-bold text-text leading-tight">{selectedProducts[0]!.name}</p>
+                      <p className="text-12 font-bold text-primary mt-0.5">
                         {formatPriceRange(selectedProducts[0]!)}
                       </p>
                       <p className="text-11 text-text-muted mt-1 leading-snug line-clamp-2">
@@ -506,19 +591,11 @@ export function CataloguePicker({
                         {selectedProducts[0]!.customizable && <span>· 🎨 Customizable</span>}
                       </div>
 
-                      {/* Mock Interactive 3-Button Suite */}
-                      <div className="mt-3 space-y-1.5 border-t border-border/60 pt-2.5">
+                      {/* Single Unified Enquire CTA Button */}
+                      <div className="mt-2.5 border-t border-border/60 pt-2">
                         <div className="flex items-center justify-center gap-1.5 rounded-lg border border-primary/40 bg-primary/10 py-1.5 text-11 font-semibold text-primary">
-                          <Tag className="h-3.5 w-3.5" />
-                          <span>🏷️ Sizes & Price</span>
-                        </div>
-                        <div className="flex items-center justify-center gap-1.5 rounded-lg border border-primary/40 bg-primary/10 py-1.5 text-11 font-semibold text-primary">
-                          <Sparkles className="h-3.5 w-3.5" />
-                          <span>🎨 Customize</span>
-                        </div>
-                        <div className="flex items-center justify-center gap-1.5 rounded-lg border border-primary/40 bg-primary/10 py-1.5 text-11 font-semibold text-primary">
-                          <ShoppingBag className="h-3.5 w-3.5" />
-                          <span>🛍️ Book / Order</span>
+                          <MessageSquare className="h-3.5 w-3.5" />
+                          <span>💬 Enquire Now</span>
                         </div>
                       </div>
                     </div>
@@ -542,44 +619,23 @@ export function CataloguePicker({
                           key={p.id}
                           className="overflow-hidden rounded-xl border border-border bg-surface-muted/30 shadow-xs"
                         >
-                          {p.images?.[0] ? (
-                            <div className="relative h-36 w-full overflow-hidden bg-black/5">
-                              <img
-                                src={p.images[0]}
-                                alt={p.name}
-                                className="h-full w-full object-cover"
-                              />
-                              <div className="absolute top-2 right-2">
-                                <span className="rounded-md bg-black/60 px-2 py-0.5 text-10 font-medium text-white backdrop-blur-xs">
-                                  ⏱️ ~{p.leadTimeDays}d lead time
-                                </span>
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="flex h-28 w-full items-center justify-center bg-surface-muted text-text-muted">
-                              <Package className="h-8 w-8 opacity-30" />
-                            </div>
-                          )}
-                          <div className="p-3">
-                            <p className="text-13 font-bold text-text">{p.name}</p>
+                          <PreviewImageCarousel
+                            images={p.images}
+                            alt={p.name}
+                            leadTime={p.leadTimeDays}
+                          />
+                          <div className="p-2.5">
+                            <p className="text-13 font-bold text-text leading-tight">{p.name}</p>
                             <p className="text-12 font-bold text-primary mt-0.5">
                               {formatPriceRange(p)}
                             </p>
                             <p className="text-11 text-text-muted mt-1 leading-snug line-clamp-2">
                               {p.description || "Handmade premium resin art."}
                             </p>
-                            <div className="mt-2.5 space-y-1.5 border-t border-border/60 pt-2">
-                              <div className="flex items-center justify-center gap-1.5 rounded-lg border border-primary/40 bg-primary/10 py-1 text-11 font-semibold text-primary">
-                                <Tag className="h-3 w-3" />
-                                <span>🏷️ Sizes & Price</span>
-                              </div>
-                              <div className="flex items-center justify-center gap-1.5 rounded-lg border border-primary/40 bg-primary/10 py-1 text-11 font-semibold text-primary">
-                                <Sparkles className="h-3 w-3" />
-                                <span>🎨 Customize</span>
-                              </div>
-                              <div className="flex items-center justify-center gap-1.5 rounded-lg border border-primary/40 bg-primary/10 py-1 text-11 font-semibold text-primary">
-                                <ShoppingBag className="h-3 w-3" />
-                                <span>🛍️ Book / Order</span>
+                            <div className="mt-2.5 border-t border-border/60 pt-2">
+                              <div className="flex items-center justify-center gap-1.5 rounded-lg border border-primary/40 bg-primary/10 py-1.5 text-11 font-semibold text-primary">
+                                <MessageSquare className="h-3.5 w-3.5" />
+                                <span>💬 Enquire Now</span>
                               </div>
                             </div>
                           </div>

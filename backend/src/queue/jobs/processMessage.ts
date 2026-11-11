@@ -370,8 +370,11 @@ async function runPipeline(params: ProcessMessageParams): Promise<AiDecision | n
     name: string;
     price: string;
     imageUrl?: string | undefined;
+    images?: string[] | undefined;
     leadTime: number;
     description?: string | undefined;
+    customizable?: boolean | undefined;
+    customOptions?: string[] | undefined;
   }> = [];
 
   if (decision.send_catalogue) {
@@ -417,7 +420,8 @@ async function runPipeline(params: ProcessMessageParams): Promise<AiDecision | n
             : `₹${minPrice.toLocaleString("en-IN")}`;
 
       const images = Array.isArray(p.images) ? p.images : [];
-      const firstImg = typeof images[0] === "string" ? images[0] : undefined;
+      const validImages = images.filter((img): img is string => typeof img === "string" && img.trim().length > 0);
+      const firstImg = typeof validImages[0] === "string" ? validImages[0] : undefined;
 
       return {
         id: p.id,
@@ -425,8 +429,11 @@ async function runPipeline(params: ProcessMessageParams): Promise<AiDecision | n
         name: p.name,
         price: priceStr,
         imageUrl: firstImg,
+        images: validImages,
         leadTime: p.leadTimeDays,
         description: p.description ?? undefined,
+        customizable: p.customizable,
+        customOptions: p.customOptions ?? [],
       };
     });
   }

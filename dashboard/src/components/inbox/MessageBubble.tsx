@@ -1,5 +1,5 @@
 import { useId, useState } from "react";
-import { AlertCircle, Bot, ChevronDown, Download, Package, ShoppingBag, Sparkles, Tag } from "lucide-react";
+import { AlertCircle, Bot, ChevronDown, ChevronLeft, ChevronRight, Download, MessageSquare, Package, Sparkles, Tag } from "lucide-react";
 import { cn } from "../../lib/cn.ts";
 import { escalationReasonLabel } from "../../lib/escalationReasons.ts";
 import { formatTime, humanize } from "../../lib/format.ts";
@@ -147,6 +147,104 @@ function getDownloadUrl(url: string): string {
   return url;
 }
 
+function ProductCardCarousel({
+  images,
+  fallbackUrl,
+  alt,
+  leadTime,
+}: {
+  images?: string[] | undefined;
+  fallbackUrl?: string | undefined;
+  alt: string;
+  leadTime?: number | undefined;
+}) {
+  const allImages =
+    Array.isArray(images) && images.length > 0
+      ? images.filter((img): img is string => typeof img === "string" && img.trim().length > 0)
+      : fallbackUrl
+        ? [fallbackUrl]
+        : [];
+
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  if (allImages.length === 0) {
+    return (
+      <div className="flex h-28 sm:h-32 w-full items-center justify-center bg-surface-muted text-text-muted">
+        <Package className="h-7 w-7 opacity-40" />
+      </div>
+    );
+  }
+
+  const currentImage = allImages[currentIndex] || allImages[0]!;
+
+  const handlePrev = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setCurrentIndex((prev) => (prev === 0 ? allImages.length - 1 : prev - 1));
+  };
+
+  const handleNext = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setCurrentIndex((prev) => (prev === allImages.length - 1 ? 0 : prev + 1));
+  };
+
+  return (
+    <div className="relative h-28 sm:h-32 w-full overflow-hidden bg-black/5 select-none group">
+      <img
+        src={currentImage}
+        alt={`${alt} image ${currentIndex + 1}`}
+        className="h-full w-full object-cover rounded-t-xl transition-all duration-300"
+      />
+
+      {leadTime !== undefined && (
+        <div className="absolute top-2 right-2 pointer-events-none z-10">
+          <span className="rounded-md bg-black/60 px-1.5 py-0.5 text-10 font-medium text-white backdrop-blur-xs">
+            ⏱️ ~{leadTime}d
+          </span>
+        </div>
+      )}
+
+      {allImages.length > 1 && (
+        <>
+          <div className="absolute top-2 left-2 pointer-events-none z-10">
+            <span className="rounded-md bg-black/60 px-1.5 py-0.5 text-10 font-semibold text-white backdrop-blur-xs">
+              {currentIndex + 1}/{allImages.length}
+            </span>
+          </div>
+
+          <button
+            type="button"
+            onClick={handlePrev}
+            className="absolute left-1.5 top-1/2 -translate-y-1/2 h-6 w-6 rounded-full bg-black/55 text-white flex items-center justify-center opacity-85 hover:opacity-100 transition-opacity z-10 cursor-pointer shadow-xs"
+            aria-label="Previous photo"
+          >
+            <ChevronLeft className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={handleNext}
+            className="absolute right-1.5 top-1/2 -translate-y-1/2 h-6 w-6 rounded-full bg-black/55 text-white flex items-center justify-center opacity-85 hover:opacity-100 transition-opacity z-10 cursor-pointer shadow-xs"
+            aria-label="Next photo"
+          >
+            <ChevronRight className="h-3.5 w-3.5" />
+          </button>
+
+          <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 flex items-center gap-1 z-10 pointer-events-none">
+            {allImages.map((_, i) => (
+              <span
+                key={i}
+                className={cn(
+                  "h-1 rounded-full transition-all duration-200",
+                  i === currentIndex ? "w-3 bg-white" : "w-1 bg-white/50",
+                )}
+              />
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 export function MessageBubble({ message, senderLabel, pending = false }: MessageBubbleProps) {
   const { senderType } = message;
   const media = Array.isArray(message.mediaUrls) ? message.mediaUrls.filter((u) => typeof u === "string" && u) : [];
@@ -160,6 +258,7 @@ export function MessageBubble({ message, senderLabel, pending = false }: Message
         name?: string;
         price?: string;
         imageUrl?: string;
+        images?: string[];
         leadTime?: number;
         description?: string;
       }>)
@@ -225,35 +324,21 @@ export function MessageBubble({ message, senderLabel, pending = false }: Message
             {sharedProducts.map((p, idx) => (
               <div
                 key={p.id || idx}
-                className="overflow-hidden rounded-2xl border border-border/80 bg-surface shadow-xs transition text-text"
+                className="overflow-hidden rounded-xl border border-border/80 bg-surface shadow-xs transition text-text"
               >
-                {/* Hero Image at TOP of card */}
-                {p.imageUrl ? (
-                  <div className="relative h-36 sm:h-40 w-full overflow-hidden bg-black/5">
-                    <img
-                      src={p.imageUrl}
-                      alt={p.name || "Product"}
-                      className="h-full w-full object-cover rounded-t-xl"
-                    />
-                    {p.leadTime !== undefined && (
-                      <div className="absolute top-2 right-2">
-                        <span className="rounded-md bg-black/60 px-2 py-0.5 text-10 font-medium text-white backdrop-blur-xs">
-                          ⏱️ ~{p.leadTime}d lead time
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="flex h-32 w-full items-center justify-center bg-surface-muted text-text-muted">
-                    <Package className="h-8 w-8 opacity-40" />
-                  </div>
-                )}
+                {/* Multi-Image Carousel at TOP of card */}
+                <ProductCardCarousel
+                  images={p.images}
+                  fallbackUrl={p.imageUrl}
+                  alt={p.name || "Product"}
+                  leadTime={p.leadTime}
+                />
 
                 {/* Product Info in Middle */}
-                <div className="p-3">
-                  <p className="text-14 font-bold text-text leading-tight">{p.name}</p>
-                  <div className="mt-1 flex items-baseline gap-2">
-                    <span className="text-13 font-bold text-primary">{p.price}</span>
+                <div className="p-2.5">
+                  <p className="text-13 font-bold text-text leading-tight">{p.name}</p>
+                  <div className="mt-0.5 flex items-baseline gap-2">
+                    <span className="text-12 font-bold text-primary">{p.price}</span>
                   </div>
                   {p.description && (
                     <p className="mt-1 text-11 text-text-muted leading-relaxed line-clamp-2">
@@ -261,19 +346,11 @@ export function MessageBubble({ message, senderLabel, pending = false }: Message
                     </p>
                   )}
 
-                  {/* 3 Intent Action Buttons at BOTTOM of card */}
-                  <div className="mt-3 space-y-1.5 border-t border-border/60 pt-2.5">
+                  {/* Single Unified Enquire CTA Button at bottom */}
+                  <div className="mt-2.5 border-t border-border/60 pt-2">
                     <div className="flex items-center justify-center gap-1.5 rounded-lg border border-primary/30 bg-primary/10 py-1.5 text-11 font-semibold text-primary">
-                      <Tag className="h-3.5 w-3.5" />
-                      <span>🏷️ Sizes & Price</span>
-                    </div>
-                    <div className="flex items-center justify-center gap-1.5 rounded-lg border border-primary/30 bg-primary/10 py-1.5 text-11 font-semibold text-primary">
-                      <Sparkles className="h-3.5 w-3.5" />
-                      <span>🎨 Customize</span>
-                    </div>
-                    <div className="flex items-center justify-center gap-1.5 rounded-lg border border-primary/30 bg-primary/10 py-1.5 text-11 font-semibold text-primary">
-                      <ShoppingBag className="h-3.5 w-3.5" />
-                      <span>🛍️ Book / Order</span>
+                      <MessageSquare className="h-3.5 w-3.5" />
+                      <span>💬 Enquire Now</span>
                     </div>
                   </div>
                 </div>
