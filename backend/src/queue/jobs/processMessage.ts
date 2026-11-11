@@ -438,6 +438,25 @@ async function runPipeline(params: ProcessMessageParams): Promise<AiDecision | n
     });
   }
 
+  // 6b. If this is a product enquiry, fetch additional gallery images (images.slice(1))
+  let additionalMediaUrls: string[] = [];
+  const enquirySlug =
+    focusedProductSlug ||
+    (latestMeta?.kind === "product_enquiry" && typeof latestMeta.slug === "string" ? latestMeta.slug : undefined);
+
+  if (enquirySlug) {
+    const [enquiredProd] = await db
+      .select({ images: products.images })
+      .from(products)
+      .where(and(eq(products.businessId, businessId), eq(products.slug, enquirySlug)));
+
+    if (enquiredProd && Array.isArray(enquiredProd.images) && enquiredProd.images.length > 1) {
+      additionalMediaUrls = enquiredProd.images
+        .slice(1)
+        .filter((img): img is string => typeof img === "string" && img.trim().length > 0);
+    }
+  }
+
   // 7. Auto-reply. Atomically confirm the conversation is still ai_active
   //    (row lock held until commit) before recording and sending the reply.
   const committed = await db.transaction(async (tx) => {
@@ -475,6 +494,7 @@ async function runPipeline(params: ProcessMessageParams): Promise<AiDecision | n
         senderType: "ai",
         senderId: null,
         content: decision.reply,
+        mediaUrls: additionalMediaUrls,
         metadata: msgMetadata,
         deliveryStatus: "queued",
       })
@@ -516,6 +536,7 @@ async function runPipeline(params: ProcessMessageParams): Promise<AiDecision | n
       channelType: channel.type,
       recipient: customer.handleOrPhone,
       text: decision.reply,
+      mediaUrls: additionalMediaUrls.length > 0 ? additionalMediaUrls : undefined,
       businessId,
       conversationId,
       ...(interactiveProducts.length > 0

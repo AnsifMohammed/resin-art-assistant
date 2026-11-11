@@ -149,32 +149,39 @@ export async function sendMessage(opts: SendMessageOptions): Promise<SendMessage
           await delay(150);
         }
       }
-    } else if (mediaUrls.length > 0) {
-      for (let i = 0; i < mediaUrls.length; i++) {
-        const mediaUrl = mediaUrls[i];
-        if (!mediaUrl) continue;
-        // Send caption with the last media item if messageText is present
-        const caption =
-          i === mediaUrls.length - 1 && messageText.trim().length > 0 ? messageText.trim() : undefined;
-        const mediaResult = await sendWhatsAppMedia({
+    } else {
+      const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+      // 1. If text is present, dispatch full text first
+      if (messageText.trim().length > 0) {
+        const textResult = await sendWhatsAppText({
           recipientPhone: opts.recipient,
-          mediaUrl,
-          caption,
+          text: messageText,
           businessId: opts.businessId,
         });
-        if (!firstMetaMessageId) {
-          firstMetaMessageId = mediaResult.metaMessageId;
-        }
+        firstMetaMessageId = textResult.metaMessageId;
         partsCount++;
       }
-    } else if (messageText.trim().length > 0) {
-      const textResult = await sendWhatsAppText({
-        recipientPhone: opts.recipient,
-        text: messageText,
-        businessId: opts.businessId,
-      });
-      firstMetaMessageId = textResult.metaMessageId;
-      partsCount = 1;
+
+      // 2. If media attachments are present, dispatch each sequentially
+      if (mediaUrls.length > 0) {
+        for (let i = 0; i < mediaUrls.length; i++) {
+          const mediaUrl = mediaUrls[i];
+          if (!mediaUrl) continue;
+          const mediaResult = await sendWhatsAppMedia({
+            recipientPhone: opts.recipient,
+            mediaUrl,
+            businessId: opts.businessId,
+          });
+          if (!firstMetaMessageId) {
+            firstMetaMessageId = mediaResult.metaMessageId;
+          }
+          partsCount++;
+          if (i < mediaUrls.length - 1) {
+            await delay(100);
+          }
+        }
+      }
     }
 
     logger.info(
