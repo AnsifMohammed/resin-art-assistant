@@ -4,6 +4,7 @@ import { z } from "zod";
 import { db } from "../db/index.ts";
 import { auditLog, knowledgeBase, messages, orders, payments } from "../db/schema.ts";
 import { AppError } from "../lib/errors.ts";
+import { logger } from "../lib/logger.ts";
 import { authenticate } from "../middleware/authenticate.ts";
 import { requireAdmin } from "../middleware/requireAdmin.ts";
 import { requireStaffOrAdmin } from "../middleware/requireStaffOrAdmin.ts";
