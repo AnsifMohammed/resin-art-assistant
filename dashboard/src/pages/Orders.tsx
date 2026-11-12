@@ -218,7 +218,7 @@ interface OrderCardProps {
   isGrid?: boolean;
 }
 
-function OrderPaymentChip({ summary, orderTotal: _orderTotal }: { summary?: PaymentSummary | undefined; orderTotal: number }) {
+function OrderPaymentChip({ summary, orderTotal: _orderTotal }: { summary?: PaymentSummary | undefined; orderTotal?: number }) {
   // No payment made yet — hide the chip entirely
   if (!summary || summary.totalPaid === 0) return null;
 
@@ -255,17 +255,16 @@ function OrderCard({
   const cardBorderBg = milestone
     ? milestone.borderClass
     : isOverdue
-    ? "border-rose-500/70 bg-rose-500/[0.04] ring-1 ring-rose-500/30 shadow-xs animate-pulse"
-    : isApproaching
-    ? "border-amber-500/60 bg-amber-500/[0.03]"
-    : "border-border bg-surface";
+      ? "border-rose-500/70 bg-rose-500/[0.04] ring-1 ring-rose-500/30 shadow-xs animate-pulse"
+      : isApproaching
+        ? "border-amber-500/60 bg-amber-500/[0.03]"
+        : "border-border bg-surface";
 
   return (
     <div
       onClick={onSelect}
-      className={`p-3 rounded-xl border ${cardBorderBg} hover:border-primary/50 hover:shadow-xs transition-all cursor-pointer flex flex-col justify-between group ${
-        isGrid ? "gap-3 min-h-[185px]" : "gap-2.5"
-      }`}
+      className={`p-3 rounded-xl border ${cardBorderBg} hover:border-primary/50 hover:shadow-xs transition-all cursor-pointer flex flex-col justify-between group ${isGrid ? "gap-3 min-h-[185px]" : "gap-2.5"
+        }`}
     >
       <div className="space-y-2">
         {/* Top: Order #, Milestone badge (if any), Date */}
@@ -393,11 +392,10 @@ function OrderCard({
             <div className={`relative ${next && onAdvance ? "shrink-0" : "w-full"}`}>
               <button
                 type="button"
-                className={`${
-                  next && onAdvance
+                className={`${next && onAdvance
                     ? "w-7 h-7 flex items-center justify-center rounded-lg bg-surface-muted hover:bg-border border border-border text-text-muted hover:text-text"
                     : "w-full inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-surface-muted hover:bg-border border border-border text-text text-11 font-medium"
-                } transition-colors cursor-pointer`}
+                  } transition-colors cursor-pointer`}
                 title="Move to another stage"
               >
                 <ArrowRightLeft className="w-3.5 h-3.5 shrink-0" />
@@ -411,14 +409,19 @@ function OrderCard({
                     onMoveTo(e.target.value as OrderStatus);
                   }
                 }}
-                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full dark:[color-scheme:dark]"
                 title="Move to another stage"
               >
-                <option value="" disabled>
+                <option value="" disabled className="bg-surface text-text dark:bg-[#111827] dark:text-[#F1F5F9]">
                   Move to stage...
                 </option>
                 {COLUMNS.map((c) => (
-                  <option key={c.id} value={c.id} disabled={c.id === order.status}>
+                  <option
+                    key={c.id}
+                    value={c.id}
+                    disabled={c.id === order.status}
+                    className="bg-surface text-text dark:bg-[#111827] dark:text-[#F1F5F9] disabled:text-text-muted dark:disabled:text-slate-500"
+                  >
                     {c.id === order.status ? `✓ ${c.label} (Current)` : `→ ${c.label}`}
                   </option>
                 ))}
@@ -473,9 +476,8 @@ const errorMessage = (err: unknown): string | undefined =>
 function SkeletonOrderCard({ isGrid = false }: { isGrid?: boolean }) {
   return (
     <div
-      className={`p-3 rounded-xl border border-border bg-surface flex flex-col justify-between ${
-        isGrid ? "gap-3 min-h-[185px]" : "gap-2.5"
-      }`}
+      className={`p-3 rounded-xl border border-border bg-surface flex flex-col justify-between ${isGrid ? "gap-3 min-h-[185px]" : "gap-2.5"
+        }`}
     >
       <div className="space-y-2">
         <div className="flex items-center justify-between gap-1.5">
@@ -911,11 +913,10 @@ function OrderCommunicationHistory({
             return (
               <div
                 key={m.id}
-                className={`p-3 rounded-lg border text-12 space-y-1.5 ${
-                  isFailed
+                className={`p-3 rounded-lg border text-12 space-y-1.5 ${isFailed
                     ? "border-rose-500/30 bg-rose-500/5 text-text"
                     : "border-border bg-surface-muted text-text"
-                }`}
+                  }`}
               >
                 <div className="flex items-center justify-between text-10">
                   <div className="flex items-center gap-1.5 flex-wrap">
@@ -1153,7 +1154,7 @@ export default function Orders() {
       if (cid) setSelectedCustomerId(cid);
       setIsCreateOpen(true);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -1220,11 +1221,11 @@ export default function Orders() {
     setEditItems(
       order.items && order.items.length > 0
         ? order.items.map((it) => ({
-            productName: it.productName,
-            productDescription: it.productDescription || "",
-            quantity: it.quantity,
-            unitPrice: Number(it.unitPrice) > 0 ? String(it.unitPrice) : "",
-          }))
+          productName: it.productName,
+          productDescription: it.productDescription || "",
+          quantity: it.quantity,
+          unitPrice: Number(it.unitPrice) > 0 ? String(it.unitPrice) : "",
+        }))
         : [{ productName: "", productDescription: "", quantity: 1, unitPrice: "" }]
     );
   };
@@ -1416,11 +1417,10 @@ export default function Orders() {
             <button
               type="button"
               onClick={() => setShowDueDropdown((v) => !v)}
-              className={`flex items-center gap-1.5 h-9 px-3 rounded-xl border text-12 font-medium transition-colors cursor-pointer ${
-                duePreset !== "all"
+              className={`flex items-center gap-1.5 h-9 px-3 rounded-xl border text-12 font-medium transition-colors cursor-pointer ${duePreset !== "all"
                   ? "border-primary/50 bg-primary/10 text-primary"
                   : "border-border bg-surface hover:bg-surface-muted text-text"
-              }`}
+                }`}
             >
               <Calendar className="w-3.5 h-3.5 shrink-0" />
               <span>
@@ -1440,11 +1440,10 @@ export default function Orders() {
                       handleDuePresetChange(preset);
                       if (preset !== "custom") setShowDueDropdown(false);
                     }}
-                    className={`w-full text-left px-3.5 py-2 text-12 font-medium transition-colors cursor-pointer flex items-center justify-between ${
-                      duePreset === preset
+                    className={`w-full text-left px-3.5 py-2 text-12 font-medium transition-colors cursor-pointer flex items-center justify-between ${duePreset === preset
                         ? "bg-primary/10 text-primary"
                         : "text-text hover:bg-surface-muted"
-                    }`}
+                      }`}
                   >
                     {{ all: "All", "7d": "7 days", "15d": "15 days", "1m": "1 month", custom: "Custom range" }[preset]}
                     {duePreset === preset && <Check className="w-3.5 h-3.5" />}
@@ -1496,22 +1495,20 @@ export default function Orders() {
           <div className="flex items-center rounded-lg border border-border bg-surface p-0.5">
             <button
               onClick={() => setViewMode("board")}
-              className={`p-1.5 rounded-md transition-colors cursor-pointer ${
-                viewMode === "board"
+              className={`p-1.5 rounded-md transition-colors cursor-pointer ${viewMode === "board"
                   ? "bg-surface-muted text-text font-bold"
                   : "text-text-muted hover:text-text"
-              }`}
+                }`}
               title="Kanban Board view"
             >
               <LayoutGrid className="w-4 h-4" />
             </button>
             <button
               onClick={() => setViewMode("table")}
-              className={`p-1.5 rounded-md transition-colors cursor-pointer ${
-                viewMode === "table"
+              className={`p-1.5 rounded-md transition-colors cursor-pointer ${viewMode === "table"
                   ? "bg-surface-muted text-text font-bold"
                   : "text-text-muted hover:text-text"
-              }`}
+                }`}
               title="Table view"
             >
               <TableIcon className="w-4 h-4" />
@@ -1525,11 +1522,10 @@ export default function Orders() {
         <div className="flex items-center gap-1.5 overflow-x-auto custom-scrollbar pb-1 text-12 font-medium">
           <button
             onClick={() => setSelectedStatus("all")}
-            className={`px-3 py-1.5 rounded-lg transition-colors shrink-0 cursor-pointer ${
-              selectedStatus === "all"
+            className={`px-3 py-1.5 rounded-lg transition-colors shrink-0 cursor-pointer ${selectedStatus === "all"
                 ? "bg-primary text-primary-foreground font-semibold"
                 : "bg-surface-muted text-text-muted hover:text-text"
-            }`}
+              }`}
           >
             All ({statusCounts?.all ?? orders.length})
           </button>
@@ -1539,11 +1535,10 @@ export default function Orders() {
               <button
                 key={col.id}
                 onClick={() => setSelectedStatus(col.id)}
-                className={`px-3 py-1.5 rounded-lg transition-colors shrink-0 cursor-pointer ${
-                  selectedStatus === col.id
+                className={`px-3 py-1.5 rounded-lg transition-colors shrink-0 cursor-pointer ${selectedStatus === col.id
                     ? "bg-primary text-primary-foreground font-semibold"
                     : "bg-surface-muted text-text-muted hover:text-text"
-                }`}
+                  }`}
               >
                 {col.label} ({count})
               </button>
@@ -1707,9 +1702,8 @@ export default function Orders() {
                       <tr
                         key={o.id}
                         onClick={() => setActiveOrder(o)}
-                        className={`hover:bg-surface-muted transition-colors cursor-pointer ${
-                          isOverdue ? "bg-rose-500/[0.03]" : isApproaching ? "bg-amber-500/[0.02]" : ""
-                        }`}
+                        className={`hover:bg-surface-muted transition-colors cursor-pointer ${isOverdue ? "bg-rose-500/[0.03]" : isApproaching ? "bg-amber-500/[0.02]" : ""
+                          }`}
                       >
                         <td className="p-3.5 font-bold font-outfit text-text">#{o.orderNo}</td>
                         <td className="p-3.5">
@@ -2176,9 +2170,8 @@ export default function Orders() {
                   return (
                     <div key={c.id} className="text-center flex flex-col items-center">
                       <div
-                        className={`w-6 h-6 rounded-full flex items-center justify-center text-10 font-bold mb-1 ${
-                          isDone ? "bg-primary text-white" : "bg-border text-text-muted"
-                        }`}
+                        className={`w-6 h-6 rounded-full flex items-center justify-center text-10 font-bold mb-1 ${isDone ? "bg-primary text-white" : "bg-border text-text-muted"
+                          }`}
                       >
                         {i + 1}
                       </div>
@@ -2197,24 +2190,22 @@ export default function Orders() {
 
               return (
                 <div
-                  className={`p-4 rounded-xl border space-y-3 ${
-                    isOverdue
+                  className={`p-4 rounded-xl border space-y-3 ${isOverdue
                       ? "border-rose-500/50 bg-rose-500/[0.06] ring-1 ring-rose-500/30"
                       : isApproaching
-                      ? "border-amber-500/40 bg-amber-500/[0.04]"
-                      : "border-border bg-surface-muted"
-                  }`}
+                        ? "border-amber-500/40 bg-amber-500/[0.04]"
+                        : "border-border bg-surface-muted"
+                    }`}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-start gap-2.5">
                       <div
-                        className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
-                          isOverdue
+                        className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${isOverdue
                             ? "bg-rose-500 text-white"
                             : isApproaching
-                            ? "bg-amber-500/20 text-amber-600 dark:text-amber-400"
-                            : "bg-primary/10 text-primary"
-                        }`}
+                              ? "bg-amber-500/20 text-amber-600 dark:text-amber-400"
+                              : "bg-primary/10 text-primary"
+                          }`}
                       >
                         {isOverdue ? (
                           <AlertTriangle className="w-4 h-4" />
@@ -2241,8 +2232,8 @@ export default function Orders() {
                           {isOverdue
                             ? "This order has exceeded the 45-day Saba Art handcrafted resin curing and production timeline without moving to Ready."
                             : isApproaching
-                            ? "Handmade production duration is nearing the 45-day threshold (35–44 days)."
-                            : "Crafted by hand in Saba Art studio. Production timeline is within normal bounds."}
+                              ? "Handmade production duration is nearing the 45-day threshold (35–44 days)."
+                              : "Crafted by hand in Saba Art studio. Production timeline is within normal bounds."}
                         </p>
                       </div>
                     </div>
@@ -2705,16 +2696,16 @@ export default function Orders() {
                       setSendNotification(nextIdx >= currentIdx);
                     }
                   }}
-                  className="w-full pl-3 pr-8 py-1.5 appearance-none rounded-lg border border-border bg-surface text-12 text-text focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed transition-opacity"
+                  className="w-full pl-3 pr-8 py-1.5 appearance-none rounded-lg border border-border dark:border-white/10 bg-surface dark:bg-[#111827] text-12 text-text dark:text-[#F1F5F9] focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed transition-opacity dark:[color-scheme:dark]"
                 >
                   {COLUMNS.map((col) => (
-                    <option key={col.id} value={col.id}>
+                    <option key={col.id} value={col.id} className="bg-surface text-text dark:bg-[#111827] dark:text-[#F1F5F9]">
                       {col.label}
                     </option>
                   ))}
-                  <option value="cancelled">Cancelled</option>
+                  <option value="cancelled" className="bg-surface text-text dark:bg-[#111827] dark:text-[#F1F5F9]">Cancelled</option>
                 </select>
-                <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted" aria-hidden />
+                <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted dark:text-slate-400" aria-hidden />
               </div>
             </div>
 
