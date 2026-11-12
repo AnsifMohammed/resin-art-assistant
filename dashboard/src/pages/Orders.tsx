@@ -230,9 +230,14 @@ function OrderPaymentChip({ summary, orderTotal: _orderTotal }: { summary?: Paym
     );
   }
 
+  // Kept short and shrink-0: the row's right-hand group is shrink-0 too, so a
+  // longer label gets squeezed and the amount is clipped mid-number.
   return (
-    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 tabular-nums whitespace-nowrap">
-      Adv · Bal: ₹{summary.balanceDue.toLocaleString("en-IN")}
+    <span
+      className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 tabular-nums whitespace-nowrap shrink-0"
+      title={`Advance paid ₹${summary.totalPaid.toLocaleString("en-IN")} · Balance due ₹${summary.balanceDue.toLocaleString("en-IN")}`}
+    >
+      Bal ₹{summary.balanceDue.toLocaleString("en-IN")}
     </span>
   );
 }
@@ -290,6 +295,17 @@ function OrderCard({
             )}
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
+            {order.trackingId ? (
+              <button
+                onClick={(e) => onCopyTracking(order.trackingId!, e)}
+                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-surface-muted text-10 font-mono text-text hover:bg-border transition-colors cursor-pointer shrink-0"
+                title={`Tracking ID: ${order.trackingId} — click to copy`}
+                aria-label={`Copy tracking ID ${order.trackingId}`}
+              >
+                <Truck className="w-3 h-3 text-teal-500 shrink-0" />
+                <Copy className="w-2.5 h-2.5 shrink-0" />
+              </button>
+            ) : null}
             {isGrid && colInfo && (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold capitalize bg-surface-muted text-text-muted border border-border/50">
                 <span className={`w-1.5 h-1.5 rounded-full ${colInfo.color}`} />
@@ -356,16 +372,6 @@ function OrderCard({
           </div>
 
           <div className="flex items-center gap-1.5 shrink-0">
-            {order.trackingId ? (
-              <button
-                onClick={(e) => onCopyTracking(order.trackingId!, e)}
-                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-surface-muted text-10 font-mono text-text hover:bg-border transition-colors cursor-pointer shrink-0"
-                title="Click to copy tracking ID"
-              >
-                <Truck className="w-3 h-3 text-teal-500 shrink-0" />
-                <Copy className="w-2.5 h-2.5 shrink-0" />
-              </button>
-            ) : null}
             <span className="text-[10px] text-text-muted flex items-center gap-0.5 shrink-0 whitespace-nowrap">
               <Clock className="w-2.5 h-2.5 shrink-0" /> {formatDueDate(order.expectedDeliveryDate)}
             </span>
