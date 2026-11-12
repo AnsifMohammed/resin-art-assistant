@@ -28,20 +28,30 @@ afterEach(() => {
 });
 
 describe("sendMessage (live mode)", () => {
-  it("WhatsApp still throws 501 LIVE_SEND_NOT_IMPLEMENTED instead of silently succeeding", async () => {
+  // This used to assert a 501: WhatsApp live sending was unimplemented and fell
+  // through to the not-implemented guard. It is implemented now, so the test
+  // asserts the delivery actually happens rather than that it is refused.
+  it("delivers WhatsApp for real when the app is live", async () => {
     expect(config.DEMO_MODE).toBe(false);
-    const fetchMock = vi.fn();
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ messages: [{ id: "wamid.live1" }] }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        }),
+    );
     vi.stubGlobal("fetch", fetchMock);
-    const attempt = sendMessage({
+
+    const result = await sendMessage({
       channelType: "whatsapp",
       recipient: "+919876543210",
       text: "hello",
       businessId: "biz-1",
       conversationId: "conv-1",
     });
-    await expect(attempt).rejects.toBeInstanceOf(AppError);
-    await expect(attempt).rejects.toMatchObject({ statusCode: 501, code: "LIVE_SEND_NOT_IMPLEMENTED" });
-    expect(fetchMock).not.toHaveBeenCalled();
+
+    expect(fetchMock).toHaveBeenCalled();
+    expect(result).toMatchObject({ metaMessageId: "wamid.live1" });
   });
 
   it("Instagram is sent through graph.instagram.com and returns Meta's message id", async () => {
