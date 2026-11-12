@@ -57,6 +57,9 @@ vi.mock("../src/db/index.ts", () => {
     if (clause.queryChunks) {
       for (const chunk of clause.queryChunks) {
         if (chunk?.name === "email") return true;
+        // and(eq(email), eq(businessId)) nests the eqs one level deeper, so the
+        // email column is not a direct chunk of the outer clause.
+        if (chunk?.queryChunks && isEmailClause(chunk)) return true;
       }
     }
     return false;

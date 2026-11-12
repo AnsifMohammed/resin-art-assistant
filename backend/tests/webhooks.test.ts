@@ -530,7 +530,11 @@ describe("Meta Webhooks", () => {
 
       expect(res.statusCode).toBe(200);
       expect(insertsInto("messages")).toHaveLength(0);
-      expect(h.state.updates.filter((u) => u.table === "messages").map((u) => u.vals)).toEqual([{ metaMessageId: "ig.mid.race" }]);
+      // Claiming the row also advances it queued -> sent, otherwise an echo that
+      // beats the send's own update would leave the message stuck at queued.
+      expect(h.state.updates.filter((u) => u.table === "messages").map((u) => u.vals)).toEqual([
+        { metaMessageId: "ig.mid.race", deliveryStatus: "sent" },
+      ]);
       expect(h.state.updates.filter((u) => u.table === "conversations")).toHaveLength(0);
       expect(h.emitConversationUpdated).not.toHaveBeenCalled();
     });

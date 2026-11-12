@@ -285,7 +285,9 @@ describe("POST /templates", () => {
 
   it.each([
     ["empty name", { name: "  ", category: "general", body: "Hi" }],
-    ["bad category", { name: "A", category: "promo", body: "Hi" }],
+    // Category is a free-form string since custom categories shipped, so "promo"
+    // is valid now; blank is still rejected by .trim().min(1).
+    ["empty category", { name: "A", category: "   ", body: "Hi" }],
     ["empty body", { name: "A", category: "general", body: "   " }],
     ["bad metaTemplateName", { name: "A", category: "general", body: "Hi", metaTemplateName: "Order Shipped" }],
   ])("400 VALIDATION_ERROR for %s", async (_label, payload) => {

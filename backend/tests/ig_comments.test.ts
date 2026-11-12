@@ -42,6 +42,7 @@ const metaInstagram = vi.hoisted(() => ({
   ]),
   splitInstagramText: vi.fn((t: string) => [t]),
   fetchInstagramDisplayName: vi.fn(async () => "Customer"),
+  fetchCommenterProfilePic: vi.fn(async () => null),
   INSTAGRAM_MAX_TEXT_BYTES: 1000,
   INSTAGRAM_GRAPH_HOST: "https://graph.instagram.com",
   INSTAGRAM_GRAPH_VERSION: "v26.0",
@@ -935,7 +936,7 @@ describe("Instagram Comments & Rules API", () => {
 
       const res = await app.inject({
         method: "GET",
-        url: "/ig-comments/media-summary",
+        url: "/ig/comments/media-summary",
         headers: { authorization: `Bearer ${adminToken}` },
       });
 
