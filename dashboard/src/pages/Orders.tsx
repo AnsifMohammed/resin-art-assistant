@@ -162,7 +162,7 @@ export function getOrderDueMilestone(order: DbOrder): DueMilestone | null {
   if (remainingDays === 1) {
     return {
       type: "1d",
-      label: "1 Day Remaining",
+      label: "1 day left",
       badgeClass: "bg-amber-600/15 text-amber-800 dark:text-amber-300 border-amber-600/40",
       borderClass: "border-border/80 border-l-4 border-l-amber-600 dark:border-l-amber-500 bg-amber-600/[0.04]",
       dotClass: "bg-amber-600",
@@ -174,7 +174,7 @@ export function getOrderDueMilestone(order: DbOrder): DueMilestone | null {
   if (remainingDays === 2) {
     return {
       type: "2d",
-      label: "2 Days Remaining",
+      label: "2 days left",
       badgeClass: "bg-orange-500/15 text-orange-700 dark:text-orange-400 border-orange-500/40",
       borderClass: "border-border/80 border-l-4 border-l-orange-500 dark:border-l-orange-400 bg-orange-500/[0.03]",
       dotClass: "bg-orange-500",
@@ -186,7 +186,7 @@ export function getOrderDueMilestone(order: DbOrder): DueMilestone | null {
   if (remainingDays === 7) {
     return {
       type: "7d",
-      label: "7 Days Remaining",
+      label: "7 days left",
       badgeClass: "bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30",
       borderClass: "border-border/80 border-l-4 border-l-amber-400 dark:border-l-amber-500",
       dotClass: "bg-amber-500",
@@ -198,7 +198,7 @@ export function getOrderDueMilestone(order: DbOrder): DueMilestone | null {
   if (totalDuration >= 3 && elapsedDays === midpoint && midpoint > 0) {
     return {
       type: "midpoint",
-      label: "Midpoint Reached",
+      label: "Midpoint",
       badgeClass: "bg-blue-500/15 text-blue-700 dark:text-blue-400 border-blue-500/30",
       borderClass: "border-border/80 border-l-4 border-l-blue-400 dark:border-l-blue-500",
       dotClass: "bg-blue-500",
@@ -276,7 +276,7 @@ function OrderCard({
             </span>
             {milestone && (
               <span
-                className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-semibold border shrink-0 ${milestone.badgeClass}`}
+                className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-semibold border min-w-0 whitespace-nowrap ${milestone.badgeClass}`}
                 title={`Production Milestone: ${milestone.label}`}
               >
                 <span className="relative flex h-1.5 w-1.5 shrink-0">
