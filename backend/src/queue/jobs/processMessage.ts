@@ -5,7 +5,6 @@ import { db } from "../../db/index.ts";
 import {
   aiDecisions,
   auditLog,
-  businesses,
   channels,
   conversations,
   customers,
@@ -15,7 +14,7 @@ import {
   products,
 } from "../../db/schema.ts";
 import { Sentry } from "../../instrument.ts";
-import { markMessageSent } from "../../lib/conversation.ts";
+import { isAutomationPaused, markMessageSent } from "../../lib/conversation.ts";
 import { logger } from "../../lib/logger.ts";
 import { emitConversationUpdated, emitEscalationNew, emitMessageNew } from "../../realtime/events.ts";
 import { ensureCustomerAnswered } from "../../services/fallback.ts";
@@ -47,15 +46,6 @@ export function normalizeReason(r: string | null | undefined): EscalationReason 
   return "intent_unknown";
 }
 
-/** Global "pause automation" switch written by POST /settings/pause. */
-export async function isAutomationPaused(businessId: string): Promise<boolean> {
-  const [biz] = await db
-    .select({ settings: businesses.settings })
-    .from(businesses)
-    .where(eq(businesses.id, businessId));
-  const settings = (biz?.settings as Record<string, unknown> | null) ?? {};
-  return Boolean(settings.automation_paused);
-}
 
 /**
  * Split a conversation's messages (oldest first) into the unprocessed batch of

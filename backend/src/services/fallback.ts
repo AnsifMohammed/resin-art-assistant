@@ -1,9 +1,9 @@
 import { and, desc, eq } from "drizzle-orm";
 import { db } from "../db/index.ts";
 import { auditLog, channels, conversations, customers, messages } from "../db/schema.ts";
-import { markMessageSent } from "../lib/conversation.ts";
+import { isAutomationPaused, markMessageSent } from "../lib/conversation.ts";
+import { AppError } from "../lib/errors.ts";
 import { logger } from "../lib/logger.ts";
-import { isAutomationPaused } from "../queue/jobs/processMessage.ts";
 import { emitMessageNew } from "../realtime/events.ts";
 import { sendMessage } from "./send.ts";
 
@@ -67,12 +67,16 @@ export async function ensureCustomerAnswered(params: EnsureCustomerAnsweredParam
     }
 
     // Recent slice of the thread is enough to answer "was the last inbound replied to?".
-    const recent = await db
+    const rows = await db
       .select()
       .from(messages)
       .where(eq(messages.conversationId, conversationId))
       .orderBy(desc(messages.createdAt))
       .limit(25);
+
+    // Sorted again in memory: whether a customer is answered must not depend on
+    // the driver honouring orderBy, and newest-first is what the checks below assume.
+    const recent = [...rows].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 
     const lastInbound = recent.find((m) => m.direction === "inbound" && m.senderType === "customer");
     if (!lastInbound) return false;
@@ -125,10 +129,24 @@ export async function ensureCustomerAnswered(params: EnsureCustomerAnsweredParam
       await markMessageSent(db, outbound.id, metaMessageId);
       emitMessageNew({ ...outbound, deliveryStatus: "sent", ...(metaMessageId ? { metaMessageId } : {}) });
     } catch (err) {
-      // Log only. Escalating on a failed fallback would loop.
+      // Never escalate on a failed fallback — that would loop. But do record it:
+      // a fallback that fails silently is indistinguishable from one that never
+      // ran, which makes "is this deployed?" impossible to answer from the data.
       logger.error({ err, conversationId }, "Fallback send failed");
       await db.update(messages).set({ deliveryStatus: "failed" }).where(eq(messages.id, outbound.id));
       emitMessageNew({ ...outbound, deliveryStatus: "failed" });
+      await db.insert(auditLog).values({
+        businessId,
+        actorType: "system",
+        action: "fallback_failed",
+        conversationId,
+        details: {
+          messageId: outbound.id,
+          state: conv.state,
+          error: err instanceof Error ? err.message : String(err),
+          ...(err instanceof AppError ? { code: err.code, meta: err.details ?? null } : {}),
+        },
+      });
       return false;
     }
 
