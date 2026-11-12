@@ -18,6 +18,7 @@ import { Sentry } from "../../instrument.ts";
 import { markMessageSent } from "../../lib/conversation.ts";
 import { logger } from "../../lib/logger.ts";
 import { emitConversationUpdated, emitEscalationNew, emitMessageNew } from "../../realtime/events.ts";
+import { ensureCustomerAnswered } from "../../services/fallback.ts";
 import { notifyEscalation } from "../../services/notify.ts";
 import { sendMessage } from "../../services/send.ts";
 
@@ -244,18 +245,34 @@ export async function processMessageJob(
   options: ProcessMessageOptions = {},
 ): Promise<AiDecision | null> {
   const finalAttempt = options.finalAttempt ?? true;
+  // Set the moment a reply is handed to the channel. If that send fails the
+  // channel itself is down, so a fallback would fail too — that case belongs to
+  // alerting, not here.
+  const outcome: PipelineOutcome = { replyAttempted: false };
   try {
-    return await runPipeline(params);
+    const decision = await runPipeline(params, outcome);
+    // runPipeline returns a decision only when a reply actually went out; every
+    // other outcome (escalated, skipped, nothing to do) returns null. So null is
+    // exactly the set of cases where the customer would otherwise hear nothing.
+    if (!decision && !outcome.replyAttempted) await ensureCustomerAnswered(params);
+    return decision;
   } catch (err) {
     logger.error({ err, conversationId: params.conversationId, finalAttempt }, "processMessageJob failed");
     Sentry.captureException(err, { extra: { ...params } });
+    // A retry may still succeed, so only answer the customer once we are done trying.
     if (!finalAttempt) throw err;
     await escalateAfterFailure(params, err);
+    if (!outcome.replyAttempted) await ensureCustomerAnswered(params);
     return null;
   }
 }
 
-async function runPipeline(params: ProcessMessageParams): Promise<AiDecision | null> {
+/** Lets runPipeline report that it already put a reply on the wire. */
+interface PipelineOutcome {
+  replyAttempted: boolean;
+}
+
+async function runPipeline(params: ProcessMessageParams, outcome: PipelineOutcome): Promise<AiDecision | null> {
   const { conversationId, businessId } = params;
 
   // 1. Load conversation. If state !== "ai_active" -> stop and return.
@@ -532,6 +549,7 @@ async function runPipeline(params: ProcessMessageParams): Promise<AiDecision | n
     // The reply goes out on the conversation's own channel; never guess.
     if (!channel) throw new Error(`Channel ${conv.channelId} not found for conversation`);
     if (!customer?.handleOrPhone) throw new Error("Customer recipient not found for conversation");
+    outcome.replyAttempted = true;
     const result = await sendMessage({
       channelType: channel.type,
       recipient: customer.handleOrPhone,
