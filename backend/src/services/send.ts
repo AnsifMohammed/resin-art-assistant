@@ -1,4 +1,4 @@
-import { config, isInstagramLive } from "../config.ts";
+import { config, isInstagramLive, isWhatsAppLive } from "../config.ts";
 import { AppError } from "../lib/errors.ts";
 import { logger } from "../lib/logger.ts";
 import { sendInstagramText, sendInstagramMedia, sendInstagramProductCards } from "./meta/instagram.ts";
@@ -115,8 +115,9 @@ export async function sendMessage(opts: SendMessageOptions): Promise<SendMessage
     return { metaMessageId: firstMetaMessageId };
   }
 
-  // Live WhatsApp delivery when not in demo mode or when explicitly configured
-  if (opts.channelType === "whatsapp" && (!config.DEMO_MODE || Boolean(config.WHATSAPP_TOKEN))) {
+  // Live WhatsApp delivery requires an explicit opt-in (WHATSAPP_LIVE) or a
+  // fully live app. Holding a token is not consent to message real numbers.
+  if (opts.channelType === "whatsapp" && isWhatsAppLive(config)) {
     let firstMetaMessageId: string | null = null;
     let partsCount = 0;
 

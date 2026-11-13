@@ -5,7 +5,6 @@ import { db } from "../../db/index.ts";
 import {
   aiDecisions,
   auditLog,
-  businesses,
   channels,
   conversations,
   customers,
@@ -15,9 +14,10 @@ import {
   products,
 } from "../../db/schema.ts";
 import { Sentry } from "../../instrument.ts";
-import { markMessageSent } from "../../lib/conversation.ts";
+import { isAutomationPaused, markMessageSent } from "../../lib/conversation.ts";
 import { logger } from "../../lib/logger.ts";
 import { emitConversationUpdated, emitEscalationNew, emitMessageNew } from "../../realtime/events.ts";
+import { ensureCustomerAnswered } from "../../services/fallback.ts";
 import { notifyEscalation } from "../../services/notify.ts";
 import { sendMessage } from "../../services/send.ts";
 
@@ -46,15 +46,6 @@ export function normalizeReason(r: string | null | undefined): EscalationReason 
   return "intent_unknown";
 }
 
-/** Global "pause automation" switch written by POST /settings/pause. */
-export async function isAutomationPaused(businessId: string): Promise<boolean> {
-  const [biz] = await db
-    .select({ settings: businesses.settings })
-    .from(businesses)
-    .where(eq(businesses.id, businessId));
-  const settings = (biz?.settings as Record<string, unknown> | null) ?? {};
-  return Boolean(settings.automation_paused);
-}
 
 /**
  * Split a conversation's messages (oldest first) into the unprocessed batch of
@@ -244,18 +235,34 @@ export async function processMessageJob(
   options: ProcessMessageOptions = {},
 ): Promise<AiDecision | null> {
   const finalAttempt = options.finalAttempt ?? true;
+  // Set the moment a reply is handed to the channel. If that send fails the
+  // channel itself is down, so a fallback would fail too — that case belongs to
+  // alerting, not here.
+  const outcome: PipelineOutcome = { replyAttempted: false };
   try {
-    return await runPipeline(params);
+    const decision = await runPipeline(params, outcome);
+    // Only `replyAttempted` may gate this. The return value is the job's result,
+    // not a reply signal: a successful escalation returns the decision while the
+    // customer has heard nothing, which is precisely the case the fallback is for.
+    if (!outcome.replyAttempted) await ensureCustomerAnswered(params);
+    return decision;
   } catch (err) {
     logger.error({ err, conversationId: params.conversationId, finalAttempt }, "processMessageJob failed");
     Sentry.captureException(err, { extra: { ...params } });
+    // A retry may still succeed, so only answer the customer once we are done trying.
     if (!finalAttempt) throw err;
     await escalateAfterFailure(params, err);
+    if (!outcome.replyAttempted) await ensureCustomerAnswered(params);
     return null;
   }
 }
 
-async function runPipeline(params: ProcessMessageParams): Promise<AiDecision | null> {
+/** Lets runPipeline report that it already put a reply on the wire. */
+interface PipelineOutcome {
+  replyAttempted: boolean;
+}
+
+async function runPipeline(params: ProcessMessageParams, outcome: PipelineOutcome): Promise<AiDecision | null> {
   const { conversationId, businessId } = params;
 
   // 1. Load conversation. If state !== "ai_active" -> stop and return.
@@ -532,6 +539,7 @@ async function runPipeline(params: ProcessMessageParams): Promise<AiDecision | n
     // The reply goes out on the conversation's own channel; never guess.
     if (!channel) throw new Error(`Channel ${conv.channelId} not found for conversation`);
     if (!customer?.handleOrPhone) throw new Error("Customer recipient not found for conversation");
+    outcome.replyAttempted = true;
     const result = await sendMessage({
       channelType: channel.type,
       recipient: customer.handleOrPhone,

@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
-import type { Db } from "../db/index.ts";
-import { conversations, messages } from "../db/schema.ts";
+import { db, type Db } from "../db/index.ts";
+import { businesses, conversations, messages } from "../db/schema.ts";
 import { logger } from "./logger.ts";
 
 /** The transaction handle passed to db.transaction's callback. */
@@ -51,4 +51,19 @@ export async function markMessageSent(
     }
   }
   await dbOrTx.update(messages).set({ deliveryStatus: "sent" }).where(eq(messages.id, messageId));
+}
+
+/**
+ * The global "pause automation" switch written by POST /settings/pause.
+ *
+ * Lives here rather than beside the pipeline so that both the pipeline and the
+ * services it calls can read it without importing each other.
+ */
+export async function isAutomationPaused(businessId: string): Promise<boolean> {
+  const [biz] = await db
+    .select({ settings: businesses.settings })
+    .from(businesses)
+    .where(eq(businesses.id, businessId));
+  const settings = (biz?.settings as Record<string, unknown> | null) ?? {};
+  return Boolean(settings.automation_paused);
 }

@@ -90,8 +90,15 @@ export const envSchema = z
       .enum(["true", "false"], { error: 'must be "true" or "false"' })
       .transform((v) => v === "true"),
     // Send real Instagram DMs (graph.instagram.com) even when DEMO_MODE=true.
-    // WhatsApp keeps following DEMO_MODE. Default false.
+    // Default false.
     INSTAGRAM_LIVE: z
+      .enum(["true", "false"], { error: 'must be "true" or "false"' })
+      .default("false")
+      .transform((v) => v === "true"),
+    // Send real WhatsApp messages even when DEMO_MODE=true. Default false, so
+    // holding a WHATSAPP_TOKEN is never on its own enough to message real
+    // phone numbers — it has to be opted into explicitly, like Instagram.
+    WHATSAPP_LIVE: z
       .enum(["true", "false"], { error: 'must be "true" or "false"' })
       .default("false")
       .transform((v) => v === "true"),
@@ -220,6 +227,18 @@ export type Config = z.infer<typeof envSchema>;
  */
 export function isInstagramLive(cfg: Pick<Config, "DEMO_MODE" | "INSTAGRAM_LIVE">): boolean {
   return cfg.INSTAGRAM_LIVE || !cfg.DEMO_MODE;
+}
+
+/**
+ * WhatsApp messages go to Meta when WHATSAPP_LIVE=true, or when the whole app
+ * is live (DEMO_MODE=false). Otherwise they are only logged (demo).
+ *
+ * Previously the send path treated a non-empty WHATSAPP_TOKEN as consent to go
+ * live, so any environment holding a token delivered real messages to real
+ * phone numbers while believing it was in demo mode.
+ */
+export function isWhatsAppLive(cfg: Pick<Config, "DEMO_MODE" | "WHATSAPP_LIVE">): boolean {
+  return cfg.WHATSAPP_LIVE || !cfg.DEMO_MODE;
 }
 
 export class ConfigError extends Error {

@@ -20,12 +20,30 @@ async function pingDatabase(): Promise<boolean> {
   }
 }
 
+/**
+ * The commit this process is running, so "is my change deployed?" is a question
+ * the server answers rather than one inferred from whether a feature appears to
+ * work. Render sets RENDER_GIT_COMMIT on every deploy; the others cover common
+ * hosts, and "unknown" simply means none were present.
+ */
+const COMMIT =
+  process.env.RENDER_GIT_COMMIT ??
+  process.env.GIT_COMMIT ??
+  process.env.SOURCE_VERSION ??
+  process.env.VERCEL_GIT_COMMIT_SHA ??
+  "unknown";
+
+/** Set once at import, so it also reveals how long the instance has been up. */
+const STARTED_AT = new Date().toISOString();
+
 export async function healthRoutes(app: FastifyInstance): Promise<void> {
   app.get("/health", async (request, reply) => {
     const ok = await pingDatabase();
     const body = {
       ok,
       mode: config.DEMO_MODE ? "demo" : "live",
+      commit: COMMIT.slice(0, 7),
+      startedAt: STARTED_AT,
       timestamp: new Date().toISOString(),
     };
     if (!ok) {
