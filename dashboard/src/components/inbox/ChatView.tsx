@@ -72,8 +72,7 @@ function PauseResumeButton({ conversation }: { conversation: ConversationDetail 
         }
       >
         <PlayCircle className="h-3.5 w-3.5 shrink-0 text-emerald-500" aria-hidden />
-        <span className="hidden sm:inline">Resume AI</span>
-        
+        <span className="hidden lg:inline">Resume AI</span>
       </button>
     );
   }
@@ -95,7 +94,7 @@ function PauseResumeButton({ conversation }: { conversation: ConversationDetail 
         }
       >
         <PauseCircle className="h-3.5 w-3.5 shrink-0 text-amber-500" aria-hidden />
-        <span className="hidden sm:inline">Pause AI</span>
+        <span className="hidden lg:inline">Pause AI</span>
       </button>
     </span>
   );
@@ -289,7 +288,7 @@ export function ChatView({ conversation, onBack, backOnlyOnMobile = false, onRes
                 title="Create an order for this customer"
               >
                 <ShoppingBag className="h-3.5 w-3.5 shrink-0 text-amber-500" aria-hidden />
-                <span className="hidden sm:inline">Create Order</span>
+                <span className="hidden lg:inline">Create Order</span>
               </button>
             )}
             {isAdmin && <PauseResumeButton conversation={conversation} />}
@@ -299,12 +298,11 @@ export function ChatView({ conversation, onBack, backOnlyOnMobile = false, onRes
                 onClick={() => setConfirmResolve(true)}
                 disabled={resolve.isPending || reply.isPending}
                 aria-busy={resolve.isPending || undefined}
-                className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1 text-11 font-medium text-white shadow-xs transition-colors hover:bg-emerald-700 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 sm:gap-1.5 sm:px-3"
+                className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-2 py-1 text-11 font-medium text-white shadow-xs transition-colors hover:bg-emerald-700 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 sm:gap-1.5 sm:px-2.5 lg:px-3"
                 title="Mark resolved and hand back to the AI"
               >
                 <CheckCircle2 className="h-3 w-3 shrink-0" aria-hidden />
-                <span className="hidden sm:inline">{resolve.isPending ? "Resolving…" : "Mark resolved"}</span>
-                <span className="sm:hidden">Resolve</span>
+                <span className="hidden lg:inline">{resolve.isPending ? "Resolving…" : "Mark resolved"}</span>
               </button>
             )}
             {headerActions}

@@ -302,8 +302,9 @@ export function ReplyBox({
           className="max-h-40 min-h-11 w-full resize-none border-none bg-transparent font-sans text-13 leading-relaxed text-text placeholder:text-text-muted focus:outline-none disabled:cursor-not-allowed"
         />
 
-        <div className="flex items-center justify-between gap-2 border-t border-border/40 pt-2 text-12">
-          <div className="flex min-w-0 items-center gap-1.5 sm:gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-y-2 gap-x-1.5 border-t border-border/40 pt-2 text-12">
+          {/* Left Action Buttons (Templates, Catalogue, Attachment) */}
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
             <button
               type="button"
               onClick={() => setPickerOpen(true)}
@@ -314,10 +315,11 @@ export function ReplyBox({
                   ? "border-primary/50 bg-primary/10 text-primary-text hover:bg-primary/20"
                   : "border-border/80 bg-surface text-text hover:bg-surface-muted",
               )}
+              title="Use message template"
             >
               <FileText className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden />
-              <span className="hidden sm:inline">Use template</span>
-              <span className="sm:hidden">Template</span>
+              <span className="hidden xl:inline">Use template</span>
+              <span className="xl:hidden">Template</span>
             </button>
 
             <button
@@ -328,8 +330,7 @@ export function ReplyBox({
               title="Share product catalogue"
             >
               <Package className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden />
-              <span className="hidden sm:inline">Catalogue</span>
-              <span className="sm:hidden">Products</span>
+              <span>Catalogue</span>
             </button>
 
             {/* Hidden native device file input supporting photos, videos, PDFs, Word, PPT, Excel, TXT */}
@@ -354,8 +355,9 @@ export function ReplyBox({
             </button>
           </div>
 
-          <div className="flex shrink-0 items-center gap-2">
-            <span className="hidden text-11 text-text-muted lg:inline">Enter to send · Shift+Enter new line</span>
+          {/* Right Controls (Hint + Send Button) */}
+          <div className="flex shrink-0 items-center gap-2 ml-auto">
+            <span className="hidden text-11 text-text-muted xl:inline">Enter to send · Shift+Enter new line</span>
             <button
               type="submit"
               disabled={!hasContent || textDisabled || sending || isUploadingAny}

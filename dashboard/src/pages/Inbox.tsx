@@ -211,7 +211,7 @@ function ConversationPane({
             <button
               type="button"
               onClick={onCloseChat}
-              className="ml-auto rounded-lg border border-border bg-surface p-1.5 text-text-muted hover:bg-surface-muted hover:text-text transition-colors cursor-pointer"
+              className="hidden md:inline-flex ml-auto rounded-lg border border-border bg-surface p-1.5 text-text-muted hover:bg-surface-muted hover:text-text transition-colors cursor-pointer"
               title="Close conversation"
               aria-label="Close conversation"
             >
@@ -270,7 +270,7 @@ function ConversationPane({
             <button
               type="button"
               onClick={onCloseChat}
-              className="rounded-lg border border-border bg-surface p-1.5 text-text-muted hover:bg-surface-muted hover:text-text transition-colors cursor-pointer"
+              className="hidden md:inline-flex rounded-lg border border-border bg-surface p-1.5 text-text-muted hover:bg-surface-muted hover:text-text transition-colors cursor-pointer"
               title="Close conversation"
               aria-label="Close conversation"
             >
@@ -679,7 +679,7 @@ export default function Inbox() {
       <div
         className={cn(
           selectedId ? "hidden md:flex" : "flex",
-          "z-10 h-full w-full shrink-0 flex-col border-r border-border bg-surface md:w-[320px] lg:w-[340px] xl:w-[360px]",
+          "z-10 h-full w-full shrink-0 flex-col border-r border-border bg-surface md:w-[280px] lg:w-[320px] xl:w-[360px]",
         )}
       >
         <div className="shrink-0 space-y-2 border-b border-border/70 p-3 sm:p-3.5">
@@ -717,7 +717,7 @@ export default function Inbox() {
           </div>
 
           <div
-            className="flex items-center gap-1.5 overflow-x-auto pb-1 text-12 font-medium custom-scrollbar"
+            className="flex items-center gap-1.5 overflow-x-auto pb-1 pr-2.5 text-12 font-medium custom-scrollbar"
             role="group"
             aria-label="Filter conversations"
           >
