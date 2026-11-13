@@ -111,6 +111,7 @@ const rt = vi.hoisted(() => ({
 vi.mock("../src/realtime/events.ts", () => rt);
 
 const { processMessageJob, selectBatch, normalizeReason } = await import("../src/queue/jobs/processMessage.ts");
+const { FALLBACK_TEXT } = await import("../src/services/fallback.ts");
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -315,8 +316,9 @@ describe("processMessageJob: outcomes", () => {
     });
     expect(state.inserted.audit_log?.[0]).toMatchObject({ action: "escalation_created", actorType: "ai" });
     expect(notifyEscalation).toHaveBeenCalledOnce();
-    expect(sendMessage).not.toHaveBeenCalled();
-    // Realtime: escalation:new + conversation:updated, no message.
+    // The AI's own draft is never sent on an escalation — a human writes that reply.
+    expect(sendMessage).not.toHaveBeenCalledWith(expect.objectContaining({ text: refundEscalation.reply }));
+    // Realtime: escalation:new + conversation:updated.
     expect(rt.emitEscalationNew).toHaveBeenCalledWith("biz-1", {
       escalationId: expect.any(String),
       conversationId: "conv-1",
@@ -324,7 +326,36 @@ describe("processMessageJob: outcomes", () => {
       customerName: expect.any(String),
     });
     expect(rt.emitConversationUpdated).toHaveBeenCalledWith("biz-1", { conversationId: "conv-1", state: "escalated", tag: null });
-    expect(rt.emitMessageNew).not.toHaveBeenCalled();
+  });
+
+  // Regression: the fallback gate used to read `!decision && !replyAttempted`, but
+  // a successful escalation returns the decision — so the one path where the
+  // customer reliably hears nothing was the one path that skipped the fallback.
+  it("sends the fallback line to the customer when the AI escalates", async () => {
+    processAiDecision.mockResolvedValue(refundEscalation);
+
+    await processMessageJob(params);
+
+    expect(state.conv.state).toBe("escalated");
+    expect(sendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ recipient: "demo_rahul", text: FALLBACK_TEXT }),
+    );
+    expect(state.inserted.messages?.at(-1)).toMatchObject({
+      direction: "outbound",
+      senderType: "ai",
+      content: FALLBACK_TEXT,
+      metadata: { kind: "fallback", state: "escalated" },
+    });
+    expect(state.inserted.audit_log?.some((a: any) => a.action === "fallback_sent")).toBe(true);
+  });
+
+  it("does not send a fallback when the AI already replied", async () => {
+    processAiDecision.mockResolvedValue(autoReply);
+
+    await processMessageJob(params);
+
+    expect(sendMessage).toHaveBeenCalledOnce();
+    expect(sendMessage).not.toHaveBeenCalledWith(expect.objectContaining({ text: FALLBACK_TEXT }));
   });
 
   it("combines all unprocessed customer messages into one AI call", async () => {

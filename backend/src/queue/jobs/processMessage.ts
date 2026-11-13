@@ -241,10 +241,10 @@ export async function processMessageJob(
   const outcome: PipelineOutcome = { replyAttempted: false };
   try {
     const decision = await runPipeline(params, outcome);
-    // runPipeline returns a decision only when a reply actually went out; every
-    // other outcome (escalated, skipped, nothing to do) returns null. So null is
-    // exactly the set of cases where the customer would otherwise hear nothing.
-    if (!decision && !outcome.replyAttempted) await ensureCustomerAnswered(params);
+    // Only `replyAttempted` may gate this. The return value is the job's result,
+    // not a reply signal: a successful escalation returns the decision while the
+    // customer has heard nothing, which is precisely the case the fallback is for.
+    if (!outcome.replyAttempted) await ensureCustomerAnswered(params);
     return decision;
   } catch (err) {
     logger.error({ err, conversationId: params.conversationId, finalAttempt }, "processMessageJob failed");
