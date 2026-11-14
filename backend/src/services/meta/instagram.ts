@@ -361,52 +361,12 @@ export async function sendInstagramProductCards(
   const productsToSend = opts.products.slice(0, 10);
   let firstMetaMessageId: string | null = null;
 
-  // If a single product with multiple images is shared, dispatch as a native Instagram carousel
-  if (productsToSend.length === 1 && productsToSend[0]!.images && productsToSend[0]!.images.length > 1) {
-    const p = productsToSend[0]!;
-    const gallery = (p.images ?? []).slice(0, 10);
-    const elements = gallery.map((imgUrl, idx) => ({
-      title: `${p.name} (${idx + 1}/${gallery.length})`.slice(0, 80),
-      image_url: imgUrl,
-      subtitle: `${p.price} • ~${p.leadTime}d lead time`.slice(0, 80),
-      buttons: [
-        {
-          type: "postback",
-          title: "💬 Enquire",
-          payload: `action:enquire:${p.slug}:${idx}`,
-        },
-      ],
-    }));
-
-    const body = await graphRequest(url, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        recipient: { id: opts.recipientId },
-        message: {
-          attachment: {
-            type: "template",
-            payload: {
-              template_type: "generic",
-              elements,
-            },
-          },
-        },
-      }),
-    });
-
-    const mid = str(body.message_id);
-    if (!mid) {
-      throw new AppError(502, "Instagram API response had no message_id", "META_ERROR");
-    }
-    return { metaMessageId: mid };
-  }
-
   for (let i = 0; i < productsToSend.length; i++) {
     const p = productsToSend[i]!;
+    const primaryImg = p.imageUrl || (p.images && p.images[0]) || undefined;
     const element = {
       title: p.name.slice(0, 80),
-      ...(p.imageUrl ? { image_url: p.imageUrl } : {}),
+      ...(primaryImg ? { image_url: primaryImg } : {}),
       subtitle: `${p.price} • ~${p.leadTime}d lead time`.slice(0, 80),
       buttons: [
         {

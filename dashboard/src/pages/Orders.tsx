@@ -519,98 +519,104 @@ function OrdersSkeleton({
   viewMode: "board" | "table";
   selectedStatus: string;
 }) {
-  if (viewMode === "table") {
-    return (
-      <div className="rounded-xl border border-border bg-surface overflow-hidden">
-        <table className="w-full text-left text-13">
-          <thead className="bg-surface-muted border-b border-border text-11 uppercase font-semibold text-text-muted">
-            <tr>
-              <th className="p-3.5">Order</th>
-              <th className="p-3.5">Customer</th>
-              <th className="p-3.5">Products</th>
-              <th className="p-3.5">Total</th>
-              <th className="p-3.5">Status</th>
-              <th className="p-3.5">Placed</th>
-              <th className="p-3.5">Tracking / Due</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border/60">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <tr key={i} className="p-3.5">
-                <td className="p-3.5">
-                  <Skeleton className="w-14 h-4" />
-                </td>
-                <td className="p-3.5">
-                  <div className="flex items-center gap-2">
-                    <Skeleton className="w-6 h-6 rounded-full shrink-0" />
-                    <Skeleton className="w-24 h-3.5" />
-                  </div>
-                </td>
-                <td className="p-3.5">
-                  <Skeleton className="w-32 h-3.5" />
-                </td>
-                <td className="p-3.5">
-                  <Skeleton className="w-16 h-4" />
-                </td>
-                <td className="p-3.5">
-                  <Skeleton className="w-20 h-5 rounded-full" />
-                </td>
-                <td className="p-3.5">
-                  <Skeleton className="w-16 h-3.5" />
-                </td>
-                <td className="p-3.5">
-                  <Skeleton className="w-20 h-4 rounded" />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    );
-  }
-
-  if (selectedStatus !== "all") {
-    return (
-      <div className="space-y-4">
-        <div className="flex items-center justify-between p-3.5 rounded-xl border border-border bg-surface/80">
-          <div className="flex items-center gap-2.5">
-            <Skeleton className="w-3 h-3 rounded-full" />
-            <Skeleton className="w-36 h-5" />
-            <Skeleton className="w-16 h-5 rounded-full" />
-          </div>
-          <Skeleton className="w-28 h-4 hidden sm:block" />
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {Array.from({ length: 8 }).map((_, i) => (
-            <SkeletonOrderCard key={i} isGrid />
-          ))}
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="h-full flex items-start gap-3 xl:gap-3.5 2xl:gap-4 overflow-x-auto custom-scrollbar pb-2 pt-1 w-full">
-      {COLUMNS.map((col) => (
-        <div
-          key={col.id}
-          className="flex-1 min-w-[220px] xl:min-w-0 h-full flex flex-col rounded-xl border border-border bg-surface/60 shadow-2xs overflow-hidden"
-        >
-          <div className="shrink-0 flex items-center justify-between p-2.5 sm:p-3 border-b border-border/40 bg-surface/95 rounded-t-xl">
-            <div className="flex items-center gap-1.5 min-w-0">
-              <span className={`w-2 h-2 rounded-full ${col.color} shrink-0`} />
-              <span className="text-12 sm:text-13 font-bold font-outfit text-text truncate">{col.label}</span>
+    <>
+      {/* Mobile vertical skeleton (< md) */}
+      <div className="block md:hidden space-y-3 pb-6">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <SkeletonOrderCard key={i} isGrid />
+        ))}
+      </div>
+
+      {/* Desktop / Tablet skeleton (≥ md) */}
+      <div className="hidden md:block h-full">
+        {viewMode === "table" ? (
+          <div className="rounded-xl border border-border bg-surface overflow-hidden">
+            <table className="w-full text-left text-13">
+              <thead className="bg-surface-muted border-b border-border text-11 uppercase font-semibold text-text-muted">
+                <tr>
+                  <th className="p-3.5">Order</th>
+                  <th className="p-3.5">Customer</th>
+                  <th className="p-3.5">Products</th>
+                  <th className="p-3.5">Total</th>
+                  <th className="p-3.5">Status</th>
+                  <th className="p-3.5">Placed</th>
+                  <th className="p-3.5">Tracking / Due</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/60">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <tr key={i} className="p-3.5">
+                    <td className="p-3.5">
+                      <Skeleton className="w-14 h-4" />
+                    </td>
+                    <td className="p-3.5">
+                      <div className="flex items-center gap-2">
+                        <Skeleton className="w-6 h-6 rounded-full shrink-0" />
+                        <Skeleton className="w-24 h-3.5" />
+                      </div>
+                    </td>
+                    <td className="p-3.5">
+                      <Skeleton className="w-32 h-3.5" />
+                    </td>
+                    <td className="p-3.5">
+                      <Skeleton className="w-16 h-4" />
+                    </td>
+                    <td className="p-3.5">
+                      <Skeleton className="w-20 h-5 rounded-full" />
+                    </td>
+                    <td className="p-3.5">
+                      <Skeleton className="w-16 h-3.5" />
+                    </td>
+                    <td className="p-3.5">
+                      <Skeleton className="w-20 h-4 rounded" />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : selectedStatus !== "all" ? (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between p-3.5 rounded-xl border border-border bg-surface/80">
+              <div className="flex items-center gap-2.5">
+                <Skeleton className="w-3 h-3 rounded-full" />
+                <Skeleton className="w-36 h-5" />
+                <Skeleton className="w-16 h-5 rounded-full" />
+              </div>
+              <Skeleton className="w-28 h-4 hidden sm:block" />
             </div>
-            <Skeleton className="w-5 h-4 rounded shrink-0" />
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <SkeletonOrderCard key={i} isGrid />
+              ))}
+            </div>
           </div>
-          <div className="flex-1 min-h-0 p-2.5 space-y-2.5 overflow-hidden">
-            <SkeletonOrderCard />
-            <SkeletonOrderCard />
+        ) : (
+          <div className="h-full flex items-start gap-3 xl:gap-3.5 2xl:gap-4 overflow-x-auto custom-scrollbar pb-2 pt-1 w-full">
+            {COLUMNS.map((col) => (
+              <div
+                key={col.id}
+                className="flex-1 min-w-[220px] xl:min-w-0 h-full flex flex-col rounded-xl border border-border bg-surface/60 shadow-2xs overflow-hidden"
+              >
+                <div className="shrink-0 flex items-center justify-between p-2.5 sm:p-3 border-b border-border/40 bg-surface/95 rounded-t-xl">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className={`w-2 h-2 rounded-full ${col.color} shrink-0`} />
+                    <span className="text-12 sm:text-13 font-bold font-outfit text-text truncate">{col.label}</span>
+                  </div>
+                  <Skeleton className="w-5 h-4 rounded shrink-0" />
+                </div>
+                <div className="flex-1 min-h-0 p-2.5 space-y-2.5 overflow-hidden">
+                  <SkeletonOrderCard />
+                  <SkeletonOrderCard />
+                </div>
+              </div>
+            ))}
           </div>
-        </div>
-      ))}
-    </div>
+        )}
+      </div>
+    </>
   );
 }
 
@@ -1499,7 +1505,7 @@ export default function Orders() {
           </button>
 
           {/* View Toggle */}
-          <div className="flex items-center rounded-lg border border-border bg-surface p-0.5">
+          <div className="hidden md:flex items-center rounded-lg border border-border bg-surface p-0.5">
             <button
               onClick={() => setViewMode("board")}
               className={`p-1.5 rounded-md transition-colors cursor-pointer ${
@@ -1574,49 +1580,36 @@ export default function Orders() {
       <div className="flex-1 min-h-0 w-full overflow-hidden">
         {isLoading ? (
           <OrdersSkeleton viewMode={viewMode} selectedStatus={selectedStatus} />
-        ) : viewMode === "board" ? (
-          selectedStatus !== "all" ? (
-            /* ─── Focus Grid View for Selected Stage ────────────────────────── */
-            <div className="h-full overflow-y-auto custom-scrollbar space-y-4 pr-1">
-              {/* Stage Summary Banner */}
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 p-3.5 rounded-xl border border-border bg-surface/80 shrink-0">
-                <div className="flex items-center gap-2.5">
-                  <span className={`w-3 h-3 rounded-full ${COLUMNS.find((c) => c.id === selectedStatus)?.color ?? "bg-primary"}`} />
-                  <h2 className="text-15 font-bold font-outfit text-text">
-                    {COLUMNS.find((c) => c.id === selectedStatus)?.label ?? "Filtered"} Orders
-                  </h2>
-                  <span className="px-2 py-0.5 rounded-full text-11 font-bold bg-primary/10 text-primary">
-                    {orders.length} {orders.length === 1 ? "order" : "orders"}
-                  </span>
-                  <span className="text-12 text-text-muted hidden md:inline">
-                    · Full-width grid view
-                  </span>
-                </div>
-
-                <button
-                  onClick={() => setSelectedStatus("all")}
-                  className="inline-flex items-center gap-1.5 text-12 font-semibold text-primary hover:underline cursor-pointer"
-                >
-                  <span>View all pipeline stages</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </button>
-              </div>
-
-              {/* Responsive Card Grid */}
+        ) : (
+          <>
+            {/* ─── Mobile Vertical Feed (< md) ───────────────────────── */}
+            <div className="block md:hidden h-full overflow-y-auto custom-scrollbar space-y-3 pb-8 pr-0.5">
               {orders.length === 0 ? (
-                <div className="rounded-xl border border-border bg-surface p-6 sm:p-10">
+                <div className="rounded-xl border border-border bg-surface p-6">
                   <EmptyState
-                    title={`No orders in ${COLUMNS.find((c) => c.id === selectedStatus)?.label.toLowerCase() ?? "this stage"}`}
-                    description="Move an order to this stage or switch back to the full pipeline."
-                    action={{
-                      label: "Back to full board",
-                      onClick: () => setSelectedStatus("all"),
-                      variant: "outline",
-                    }}
+                    title={
+                      selectedStatus === "all"
+                        ? "No orders found"
+                        : `No orders in ${COLUMNS.find((c) => c.id === selectedStatus)?.label.toLowerCase() ?? "this stage"}`
+                    }
+                    description={
+                      searchQuery
+                        ? "Try a different search term or clear the filter."
+                        : "New orders will appear here automatically."
+                    }
+                    action={
+                      selectedStatus !== "all"
+                        ? {
+                            label: "View all stages",
+                            onClick: () => setSelectedStatus("all"),
+                            variant: "outline",
+                          }
+                        : undefined
+                    }
                   />
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 items-stretch pb-4">
+                <div className="space-y-3">
                   {orders.map((o) => (
                     <OrderCard
                       key={o.id}
@@ -1631,178 +1624,241 @@ export default function Orders() {
                 </div>
               )}
             </div>
-          ) : (
-            /* ─── Full Pipeline Kanban View (All Stages) ────────────────────── */
-            <div className="h-full flex items-start gap-3 xl:gap-3.5 2xl:gap-4 overflow-x-auto custom-scrollbar pb-2 pt-1 w-full">
-              {COLUMNS.map((col) => {
-                const columnOrders = orders.filter((o) => o.status === col.id);
-                return (
-                  <div
-                    key={col.id}
-                    className="flex-1 min-w-[220px] xl:min-w-0 h-full flex flex-col rounded-xl border border-border bg-surface/60 shadow-2xs transition-all overflow-hidden"
-                  >
-                    {/* Sticky Column Header with Quick Focus Click */}
-                    <div
-                      onClick={() => setSelectedStatus(col.id)}
-                      className="shrink-0 flex items-center justify-between p-2.5 sm:p-3 border-b border-border/40 bg-surface/95 backdrop-blur-sm rounded-t-xl cursor-pointer hover:bg-surface-muted/60 transition-colors"
-                      title={`Click to focus on ${col.label} orders`}
-                    >
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <span className={`w-2 h-2 rounded-full ${col.color} shrink-0`} />
-                        <span className="text-12 sm:text-13 font-bold font-outfit text-text truncate">{col.label}</span>
+
+            {/* ─── Desktop / Tablet View (≥ md) ──────────────────────── */}
+            <div className="hidden md:block h-full">
+              {viewMode === "board" ? (
+                selectedStatus !== "all" ? (
+                  /* ─── Focus Grid View for Selected Stage ────────────────────────── */
+                  <div className="h-full overflow-y-auto custom-scrollbar space-y-4 pr-1">
+                    {/* Stage Summary Banner */}
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 p-3.5 rounded-xl border border-border bg-surface/80 shrink-0">
+                      <div className="flex items-center gap-2.5">
+                        <span className={`w-3 h-3 rounded-full ${COLUMNS.find((c) => c.id === selectedStatus)?.color ?? "bg-primary"}`} />
+                        <h2 className="text-15 font-bold font-outfit text-text">
+                          {COLUMNS.find((c) => c.id === selectedStatus)?.label ?? "Filtered"} Orders
+                        </h2>
+                        <span className="px-2 py-0.5 rounded-full text-11 font-bold bg-primary/10 text-primary">
+                          {orders.length} {orders.length === 1 ? "order" : "orders"}
+                        </span>
+                        <span className="text-12 text-text-muted hidden md:inline">
+                          · Full-width grid view
+                        </span>
                       </div>
-                      <span className="px-1.5 py-0.5 rounded text-11 font-bold bg-surface-muted text-text-muted hover:bg-primary/10 hover:text-primary transition-colors shrink-0">
-                        {columnOrders.length}
-                      </span>
+
+                      <button
+                        onClick={() => setSelectedStatus("all")}
+                        className="inline-flex items-center gap-1.5 text-12 font-semibold text-primary hover:underline cursor-pointer"
+                      >
+                        <span>View all pipeline stages</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </button>
                     </div>
 
-                    {/* Independent Scrollable Body */}
-                    <div className="flex-1 min-h-0 overflow-y-auto p-2.5 space-y-2.5 custom-scrollbar">
-                      {columnOrders.length === 0 ? (
-                        <div className="p-4 rounded-lg border border-dashed border-border/60 text-center text-11 text-text-muted">
-                          No orders
-                        </div>
-                      ) : (
-                        columnOrders.map((o) => (
+                    {/* Responsive Card Grid */}
+                    {orders.length === 0 ? (
+                      <div className="rounded-xl border border-border bg-surface p-6 sm:p-10">
+                        <EmptyState
+                          title={`No orders in ${COLUMNS.find((c) => c.id === selectedStatus)?.label.toLowerCase() ?? "this stage"}`}
+                          description="Move an order to this stage or switch back to the full pipeline."
+                          action={{
+                            label: "Back to full board",
+                            onClick: () => setSelectedStatus("all"),
+                            variant: "outline",
+                          }}
+                        />
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 items-stretch pb-4">
+                        {orders.map((o) => (
                           <OrderCard
                             key={o.id}
                             order={o}
+                            isGrid
                             onSelect={() => setActiveOrder(o)}
                             onAdvance={(nextStatus) => handleOpenStatusDialog(o, nextStatus)}
                             onMoveTo={(status) => handleOpenStatusDialog(o, status)}
                             onCopyTracking={copyTracking}
                           />
-                        ))
-                      )}
-                    </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                );
-              })}
-            </div>
-          )
-        ) : (
-          /* ─── Table View ────────────────────────────────────────────────────────── */
-          <div className="h-full overflow-auto rounded-xl border border-border bg-surface custom-scrollbar">
-            <table className="w-full text-left text-13">
-              <thead className="sticky top-0 z-10 bg-surface-muted border-b border-border text-11 uppercase font-semibold text-text-muted">
-                <tr>
-                  <th className="p-3.5">Order</th>
-                  <th className="p-3.5">Customer</th>
-                  <th className="p-3.5">Products</th>
-                  <th className="p-3.5">Total</th>
-                  <th className="p-3.5">Status</th>
-                  <th className="p-3.5">Placed</th>
-                  <th className="p-3.5">Tracking / Due</th>
-                  <th className="p-3.5 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border/40">
-                {orders.length === 0 ? (
-                  <tr>
-                    <td colSpan={8} className="p-8 text-center text-text-muted text-13 font-normal">
-                      No orders found matching the filter.
-                    </td>
-                  </tr>
                 ) : (
-                  orders.map((o) => {
-                    const prodDays = calculateProductionDays(o);
-                    const isOverdue = o.status === "in_production" && prodDays >= 45;
-                    const isApproaching = o.status === "in_production" && prodDays >= 35 && prodDays < 45;
-
-                    return (
-                      <tr
-                        key={o.id}
-                        onClick={() => setActiveOrder(o)}
-                        className={`hover:bg-surface-muted transition-colors cursor-pointer ${
-                          isOverdue ? "bg-rose-500/[0.03]" : isApproaching ? "bg-amber-500/[0.02]" : ""
-                        }`}
-                      >
-                        <td className="p-3.5 font-bold font-outfit text-text">#{o.orderNo}</td>
-                        <td className="p-3.5">
-                          <div className="flex items-center gap-1.5">
-                            <ChannelIcon channel={o.channel} size={13} />
-                            <span className="font-medium text-text">{o.customerName}</span>
-                          </div>
-                        </td>
-                        <td className="p-3.5 text-text-muted max-w-xs truncate">
-                          {o.items?.map((i) => i.productName).join(", ") || "No items"}
-                        </td>
-                        <td className="p-3.5 font-bold font-outfit text-text tabular-nums">
-                          <div className="flex items-center gap-1.5 whitespace-nowrap">
-                            <span>₹{Number(o.totalAmount).toLocaleString("en-IN")}</span>
-                            <OrderPaymentChip summary={o.paymentSummary} orderTotal={Number(o.totalAmount)} />
-                          </div>
-                        </td>
-                        <td className="p-3.5">
-                          <div className="flex flex-col gap-1 items-start">
-                            <span className="px-2 py-0.5 rounded text-11 font-semibold capitalize bg-surface-muted border border-border">
-                              {o.status.replaceAll("_", " ")}
+                  /* ─── Full Pipeline Kanban View (All Stages) ────────────────────── */
+                  <div className="h-full flex items-start gap-3 xl:gap-3.5 2xl:gap-4 overflow-x-auto custom-scrollbar pb-2 pt-1 w-full">
+                    {COLUMNS.map((col) => {
+                      const columnOrders = orders.filter((o) => o.status === col.id);
+                      return (
+                        <div
+                          key={col.id}
+                          className="flex-1 min-w-[220px] xl:min-w-0 h-full flex flex-col rounded-xl border border-border bg-surface/60 shadow-2xs transition-all overflow-hidden"
+                        >
+                          {/* Sticky Column Header with Quick Focus Click */}
+                          <div
+                            onClick={() => setSelectedStatus(col.id)}
+                            className="shrink-0 flex items-center justify-between p-2.5 sm:p-3 border-b border-border/40 bg-surface/95 backdrop-blur-sm rounded-t-xl cursor-pointer hover:bg-surface-muted/60 transition-colors"
+                            title={`Click to focus on ${col.label} orders`}
+                          >
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <span className={`w-2 h-2 rounded-full ${col.color} shrink-0`} />
+                              <span className="text-12 sm:text-13 font-bold font-outfit text-text truncate">{col.label}</span>
+                            </div>
+                            <span className="px-1.5 py-0.5 rounded text-11 font-bold bg-surface-muted text-text-muted hover:bg-primary/10 hover:text-primary transition-colors shrink-0">
+                              {columnOrders.length}
                             </span>
-                            {o.status === "in_production" && (
-                              isOverdue ? (
-                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-500 text-white shadow-2xs">
-                                  <AlertTriangle className="w-2.5 h-2.5 shrink-0" />
-                                  <span>{prodDays}d · Overdue (≥45d)</span>
-                                </span>
-                              ) : isApproaching ? (
-                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30">
-                                  <Clock className="w-2.5 h-2.5 shrink-0" />
-                                  <span>{prodDays}d · Approaching 45d</span>
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">
-                                  <Clock className="w-2.5 h-2.5 shrink-0" />
-                                  <span>{prodDays}d in prod</span>
-                                </span>
-                              )
+                          </div>
+
+                          {/* Independent Scrollable Body */}
+                          <div className="flex-1 min-h-0 overflow-y-auto p-2.5 space-y-2.5 custom-scrollbar">
+                            {columnOrders.length === 0 ? (
+                              <div className="p-4 rounded-lg border border-dashed border-border/60 text-center text-11 text-text-muted">
+                                No orders
+                              </div>
+                            ) : (
+                              columnOrders.map((o) => (
+                                <OrderCard
+                                  key={o.id}
+                                  order={o}
+                                  onSelect={() => setActiveOrder(o)}
+                                  onAdvance={(nextStatus) => handleOpenStatusDialog(o, nextStatus)}
+                                  onMoveTo={(status) => handleOpenStatusDialog(o, status)}
+                                  onCopyTracking={copyTracking}
+                                />
+                              ))
                             )}
                           </div>
-                        </td>
-                        <td className="p-3.5 text-text-muted">{formatOrderDate(o.createdAt)}</td>
-                        <td className="p-3.5">
-                          {o.trackingId ? (
-                            <span className="font-mono text-11 text-teal-500 flex items-center gap-1">
-                              <Truck className="w-3.5 h-3.5" /> {o.trackingId}
-                            </span>
-                          ) : (
-                            <div className="flex flex-col gap-1 items-start">
-                              <span className="text-12 text-text-muted">
-                                {formatDueDate(o.expectedDeliveryDate)}
-                              </span>
-                              {(() => {
-                                const ms = getOrderDueMilestone(o);
-                                if (!ms) return null;
-                                return (
-                                  <span
-                                    className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold border ${ms.badgeClass}`}
-                                    title={`Milestone: ${ms.label}`}
-                                  >
-                                    <Calendar className="w-2.5 h-2.5 shrink-0" />
-                                    <span>{ms.label}</span>
-                                  </span>
-                                );
-                              })()}
-                            </div>
-                          )}
-                        </td>
-                        <td className="p-3.5 text-right">
-                          <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
-                            <button
-                              type="button"
-                              onClick={() => setActiveOrder(o)}
-                              className="px-2.5 py-1 rounded-lg border border-border bg-surface hover:bg-surface-muted text-11 font-medium text-text cursor-pointer transition-colors"
-                            >
-                              View
-                            </button>
-                          </div>
-                        </td>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )
+              ) : (
+                /* ─── Table View ────────────────────────────────────────────────────────── */
+                <div className="h-full overflow-auto rounded-xl border border-border bg-surface custom-scrollbar">
+                  <table className="w-full text-left text-13">
+                    <thead className="sticky top-0 z-10 bg-surface-muted border-b border-border text-11 uppercase font-semibold text-text-muted">
+                      <tr>
+                        <th className="p-3.5">Order</th>
+                        <th className="p-3.5">Customer</th>
+                        <th className="p-3.5">Products</th>
+                        <th className="p-3.5">Total</th>
+                        <th className="p-3.5">Status</th>
+                        <th className="p-3.5">Placed</th>
+                        <th className="p-3.5">Tracking / Due</th>
+                        <th className="p-3.5 text-right">Actions</th>
                       </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
+                    </thead>
+                    <tbody className="divide-y divide-border/40">
+                      {orders.length === 0 ? (
+                        <tr>
+                          <td colSpan={8} className="p-8 text-center text-text-muted text-13 font-normal">
+                            No orders found matching the filter.
+                          </td>
+                        </tr>
+                      ) : (
+                        orders.map((o) => {
+                          const prodDays = calculateProductionDays(o);
+                          const isOverdue = o.status === "in_production" && prodDays >= 45;
+                          const isApproaching = o.status === "in_production" && prodDays >= 35 && prodDays < 45;
+
+                          return (
+                            <tr
+                              key={o.id}
+                              onClick={() => setActiveOrder(o)}
+                              className={`hover:bg-surface-muted transition-colors cursor-pointer ${
+                                isOverdue ? "bg-rose-500/[0.03]" : isApproaching ? "bg-amber-500/[0.02]" : ""
+                              }`}
+                            >
+                              <td className="p-3.5 font-bold font-outfit text-text">#{o.orderNo}</td>
+                              <td className="p-3.5">
+                                <div className="flex items-center gap-1.5">
+                                  <ChannelIcon channel={o.channel} size={13} />
+                                  <span className="font-medium text-text">{o.customerName}</span>
+                                </div>
+                              </td>
+                              <td className="p-3.5 text-text-muted max-w-xs truncate">
+                                {o.items?.map((i) => i.productName).join(", ") || "No items"}
+                              </td>
+                              <td className="p-3.5 font-bold font-outfit text-text tabular-nums">
+                                <div className="flex items-center gap-1.5 whitespace-nowrap">
+                                  <span>₹{Number(o.totalAmount).toLocaleString("en-IN")}</span>
+                                  <OrderPaymentChip summary={o.paymentSummary} orderTotal={Number(o.totalAmount)} />
+                                </div>
+                              </td>
+                              <td className="p-3.5">
+                                <div className="flex flex-col gap-1 items-start">
+                                  <span className="px-2 py-0.5 rounded text-11 font-semibold capitalize bg-surface-muted border border-border">
+                                    {o.status.replaceAll("_", " ")}
+                                  </span>
+                                  {o.status === "in_production" && (
+                                    isOverdue ? (
+                                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-500 text-white shadow-2xs">
+                                        <AlertTriangle className="w-2.5 h-2.5 shrink-0" />
+                                        <span>{prodDays}d · Overdue (≥45d)</span>
+                                      </span>
+                                    ) : isApproaching ? (
+                                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30">
+                                        <Clock className="w-2.5 h-2.5 shrink-0" />
+                                        <span>{prodDays}d · Approaching 45d</span>
+                                      </span>
+                                    ) : (
+                                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">
+                                        <Clock className="w-2.5 h-2.5 shrink-0" />
+                                        <span>{prodDays}d in prod</span>
+                                      </span>
+                                    )
+                                  )}
+                                </div>
+                              </td>
+                              <td className="p-3.5 text-text-muted">{formatOrderDate(o.createdAt)}</td>
+                              <td className="p-3.5">
+                                {o.trackingId ? (
+                                  <span className="font-mono text-11 text-teal-500 flex items-center gap-1">
+                                    <Truck className="w-3.5 h-3.5" /> {o.trackingId}
+                                  </span>
+                                ) : (
+                                  <div className="flex flex-col gap-1 items-start">
+                                    <span className="text-12 text-text-muted">
+                                      {formatDueDate(o.expectedDeliveryDate)}
+                                    </span>
+                                    {(() => {
+                                      const ms = getOrderDueMilestone(o);
+                                      if (!ms) return null;
+                                      return (
+                                        <span
+                                          className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold border ${ms.badgeClass}`}
+                                          title={`Milestone: ${ms.label}`}
+                                        >
+                                          <Calendar className="w-2.5 h-2.5 shrink-0" />
+                                          <span>{ms.label}</span>
+                                        </span>
+                                      );
+                                    })()}
+                                  </div>
+                                )}
+                              </td>
+                              <td className="p-3.5 text-right">
+                                <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
+                                  <button
+                                    type="button"
+                                    onClick={() => setActiveOrder(o)}
+                                    className="px-2.5 py-1 rounded-lg border border-border bg-surface hover:bg-surface-muted text-11 font-medium text-text cursor-pointer transition-colors"
+                                  >
+                                    View
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </>
         )}
       </div>
 
