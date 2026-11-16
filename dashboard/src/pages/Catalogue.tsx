@@ -232,7 +232,7 @@ export default function Catalogue() {
   const [formLeadTime, setFormLeadTime] = useState<number>(3);
   const [formCustomizable, setFormCustomizable] = useState(false);
   const [formSizes, setFormSizes] = useState<ProductSize[]>([
-    { name: "Standard", price: 1200 },
+    { name: "Standard", price: 0 },
   ]);
   const [formOptions, setFormOptions] = useState<string[]>([]);
   const [formImages, setFormImages] = useState<string[]>([]);
@@ -320,9 +320,9 @@ export default function Catalogue() {
     setDetailPhotoIdx(0);
     setFormName("");
     setFormDescription("");
-    setFormLeadTime(3);
+    setFormLeadTime(0);
     setFormCustomizable(false);
-    setFormSizes([{ name: "Standard", price: 1200 }]);
+    setFormSizes([{ name: "Standard", price: 0 }]);
     setFormOptions(["Colour", "Name engraving"]);
     setFormImages([]);
     setIsAddingNew(true);
@@ -341,7 +341,7 @@ export default function Catalogue() {
 
   // Size row management
   const handleAddSizeRow = () => {
-    setFormSizes([...formSizes, { name: "", price: 500 }]);
+    setFormSizes([...formSizes, { name: "", price: 0 }]);
   };
 
   const handleUpdateSizeRow = (index: number, field: "name" | "price", val: string | number) => {
@@ -351,7 +351,8 @@ export default function Catalogue() {
     if (field === "name") {
       updated[index] = { ...current, name: String(val) };
     } else {
-      updated[index] = { ...current, price: Math.max(1, Math.round(Number(val) || 0)) };
+      const numVal = val === "" ? 0 : Math.max(0, Math.round(Number(val) || 0));
+      updated[index] = { ...current, price: numVal };
     }
     setFormSizes(updated);
   };
@@ -898,10 +899,15 @@ export default function Catalogue() {
                         type="number"
                         min="1"
                         required
-                        placeholder="Price"
-                        value={s.price || ""}
+                        placeholder="0"
+                        value={s.price === 0 ? "" : s.price}
+                        onFocus={(e) => {
+                          if (s.price === 0 || e.target.value === "0") {
+                            handleUpdateSizeRow(idx, "price", "");
+                          }
+                        }}
                         onChange={(e) => handleUpdateSizeRow(idx, "price", e.target.value)}
-                        className="w-full pl-6 pr-2 py-1.5 text-13 rounded-lg bg-surface border border-border text-text tabular-nums focus:outline-none focus:ring-2 focus:ring-primary/40"
+                        className="w-full pl-6 pr-2 py-1.5 text-13 rounded-lg bg-surface border border-border text-text tabular-nums focus:outline-none focus:ring-2 focus:ring-primary/40 [color-scheme:dark] dark:[color-scheme:dark]"
                       />
                     </div>
                     {formSizes.length > 1 && (
@@ -929,9 +935,18 @@ export default function Catalogue() {
                 min="0"
                 max="60"
                 required
-                value={formLeadTime}
-                onChange={(e) => setFormLeadTime(Number(e.target.value))}
-                className="w-full px-3 py-2 text-13 rounded-lg bg-surface-muted border border-border text-text tabular-nums focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary"
+                placeholder="0"
+                value={formLeadTime === 0 ? "" : formLeadTime}
+                onFocus={(e) => {
+                  if (formLeadTime === 0 || e.target.value === "0") {
+                    setFormLeadTime(0);
+                  }
+                }}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setFormLeadTime(val === "" ? 0 : Math.max(0, Math.round(Number(val) || 0)));
+                }}
+                className="w-full px-3 py-2 text-13 rounded-lg bg-surface-muted border border-border text-text tabular-nums focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary [color-scheme:dark] dark:[color-scheme:dark]"
               />
             </div>
 
