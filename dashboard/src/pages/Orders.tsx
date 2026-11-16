@@ -273,15 +273,45 @@ function OrderCard({
       }`}
     >
       <div className="space-y-2">
-        {/* Top: Order #, Milestone badge (if any), Date */}
-        <div className="flex items-center justify-between gap-1.5">
-          <div className="flex items-center gap-1.5 min-w-0 overflow-hidden">
-            <span className="text-12 font-bold font-outfit text-text group-hover:text-primary transition-colors truncate shrink-0 max-w-[90px]">
-              #{order.orderNo}
-            </span>
-            {milestone && (
+        {/* Top: Order #, Status badge, Date */}
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between gap-1.5">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="text-12 sm:text-13 font-bold font-outfit text-text group-hover:text-primary transition-colors truncate">
+                #{order.orderNo}
+              </span>
+              {colInfo && (
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold capitalize bg-surface-muted text-text-muted border border-border/50 shrink-0">
+                  <span className={`w-1.5 h-1.5 rounded-full ${colInfo.color}`} />
+                  {colInfo.label}
+                </span>
+              )}
+            </div>
+
+            <div className="flex items-center gap-1.5 shrink-0">
+              {order.trackingId ? (
+                <button
+                  type="button"
+                  onClick={(e) => onCopyTracking(order.trackingId!, e)}
+                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-surface-muted text-10 font-mono text-text hover:bg-border transition-colors cursor-pointer"
+                  title={`Tracking ID: ${order.trackingId} — click to copy`}
+                  aria-label={`Copy tracking ID ${order.trackingId}`}
+                >
+                  <Truck className="w-3 h-3 text-teal-500 shrink-0" />
+                  <Copy className="w-2.5 h-2.5 shrink-0" />
+                </button>
+              ) : null}
+              <span className="text-11 font-medium text-text-muted shrink-0">
+                {formatOrderDate(order.createdAt)}
+              </span>
+            </div>
+          </div>
+
+          {/* Dedicated Milestone Badge Row (if milestone exists) */}
+          {milestone && (
+            <div className="pt-0.5">
               <span
-                className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-semibold border min-w-0 whitespace-nowrap ${milestone.badgeClass}`}
+                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold border max-w-full ${milestone.badgeClass}`}
                 title={`Production Milestone: ${milestone.label}`}
               >
                 <span className="relative flex h-1.5 w-1.5 shrink-0">
@@ -292,30 +322,8 @@ function OrderCard({
                 </span>
                 <span className="truncate">{milestone.label}</span>
               </span>
-            )}
-          </div>
-          <div className="flex items-center gap-1.5 shrink-0">
-            {order.trackingId ? (
-              <button
-                onClick={(e) => onCopyTracking(order.trackingId!, e)}
-                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-surface-muted text-10 font-mono text-text hover:bg-border transition-colors cursor-pointer shrink-0"
-                title={`Tracking ID: ${order.trackingId} — click to copy`}
-                aria-label={`Copy tracking ID ${order.trackingId}`}
-              >
-                <Truck className="w-3 h-3 text-teal-500 shrink-0" />
-                <Copy className="w-2.5 h-2.5 shrink-0" />
-              </button>
-            ) : null}
-            {isGrid && colInfo && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold capitalize bg-surface-muted text-text-muted border border-border/50">
-                <span className={`w-1.5 h-1.5 rounded-full ${colInfo.color}`} />
-                {colInfo.label}
-              </span>
-            )}
-            <span className="text-11 font-medium text-text-muted">
-              {formatOrderDate(order.createdAt)}
-            </span>
-          </div>
+            </div>
+          )}
         </div>
 
         {/* Customer row */}
@@ -417,14 +425,19 @@ function OrderCard({
                     onMoveTo(e.target.value as OrderStatus);
                   }
                 }}
-                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full [color-scheme:dark] dark:[color-scheme:dark]"
                 title="Move to another stage"
               >
-                <option value="" disabled>
+                <option value="" disabled className="bg-surface text-text dark:bg-[#111827] dark:text-[#F1F5F9]">
                   Move to stage...
                 </option>
                 {COLUMNS.map((c) => (
-                  <option key={c.id} value={c.id} disabled={c.id === order.status}>
+                  <option
+                    key={c.id}
+                    value={c.id}
+                    disabled={c.id === order.status}
+                    className="bg-surface text-text dark:bg-[#111827] dark:text-[#F1F5F9]"
+                  >
                     {c.id === order.status ? `✓ ${c.label} (Current)` : `→ ${c.label}`}
                   </option>
                 ))}
@@ -1422,24 +1435,25 @@ export default function Orders() {
         </div>
 
         {/* Action Buttons & Due Date Filter */}
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="grid grid-cols-2 gap-2 w-full sm:w-auto sm:flex sm:items-center">
           {/* Due Date Filter — compact dropdown */}
-          <div className="relative" data-due-dropdown>
+          <div className="relative w-full sm:w-auto" data-due-dropdown>
             <button
               type="button"
               onClick={() => setShowDueDropdown((v) => !v)}
-              className={`flex items-center gap-1.5 h-9 px-3 rounded-xl border text-12 font-medium transition-colors cursor-pointer ${
+              className={`w-full sm:w-auto flex items-center justify-between sm:justify-start gap-1.5 h-9 px-3 rounded-xl border text-12 font-medium transition-colors cursor-pointer ${
                 duePreset !== "all"
                   ? "border-primary/50 bg-primary/10 text-primary"
                   : "border-border bg-surface hover:bg-surface-muted text-text"
               }`}
             >
-              <Calendar className="w-3.5 h-3.5 shrink-0" />
-              <span>
-                Due:{" "}
-                {{ all: "All", "7d": "7 days", "15d": "15 days", "1m": "1 month", custom: "Custom" }[duePreset]}
-              </span>
-              <ChevronDown className={`w-3.5 h-3.5 text-text-muted transition-transform ${showDueDropdown ? "rotate-180" : ""}`} />
+              <div className="flex items-center gap-1.5 truncate">
+                <Calendar className="w-3.5 h-3.5 shrink-0" />
+                <span className="truncate">
+                  Due: {{ all: "All", "7d": "7d", "15d": "15d", "1m": "1mo", custom: "Custom" }[duePreset]}
+                </span>
+              </div>
+              <ChevronDown className={`w-3.5 h-3.5 text-text-muted transition-transform shrink-0 ${showDueDropdown ? "rotate-180" : ""}`} />
             </button>
 
             {showDueDropdown && (
@@ -1498,9 +1512,9 @@ export default function Orders() {
 
           <button
             onClick={handleOpenCreateModal}
-            className="px-3.5 py-2 rounded-xl bg-primary hover:bg-amber-600 text-primary-foreground font-semibold text-13 flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+            className="w-full sm:w-auto px-3.5 py-2 rounded-xl bg-primary hover:bg-amber-600 text-primary-foreground font-semibold text-13 flex items-center justify-center gap-1.5 shadow-sm transition-all cursor-pointer"
           >
-            <Plus className="w-4 h-4" />
+            <Plus className="w-4 h-4 shrink-0" />
             <span>New Order</span>
           </button>
 
@@ -1532,9 +1546,35 @@ export default function Orders() {
         </div>
       </div>
 
-      {/* ─── Search & Status Tabs ───────────────────────────── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-xl border border-border bg-surface shrink-0">
-        <div className="flex items-center gap-1.5 overflow-x-auto custom-scrollbar pb-1 text-12 font-medium">
+      {/* ─── Search & Status Filters ───────────────────────────── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 p-3 rounded-xl border border-border bg-surface shrink-0">
+        {/* Mobile Vertical Filter Dropdown (< sm) */}
+        <div className="block sm:hidden w-full">
+          <div className="relative">
+            <select
+              value={selectedStatus}
+              onChange={(e) => setSelectedStatus(e.target.value)}
+              className="w-full appearance-none rounded-lg border border-border bg-surface-muted px-3 py-2 text-12 font-medium text-text focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer pr-8 [color-scheme:dark] dark:[color-scheme:dark]"
+              aria-label="Filter orders by stage"
+            >
+              <option value="all" className="bg-surface text-text dark:bg-[#111827] dark:text-[#F1F5F9]">
+                All Stages ({statusCounts?.all ?? orders.length})
+              </option>
+              {COLUMNS.map((col) => {
+                const count = statusCounts ? statusCounts[col.id] ?? 0 : orders.filter((o) => o.status === col.id).length;
+                return (
+                  <option key={col.id} value={col.id} className="bg-surface text-text dark:bg-[#111827] dark:text-[#F1F5F9]">
+                    {col.label} ({count})
+                  </option>
+                );
+              })}
+            </select>
+            <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
+          </div>
+        </div>
+
+        {/* Desktop & Tablet Horizontal Filter Tabs (≥ sm) */}
+        <div className="hidden sm:flex items-center gap-1.5 overflow-x-auto custom-scrollbar pb-0.5 text-12 font-medium min-w-0">
           <button
             onClick={() => setSelectedStatus("all")}
             className={`px-3 py-1.5 rounded-lg transition-colors shrink-0 cursor-pointer ${
@@ -1563,8 +1603,8 @@ export default function Orders() {
           })}
         </div>
 
-        {/* Search Input */}
-        <div className="relative min-w-[200px] sm:min-w-[240px]">
+        {/* Search Input (Full width on mobile, auto width on desktop) */}
+        <div className="relative w-full sm:w-[240px] shrink-0">
           <Search className="absolute left-3 top-2.5 w-4 h-4 text-text-muted" />
           <input
             type="text"
@@ -1584,6 +1624,26 @@ export default function Orders() {
           <>
             {/* ─── Mobile Vertical Feed (< md) ───────────────────────── */}
             <div className="block md:hidden h-full overflow-y-auto custom-scrollbar space-y-3 pb-8 pr-0.5">
+              {selectedStatus !== "all" && (
+                <div className="flex items-center justify-between p-2.5 rounded-xl border border-border bg-surface/80 text-12 shrink-0">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className={`w-2.5 h-2.5 rounded-full ${COLUMNS.find((c) => c.id === selectedStatus)?.color ?? "bg-primary"} shrink-0`} />
+                    <span className="font-bold text-text truncate">
+                      {COLUMNS.find((c) => c.id === selectedStatus)?.label ?? "Filtered"} Orders
+                    </span>
+                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-primary/10 text-primary">
+                      {orders.length}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedStatus("all")}
+                    className="text-11 font-semibold text-primary hover:underline cursor-pointer shrink-0"
+                  >
+                    Clear stage filter
+                  </button>
+                </div>
+              )}
               {orders.length === 0 ? (
                 <div className="rounded-xl border border-border bg-surface p-6">
                   <EmptyState
