@@ -226,6 +226,22 @@ export default function Catalogue() {
   const [isAddingNew, setIsAddingNew] = useState(false);
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
 
+  // Lightbox / enlarged image preview state
+  const [previewImageModal, setPreviewImageModal] = useState<{ url: string; alt?: string } | null>(null);
+
+  // Close image preview modal on Escape (captured before SlideOver)
+  useEffect(() => {
+    if (!previewImageModal) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.stopImmediatePropagation();
+        setPreviewImageModal(null);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown, { capture: true });
+    return () => window.removeEventListener("keydown", handleKeyDown, { capture: true });
+  }, [previewImageModal]);
+
   // Form state for Add/Edit
   const [formName, setFormName] = useState("");
   const [formDescription, setFormDescription] = useState("");
@@ -1062,35 +1078,57 @@ export default function Catalogue() {
                   {formImages.map((imgUrl, i) => (
                     <div
                       key={i}
-                      className="group relative aspect-[4/3] rounded-lg overflow-hidden border border-border bg-surface"
+                      onClick={() => setPreviewImageModal({ url: imgUrl, alt: `Photo ${i + 1}` })}
+                      className="group relative aspect-[4/3] rounded-lg overflow-hidden border border-border bg-surface cursor-zoom-in"
+                      title="Click to enlarge"
                     >
-                      <img src={imgUrl} alt={`Product ${i + 1}`} className="w-full h-full object-cover" />
+                      <img
+                        src={imgUrl}
+                        alt={`Product ${i + 1}`}
+                        className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105"
+                      />
                       {/* Main photo badge */}
                       {i === 0 && (
-                        <div className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded text-10 font-bold bg-primary text-primary-foreground shadow-xs">
+                        <div className="absolute top-1.5 left-1.5 z-10 px-1.5 py-0.5 rounded text-10 font-bold bg-primary text-primary-foreground shadow-xs pointer-events-none">
                           Main
                         </div>
                       )}
-                      {/* Controls on hover */}
-                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1.5">
-                        {i !== 0 && (
-                          <button
-                            type="button"
-                            onClick={() => handleSetMainImage(i)}
-                            className="p-1 rounded bg-surface/90 text-text hover:text-primary cursor-pointer"
-                            title="Make main photo"
-                          >
-                            <Star className="w-3.5 h-3.5" />
-                          </button>
-                        )}
+
+                      {/* Always-visible delete cross button in top-right */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRemoveImage(i);
+                        }}
+                        className="absolute top-1.5 right-1.5 z-10 p-1 rounded-full bg-black/60 hover:bg-danger text-white transition-colors cursor-pointer shadow-xs"
+                        title="Remove photo"
+                        aria-label="Remove photo"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+
+                      {/* Make main photo button in bottom-right if not already main */}
+                      {i !== 0 && (
                         <button
                           type="button"
-                          onClick={() => handleRemoveImage(i)}
-                          className="p-1 rounded bg-surface/90 text-danger hover:bg-danger hover:text-white cursor-pointer"
-                          title="Remove photo"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSetMainImage(i);
+                          }}
+                          className="absolute bottom-1.5 right-1.5 z-10 p-1 rounded-full bg-black/60 hover:bg-primary text-white transition-colors cursor-pointer shadow-xs"
+                          title="Make main photo"
+                          aria-label="Make main photo"
                         >
-                          <X className="w-3.5 h-3.5" />
+                          <Star className="w-3.5 h-3.5" />
                         </button>
+                      )}
+
+                      {/* Hover overlay indication */}
+                      <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none flex items-center justify-center">
+                        <span className="text-10 text-white font-medium bg-black/60 px-1.5 py-0.5 rounded backdrop-blur-xs">
+                          Click to enlarge
+                        </span>
                       </div>
                     </div>
                   ))}
@@ -1134,25 +1172,52 @@ export default function Catalogue() {
           <div className="space-y-6">
             {/* Photos Carousel / Main Photo */}
             <div className="space-y-2">
-              <div className="relative aspect-[4/3] w-full rounded-xl overflow-hidden border border-border shadow-xs bg-surface-muted flex items-center justify-center">
+              <div
+                className={`relative aspect-[4/3] w-full rounded-xl overflow-hidden border border-border shadow-xs bg-surface-muted flex items-center justify-center ${
+                  selectedProduct.images && selectedProduct.images.length > 0
+                    ? "cursor-zoom-in group"
+                    : ""
+                }`}
+                onClick={() => {
+                  const activeImg =
+                    selectedProduct.images &&
+                    (selectedProduct.images[detailPhotoIdx] || selectedProduct.images[0]);
+                  if (activeImg) {
+                    setPreviewImageModal({
+                      url: activeImg,
+                      alt: selectedProduct.name,
+                    });
+                  }
+                }}
+                title={
+                  selectedProduct.images && selectedProduct.images.length > 0
+                    ? "Click to enlarge"
+                    : undefined
+                }
+              >
                 {selectedProduct.images && selectedProduct.images.length > 0 ? (
                   <>
                     <img
                       src={selectedProduct.images[detailPhotoIdx] || selectedProduct.images[0]}
                       alt={selectedProduct.name}
-                      className="w-full h-full object-contain bg-surface-muted/60"
+                      className="w-full h-full object-contain bg-surface-muted/60 transition-transform duration-200 group-hover:scale-[1.02]"
                     />
+                    {/* Visual zoom cue indicator on top right */}
+                    <div className="absolute top-2 right-2 px-2 py-0.5 rounded-md bg-black/60 text-white text-11 font-medium opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none backdrop-blur-xs">
+                      Click to enlarge
+                    </div>
                     {selectedProduct.images.length > 1 && (
                       <>
                         <button
                           type="button"
-                          onClick={() =>
+                          onClick={(e) => {
+                            e.stopPropagation();
                             setDetailPhotoIdx(
                               (prev) =>
                                 (prev - 1 + selectedProduct.images.length) %
                                 selectedProduct.images.length
-                            )
-                          }
+                            );
+                          }}
                           className="absolute left-2 top-1/2 -translate-y-1/2 z-10 w-8 h-8 rounded-full bg-surface/85 backdrop-blur-md shadow-xs flex items-center justify-center text-text hover:bg-surface border border-border/60 transition cursor-pointer"
                           aria-label="Previous photo"
                         >
@@ -1160,11 +1225,12 @@ export default function Catalogue() {
                         </button>
                         <button
                           type="button"
-                          onClick={() =>
+                          onClick={(e) => {
+                            e.stopPropagation();
                             setDetailPhotoIdx(
                               (prev) => (prev + 1) % selectedProduct.images.length
-                            )
-                          }
+                            );
+                          }}
                           className="absolute right-2 top-1/2 -translate-y-1/2 z-10 w-8 h-8 rounded-full bg-surface/85 backdrop-blur-md shadow-xs flex items-center justify-center text-text hover:bg-surface border border-border/60 transition cursor-pointer"
                           aria-label="Next photo"
                         >
@@ -1188,13 +1254,22 @@ export default function Catalogue() {
                     <button
                       key={i}
                       type="button"
-                      onClick={() => setDetailPhotoIdx(i)}
+                      onClick={() => {
+                        if (i === detailPhotoIdx) {
+                          setPreviewImageModal({
+                            url: img,
+                            alt: `${selectedProduct.name} - Photo ${i + 1}`,
+                          });
+                        } else {
+                          setDetailPhotoIdx(i);
+                        }
+                      }}
                       className={`relative w-16 h-12 rounded-lg overflow-hidden border-2 transition-all cursor-pointer shrink-0 ${
                         i === detailPhotoIdx
                           ? "border-primary ring-2 ring-primary/20 scale-102"
                           : "border-border/60 opacity-70 hover:opacity-100"
                       }`}
-                      title={`View photo ${i + 1}`}
+                      title={i === detailPhotoIdx ? "Click to enlarge" : `View photo ${i + 1}`}
                     >
                       <img src={img} alt="" className="w-full h-full object-cover" />
                     </button>
@@ -1314,6 +1389,45 @@ export default function Catalogue() {
         confirmLabel="Delete"
         tone="danger"
       />
+
+      {/* ─── Lightbox / Enlarged Image Modal ───────────────────────────────── */}
+      {previewImageModal && (
+        <div
+          className="fixed inset-0 z-[70] bg-black/85 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150"
+          onClick={() => setPreviewImageModal(null)}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Image preview"
+        >
+          {/* Prominent Close Cross [ ✕ ] Button */}
+          <button
+            type="button"
+            onClick={() => setPreviewImageModal(null)}
+            className="absolute top-4 right-4 z-10 p-2.5 rounded-full bg-black/60 hover:bg-black/90 text-white hover:text-white transition-colors cursor-pointer border border-white/20 shadow-lg"
+            aria-label="Close image preview"
+            title="Close (Esc)"
+          >
+            <X className="w-6 h-6" />
+          </button>
+
+          {/* Enlarged Image Container */}
+          <div
+            className="relative max-w-4xl max-h-[85vh] w-auto h-auto flex flex-col items-center justify-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <img
+              src={previewImageModal.url}
+              alt={previewImageModal.alt || "Product image"}
+              className="max-h-[80vh] max-w-[90vw] object-contain rounded-xl shadow-2xl select-none"
+            />
+            {previewImageModal.alt && (
+              <div className="mt-3 px-3 py-1 rounded-full bg-black/70 text-white text-xs font-medium backdrop-blur-md max-w-[80vw] truncate text-center select-none">
+                {previewImageModal.alt}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
