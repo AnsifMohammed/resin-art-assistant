@@ -74,8 +74,8 @@ export function SlideOver({
           >
             {/* Header */}
             {(title || subtitle) && (
-              <div className="flex items-start justify-between border-b border-border px-6 py-4">
-                <div className="min-w-0 pr-4">
+              <div className="flex items-start justify-between border-b border-border px-4 sm:px-6 py-3.5 sm:py-4">
+                <div className="min-w-0 pr-3 sm:pr-4">
                   <div className="flex items-center gap-2">
                     {title && (
                       <h2 className="text-18 font-bold font-outfit text-text tracking-tight truncate">
@@ -100,13 +100,13 @@ export function SlideOver({
             )}
 
             {/* Scrollable body */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 custom-scrollbar">
               {children}
             </div>
 
             {/* Footer */}
             {footer && (
-              <div className="border-t border-border bg-surface px-6 py-4">
+              <div className="border-t border-border bg-surface px-4 sm:px-6 py-3.5 sm:py-4">
                 {footer}
               </div>
             )}

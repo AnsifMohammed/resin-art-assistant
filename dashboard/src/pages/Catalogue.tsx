@@ -547,12 +547,12 @@ export default function Catalogue() {
           </div>
 
           {/* Action Controls */}
-          <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
-            <div className="flex items-center rounded-lg border border-border bg-surface p-0.5 shadow-2xs">
+          <div className="flex items-center gap-2 sm:gap-2.5 w-full sm:w-auto">
+            <div className="flex items-center rounded-lg border border-border bg-surface p-0.5 shadow-2xs shrink-0">
               <button
                 type="button"
                 onClick={() => setViewMode("grid")}
-                className={`p-1.5 rounded-md transition-colors cursor-pointer ${
+                className={`p-2 sm:p-1.5 rounded-md transition-colors cursor-pointer ${
                   viewMode === "grid"
                     ? "bg-surface-muted text-text font-bold"
                     : "text-text-muted hover:text-text"
@@ -565,7 +565,7 @@ export default function Catalogue() {
               <button
                 type="button"
                 onClick={() => setViewMode("table")}
-                className={`p-1.5 rounded-md transition-colors cursor-pointer ${
+                className={`p-2 sm:p-1.5 rounded-md transition-colors cursor-pointer ${
                   viewMode === "table"
                     ? "bg-surface-muted text-text font-bold"
                     : "text-text-muted hover:text-text"
@@ -580,7 +580,7 @@ export default function Catalogue() {
             <button
               type="button"
               onClick={handleStartAdd}
-              className="inline-flex items-center gap-1.5 px-3.5 sm:px-4 py-2 rounded-lg bg-primary text-primary-foreground font-semibold text-13 shadow-xs hover:brightness-105 active:scale-98 transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-3.5 sm:px-4 py-2 min-h-[42px] sm:min-h-0 rounded-lg bg-primary text-primary-foreground font-semibold text-13 shadow-xs hover:brightness-105 active:scale-98 transition-all cursor-pointer whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             >
               <Plus className="w-4 h-4" />
               <span>Add product</span>
@@ -801,11 +801,11 @@ export default function Catalogue() {
                         <td className="p-3 text-right" onClick={(e) => e.stopPropagation()}>
                           <div className="flex items-center justify-end gap-1">
                             <button type="button" onClick={() => handleStartEdit(p)}
-                              className="p-1.5 rounded-md hover:bg-surface-muted text-text-muted hover:text-text cursor-pointer transition" title="Edit product">
+                              className="p-2 sm:p-1.5 rounded-md hover:bg-surface-muted text-text-muted hover:text-text cursor-pointer transition" title="Edit product">
                               <Pencil className="w-4 h-4" />
                             </button>
                             <button type="button" onClick={() => setProductToDelete(p)}
-                              className="p-1.5 rounded-md hover:bg-rose-500/10 text-text-muted hover:text-rose-600 cursor-pointer transition" title="Delete product">
+                              className="p-2 sm:p-1.5 rounded-md hover:bg-rose-500/10 text-text-muted hover:text-rose-600 cursor-pointer transition" title="Delete product">
                               <Trash2 className="w-4 h-4" />
                             </button>
                           </div>
@@ -877,7 +877,7 @@ export default function Catalogue() {
 
             {/* Sizes & Prices Table (At least 1 size, each size has its own price) */}
             <div className="space-y-2 p-3.5 rounded-xl border border-border bg-surface-muted/40">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5">
                 <div>
                   <label className="block text-13 font-semibold text-text">
                     Sizes & Prices <span className="text-danger">*</span>
@@ -889,7 +889,7 @@ export default function Catalogue() {
                 <button
                   type="button"
                   onClick={handleAddSizeRow}
-                  className="inline-flex items-center gap-1 px-2.5 py-1 text-12 font-medium rounded-md bg-surface text-text border border-border hover:bg-surface-muted cursor-pointer transition-colors"
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-1 px-2.5 py-2 sm:py-1 min-h-[38px] sm:min-h-0 shrink-0 text-12 font-medium rounded-md bg-surface text-text border border-border hover:bg-surface-muted cursor-pointer transition-colors whitespace-nowrap"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>Add size</span>
@@ -898,44 +898,49 @@ export default function Catalogue() {
 
               <div className="space-y-2 pt-1">
                 {formSizes.map((s, idx) => (
-                  <div key={idx} className="flex items-center gap-2">
+                  <div
+                    key={idx}
+                    className="flex flex-col sm:flex-row sm:items-center gap-2 p-2.5 sm:p-0 rounded-lg sm:rounded-none border border-border/60 sm:border-0 bg-surface/60 sm:bg-transparent"
+                  >
                     <input
                       type="text"
                       required
                       placeholder="Size name (e.g. 10cm round or Standard)"
                       value={s.name}
                       onChange={(e) => handleUpdateSizeRow(idx, "name", e.target.value)}
-                      className="flex-1 px-3 py-1.5 text-13 rounded-lg bg-surface border border-border text-text focus:outline-none focus:ring-2 focus:ring-primary/40"
+                      className="w-full sm:flex-1 px-3 py-2 sm:py-1.5 text-13 rounded-lg bg-surface border border-border text-text focus:outline-none focus:ring-2 focus:ring-primary/40"
                     />
-                    <div className="relative w-32 shrink-0">
-                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-12 text-text-muted font-bold">
-                        ₹
-                      </span>
-                      <input
-                        type="number"
-                        min="1"
-                        required
-                        placeholder="0"
-                        value={s.price === 0 ? "" : s.price}
-                        onFocus={(e) => {
-                          if (s.price === 0 || e.target.value === "0") {
-                            handleUpdateSizeRow(idx, "price", "");
-                          }
-                        }}
-                        onChange={(e) => handleUpdateSizeRow(idx, "price", e.target.value)}
-                        className="w-full pl-6 pr-2 py-1.5 text-13 rounded-lg bg-surface border border-border text-text tabular-nums focus:outline-none focus:ring-2 focus:ring-primary/40 [color-scheme:dark] dark:[color-scheme:dark]"
-                      />
+                    <div className="flex items-center gap-2 sm:contents">
+                      <div className="relative flex-1 sm:flex-none sm:w-32 shrink-0">
+                        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-12 text-text-muted font-bold">
+                          ₹
+                        </span>
+                        <input
+                          type="number"
+                          min="1"
+                          required
+                          placeholder="0"
+                          value={s.price === 0 ? "" : s.price}
+                          onFocus={(e) => {
+                            if (s.price === 0 || e.target.value === "0") {
+                              handleUpdateSizeRow(idx, "price", "");
+                            }
+                          }}
+                          onChange={(e) => handleUpdateSizeRow(idx, "price", e.target.value)}
+                          className="w-full pl-6 pr-2 py-2 sm:py-1.5 text-13 rounded-lg bg-surface border border-border text-text tabular-nums focus:outline-none focus:ring-2 focus:ring-primary/40 [color-scheme:dark] dark:[color-scheme:dark]"
+                        />
+                      </div>
+                      {formSizes.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveSizeRow(idx)}
+                          className="p-2 sm:p-1.5 shrink-0 text-text-muted hover:text-danger rounded-md hover:bg-surface cursor-pointer"
+                          title="Remove size"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
                     </div>
-                    {formSizes.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveSizeRow(idx)}
-                        className="p-1.5 text-text-muted hover:text-danger rounded-md hover:bg-surface cursor-pointer"
-                        title="Remove size"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    )}
                   </div>
                 ))}
               </div>
@@ -1009,12 +1014,12 @@ export default function Catalogue() {
                       }
                     }}
                     placeholder="e.g. colour, name, dried flowers"
-                    className="flex-1 px-3 py-1.5 text-13 rounded-lg bg-surface-muted border border-border text-text focus:outline-none focus:ring-2 focus:ring-primary/40"
+                    className="flex-1 min-w-0 px-3 py-2 sm:py-1.5 text-13 rounded-lg bg-surface-muted border border-border text-text focus:outline-none focus:ring-2 focus:ring-primary/40"
                   />
                   <button
                     type="button"
                     onClick={handleAddOptionChip}
-                    className="px-3 py-1.5 rounded-lg bg-surface-muted border border-border text-12 font-medium hover:text-text cursor-pointer"
+                    className="px-3.5 sm:px-3 py-2 sm:py-1.5 min-h-[38px] sm:min-h-0 shrink-0 rounded-lg bg-surface-muted border border-border text-12 font-medium hover:text-text cursor-pointer"
                   >
                     Add
                   </button>
@@ -1041,7 +1046,7 @@ export default function Catalogue() {
 
             {/* Photo Upload to Cloudinary */}
             <div className="space-y-3 p-3.5 rounded-xl border border-border bg-surface-muted/40">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5">
                 <div>
                   <label className="block text-13 font-semibold text-text">
                     Product Photos (Max 5)
@@ -1061,7 +1066,7 @@ export default function Catalogue() {
                   type="button"
                   disabled={isUploadingImage || formImages.length >= 5}
                   onClick={() => fileInputRef.current?.click()}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground font-semibold text-12 shadow-xs hover:brightness-105 disabled:opacity-50 cursor-pointer transition-all"
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-3 py-2 sm:py-1.5 min-h-[38px] sm:min-h-0 shrink-0 rounded-lg bg-primary text-primary-foreground font-semibold text-12 shadow-xs hover:brightness-105 disabled:opacity-50 cursor-pointer transition-all whitespace-nowrap"
                 >
                   {isUploadingImage ? (
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -1144,21 +1149,21 @@ export default function Catalogue() {
             </div>
 
             {/* Action buttons */}
-            <div className="flex items-center justify-end gap-2.5 pt-4 border-t border-border">
+            <div className="sticky bottom-0 z-20 -mx-4 -mb-4 px-4 py-3 bg-surface/95 backdrop-blur-xs border-t border-border grid grid-cols-2 gap-2.5 sm:static sm:mx-0 sm:mb-0 sm:px-0 sm:pt-4 sm:pb-0 sm:bg-transparent sm:backdrop-blur-none sm:flex sm:items-center sm:justify-end">
               <button
                 type="button"
                 onClick={() => {
                   if (isAddingNew) handleCloseSlideOver();
                   else setIsEditing(false);
                 }}
-                className="px-4 py-2 rounded-lg border border-border bg-surface text-text text-13 font-medium hover:bg-surface-muted cursor-pointer transition-colors"
+                className="inline-flex items-center justify-center px-4 py-2.5 sm:py-2 min-h-[44px] sm:min-h-0 rounded-lg border border-border bg-surface text-text text-13 font-medium hover:bg-surface-muted cursor-pointer transition-colors whitespace-nowrap"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={createMutation.isPending || updateMutation.isPending}
-                className="inline-flex items-center gap-1.5 px-5 py-2 rounded-lg bg-primary text-primary-foreground font-semibold text-13 shadow-xs hover:brightness-105 disabled:opacity-50 transition-all cursor-pointer"
+                className="inline-flex items-center justify-center gap-1.5 px-4 sm:px-5 py-2.5 sm:py-2 min-h-[44px] sm:min-h-0 rounded-lg bg-primary text-primary-foreground font-semibold text-13 shadow-xs hover:brightness-105 disabled:opacity-50 transition-all cursor-pointer whitespace-nowrap"
               >
                 {(createMutation.isPending || updateMutation.isPending) && (
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -1357,11 +1362,11 @@ export default function Catalogue() {
             </div>
 
             {/* Action Buttons */}
-            <div className="flex items-center gap-3 pt-4 border-t border-border">
+            <div className="sticky bottom-0 z-20 -mx-4 -mb-4 px-4 py-3 bg-surface/95 backdrop-blur-xs border-t border-border flex items-center gap-3 sm:static sm:mx-0 sm:mb-0 sm:px-0 sm:pt-4 sm:pb-0 sm:bg-transparent sm:backdrop-blur-none">
               <button
                 type="button"
                 onClick={() => handleStartEdit(selectedProduct)}
-                className="flex-1 inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg bg-primary text-primary-foreground font-semibold text-13 shadow-xs hover:brightness-105 cursor-pointer transition-all"
+                className="flex-1 inline-flex items-center justify-center gap-1.5 px-4 py-2.5 min-h-[44px] sm:min-h-0 rounded-lg bg-primary text-primary-foreground font-semibold text-13 shadow-xs hover:brightness-105 cursor-pointer transition-all whitespace-nowrap"
               >
                 <Pencil className="w-4 h-4" />
                 <span>Edit product</span>
@@ -1369,7 +1374,7 @@ export default function Catalogue() {
               <button
                 type="button"
                 onClick={() => setProductToDelete(selectedProduct)}
-                className="inline-flex items-center justify-center p-2.5 rounded-lg border border-border text-danger hover:bg-danger/10 cursor-pointer transition-colors"
+                className="inline-flex items-center justify-center p-2.5 min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 rounded-lg border border-border text-danger hover:bg-danger/10 cursor-pointer transition-colors shrink-0"
                 title="Delete product"
               >
                 <Trash2 className="w-4 h-4" />
