@@ -1362,6 +1362,27 @@ export interface SendProgressUpdateRequest {
   text: string;
 }
 
+export interface OrderNotificationItem {
+  id: string;
+  orderId: string;
+  orderNo: string;
+  customerName: string;
+  status: OrderStatus;
+  action: "order_notification_sent" | "order_notification_failed";
+  deliveryStatus: "sent" | "failed" | "skipped";
+  channel: "whatsapp" | "instagram";
+  templateName?: string | null | undefined;
+  type?: string | undefined;
+  preview: string;
+  error?: string | null | undefined;
+  createdAt: ISODateString;
+  actorName?: string | null | undefined;
+}
+
+export interface OrderNotificationListResponse {
+  notifications: OrderNotificationItem[];
+}
+
 // ─── Customers (admin only) ──────────────────────────────────────────────────
 
 /** Mirrors backend/src/lib/segments.ts. "all" is not a membership segment. */

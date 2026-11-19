@@ -2,6 +2,7 @@ import type {
   CreateOrderRequest,
   OrderListResponse,
   OrderMessage,
+  OrderNotificationListResponse,
   OrderResponse,
   SendProgressUpdateRequest,
   UpdateOrderRequest,
@@ -60,3 +61,7 @@ export const retryOrderNotification = (id: string, messageId: string) =>
     `/orders/${encodeURIComponent(id)}/retry-notification/${encodeURIComponent(messageId)}`,
     {}
   );
+
+/** GET /orders/notifications - Get recent order/production notifications */
+export const getOrderNotifications = (limit = 20, signal?: AbortSignal) =>
+  api.get<OrderNotificationListResponse>(`/orders/notifications?limit=${limit}`, undefined, signal);
