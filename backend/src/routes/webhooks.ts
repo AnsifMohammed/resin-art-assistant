@@ -10,6 +10,12 @@ import { enqueueProcessIgComment } from "../queue/enqueueIgComment.ts";
 import { applyWhatsAppStatus } from "../services/deliveryReceipts.ts";
 import { handleOptKeyword } from "../services/optOut.ts";
 import {
+  extractWhatsAppMedia,
+  fetchInstagramInboundMedia,
+  fetchWhatsAppInboundMedia,
+  type InboundMediaKind,
+} from "../services/meta/inboundMedia.ts";
+import {
   fetchInstagramDisplayName,
   type IgMedia,
   INSTAGRAM_MAX_TEXT_BYTES,
@@ -93,6 +99,8 @@ interface InboundCustomerMessage {
   handleOrPhone: string;
   customerName: string;
   text: string;
+  /** Permanent (Cloudinary) URLs for any photo/video/audio/document sent with the message. */
+  mediaUrls?: string[] | undefined;
   metaMessageId: string | undefined;
   metadata?: Record<string, unknown> | undefined;
 }
@@ -175,6 +183,7 @@ async function handleCustomerMessage(m: InboundCustomerMessage): Promise<void> {
       direction: "inbound",
       senderType: "customer",
       content: m.text,
+      mediaUrls: m.mediaUrls ?? [],
       metaMessageId: m.metaMessageId,
       deliveryStatus: "delivered",
       metadata: m.metadata ?? {},
@@ -412,7 +421,10 @@ async function handleEcho(m: EchoMessage): Promise<void> {
     .values({
       conversationId: conv.id,
       businessId: config.BUSINESS_ID,
-      direction: "inbound",
+      // An echo is our own message coming back from Meta. Unclaimed by
+      // claimOwnOutboundEcho, it is the owner replying from the Instagram/
+      // WhatsApp app, so it belongs on the outbound side of the inbox.
+      direction: "outbound",
       senderType: "owner",
       content: m.text,
       metaMessageId: m.metaMessageId,
@@ -596,6 +608,28 @@ async function processWhatsApp(body: any): Promise<void> {
             continue;
           }
 
+          // Photos, voice notes and documents: pull the bytes from Meta and keep a
+          // permanent copy. Media that cannot be fetched must never cost us the message.
+          const mediaRef = extractWhatsAppMedia(msg);
+          let mediaUrls: string[] = [];
+          let mediaKinds: InboundMediaKind[] = [];
+          if (mediaRef) {
+            if (!text) {
+              const caption = msg?.[mediaRef.kind]?.caption;
+              if (typeof caption === "string") text = caption;
+            }
+            try {
+              const media = await fetchWhatsAppInboundMedia({
+                businessId: config.BUSINESS_ID,
+                media: [mediaRef],
+              });
+              mediaUrls = media.urls;
+              mediaKinds = media.kinds;
+            } catch (mediaErr) {
+              logger.error({ mediaErr, metaMessageId }, "Inbound WhatsApp media failed; storing the message without it");
+            }
+          }
+
           const contact = contacts.find((c: any) => c?.wa_id === from);
           await handleCustomerMessage({
             channelType: "whatsapp",
@@ -603,8 +637,9 @@ async function processWhatsApp(body: any): Promise<void> {
             handleOrPhone: from,
             customerName: contact?.profile?.name || from,
             text,
+            mediaUrls,
             metaMessageId,
-            metadata,
+            metadata: mediaKinds.length > 0 ? { ...(metadata ?? {}), mediaTypes: mediaKinds } : metadata,
           });
         } catch (err) {
           logger.error({ err, metaMessageId }, "Failed to process WhatsApp message");
@@ -659,14 +694,27 @@ async function processInstagram(body: any): Promise<void> {
           continue;
         }
 
+        // Instagram attachment URLs expire, so the bytes are copied to our own
+        // storage before the message row is written.
+        const attachments = Array.isArray(message?.attachments) ? message.attachments : [];
+        let media: { urls: string[]; kinds: InboundMediaKind[] } = { urls: [], kinds: [] };
+        if (attachments.length > 0) {
+          try {
+            media = await fetchInstagramInboundMedia({ businessId: config.BUSINESS_ID, attachments });
+          } catch (mediaErr) {
+            logger.error({ mediaErr, metaMessageId }, "Inbound Instagram media failed; storing the message without it");
+          }
+        }
+
         await handleCustomerMessage({
           channelType: "instagram",
           channelIdentifier: accountId || "instagram-main",
           handleOrPhone: senderId,
           customerName: senderId,
           text,
+          mediaUrls: media.urls,
           metaMessageId,
-          metadata,
+          metadata: media.kinds.length > 0 ? { ...(metadata ?? {}), mediaTypes: media.kinds } : metadata,
         });
       } catch (err) {
         logger.error({ err, metaMessageId }, "Failed to process Instagram message");

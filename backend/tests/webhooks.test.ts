@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { PgDialect } from "drizzle-orm/pg-core";
 import { applyTestEnv } from "./env.ts";
 
@@ -29,14 +29,37 @@ const h = vi.hoisted(() => {
     failIds: new Set<string>(),
   };
   const enqueue = vi.fn(async () => ({ mode: "inline", jobId: null }));
+  const fetchWaMedia = vi.fn(async (_opts: any) => ({ urls: [] as string[], kinds: [] as string[] }));
+  const fetchIgMedia = vi.fn(async (_opts: any) => ({ urls: [] as string[], kinds: [] as string[] }));
+  const uploadBuffer = vi.fn(async (_opts: any) => ({
+    url: "https://res.cloudinary.com/x/image/upload/stored.jpg",
+    secureUrl: "https://res.cloudinary.com/x/image/upload/stored.jpg",
+    resourceType: "image",
+    format: "jpg",
+  }));
   const emitMessageNew = vi.fn();
   const emitConversationUpdated = vi.fn();
   const emitCustomerUpdated = vi.fn();
   const emitBroadcastUpdated = vi.fn();
   const emitIgCommentNew = vi.fn();
   const emitIgCommentUpdated = vi.fn();
-  return { state, enqueue, emitMessageNew, emitConversationUpdated, emitCustomerUpdated, emitBroadcastUpdated, emitIgCommentNew, emitIgCommentUpdated };
+  return { state, enqueue, fetchWaMedia, fetchIgMedia, uploadBuffer, emitMessageNew, emitConversationUpdated, emitCustomerUpdated, emitBroadcastUpdated, emitIgCommentNew, emitIgCommentUpdated };
 });
+
+// Inbound media: the webhook wiring is tested against a stub, the service
+// itself against a mocked fetch + Cloudinary further down. No real network.
+vi.mock("../src/services/meta/inboundMedia.ts", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../src/services/meta/inboundMedia.ts")>();
+  return {
+    ...actual,
+    fetchWhatsAppInboundMedia: h.fetchWaMedia,
+    fetchInstagramInboundMedia: h.fetchIgMedia,
+  };
+});
+
+vi.mock("../src/services/cloudinary.ts", () => ({
+  uploadBufferToCloudinary: h.uploadBuffer,
+}));
 
 vi.mock("../src/realtime/events.ts", () => ({
   emitMessageNew: h.emitMessageNew,
@@ -133,6 +156,11 @@ beforeEach(() => {
   h.state.duplicateIds = new Set();
   h.state.failIds = new Set();
   h.enqueue.mockClear();
+  h.fetchWaMedia.mockReset();
+  h.fetchWaMedia.mockResolvedValue({ urls: [], kinds: [] });
+  h.fetchIgMedia.mockReset();
+  h.fetchIgMedia.mockResolvedValue({ urls: [], kinds: [] });
+  h.uploadBuffer.mockClear();
   h.emitMessageNew.mockClear();
   h.emitConversationUpdated.mockClear();
   h.emitCustomerUpdated.mockClear();
@@ -378,7 +406,7 @@ describe("Meta Webhooks", () => {
       expect(msgs).toHaveLength(1);
       expect(msgs[0]).toMatchObject({
         conversationId: "conv-1",
-        direction: "inbound",
+        direction: "outbound",
         senderType: "owner",
         metaMessageId: "wamid.echo1",
       });
@@ -430,6 +458,199 @@ describe("Meta Webhooks", () => {
     });
   });
 
+  describe("POST /webhook inbound media", () => {
+    const igPayload = (event: any) => ({ object: "instagram", entry: [{ id: IG_ACCOUNT, time: 1, messaging: [event] }] });
+    const waImage = (id: string, image: Record<string, unknown>) => ({
+      id,
+      from: "919876543210",
+      timestamp: "1790589000",
+      type: "image",
+      image,
+    });
+
+    it("stores the caption and the media url for a WhatsApp photo with a caption", async () => {
+      h.fetchWaMedia.mockResolvedValue({ urls: ["https://res.cloudinary.com/x/a.jpg"], kinds: ["image"] });
+      const raw = JSON.stringify(
+        waPayload([waImage("wamid.img1", { id: "media-1", mime_type: "image/jpeg", caption: "Is this available?" })]),
+      );
+      const res = await post(raw, sign(raw));
+
+      expect(res.statusCode).toBe(200);
+      expect(h.fetchWaMedia).toHaveBeenCalledTimes(1);
+      expect(h.fetchWaMedia.mock.calls[0]![0]).toMatchObject({
+        media: [{ kind: "image", id: "media-1", mimeType: "image/jpeg" }],
+      });
+      const msgs = insertsInto("messages");
+      expect(msgs).toHaveLength(1);
+      expect(msgs[0]).toMatchObject({
+        content: "Is this available?",
+        mediaUrls: ["https://res.cloudinary.com/x/a.jpg"],
+        direction: "inbound",
+        senderType: "customer",
+        metadata: { mediaTypes: ["image"] },
+      });
+      expect(h.enqueue).toHaveBeenCalledTimes(1);
+    });
+
+    it("still stores a message row for a WhatsApp photo with no caption", async () => {
+      h.fetchWaMedia.mockResolvedValue({ urls: ["https://res.cloudinary.com/x/b.jpg"], kinds: ["image"] });
+      const raw = JSON.stringify(waPayload([waImage("wamid.img2", { id: "media-2", mime_type: "image/jpeg" })]));
+      const res = await post(raw, sign(raw));
+
+      expect(res.statusCode).toBe(200);
+      const msgs = insertsInto("messages");
+      expect(msgs).toHaveLength(1);
+      expect(msgs[0].content).toBe("");
+      expect(msgs[0].mediaUrls).toEqual(["https://res.cloudinary.com/x/b.jpg"]);
+      expect(h.emitMessageNew).toHaveBeenCalledTimes(1);
+      expect(h.enqueue).toHaveBeenCalledTimes(1);
+    });
+
+    it("stores media urls for an Instagram attachment", async () => {
+      h.state.rows.channels = [{ id: "chan-ig", type: "instagram" }];
+      h.state.rows.customers = [{ id: "cust-ig", handleOrPhone: "igsid-555" }];
+      h.state.rows.conversations = [{ id: "conv-ig", customerId: "cust-ig", state: "ai_active" }];
+      h.fetchIgMedia.mockResolvedValue({ urls: ["https://res.cloudinary.com/x/c.jpg"], kinds: ["image"] });
+      const raw = JSON.stringify(
+        igPayload({
+          sender: { id: "igsid-555" },
+          recipient: { id: IG_ACCOUNT },
+          timestamp: 1,
+          message: {
+            mid: "ig.mid.media",
+            attachments: [{ type: "image", payload: { url: "https://lookaside.fbsbx.com/expiring.jpg" } }],
+          },
+        }),
+      );
+      const res = await post(raw, sign(raw));
+
+      expect(res.statusCode).toBe(200);
+      expect(h.fetchIgMedia.mock.calls[0]![0]).toMatchObject({
+        attachments: [{ type: "image", payload: { url: "https://lookaside.fbsbx.com/expiring.jpg" } }],
+      });
+      expect(insertsInto("messages")[0]).toMatchObject({
+        content: "",
+        mediaUrls: ["https://res.cloudinary.com/x/c.jpg"],
+        metadata: { mediaTypes: ["image"] },
+      });
+    });
+
+    it("keeps the message when media ingestion fails", async () => {
+      h.fetchWaMedia.mockRejectedValue(new Error("meta is down"));
+      const raw = JSON.stringify(
+        waPayload([waImage("wamid.img3", { id: "media-3", mime_type: "image/jpeg", caption: "look" })]),
+      );
+      const res = await post(raw, sign(raw));
+
+      expect(res.statusCode).toBe(200);
+      const msgs = insertsInto("messages");
+      expect(msgs).toHaveLength(1);
+      expect(msgs[0]).toMatchObject({ content: "look", mediaUrls: [], metaMessageId: "wamid.img3" });
+      expect(h.enqueue).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("inbound media service", () => {
+    let service: typeof import("../src/services/meta/inboundMedia.ts");
+    let fetchSpy: ReturnType<typeof vi.spyOn>;
+
+    beforeAll(async () => {
+      service = await vi.importActual<typeof import("../src/services/meta/inboundMedia.ts")>(
+        "../src/services/meta/inboundMedia.ts",
+      );
+    });
+
+    beforeEach(() => {
+      fetchSpy = vi.spyOn(globalThis, "fetch" as never);
+    });
+
+    afterEach(() => {
+      fetchSpy.mockRestore();
+    });
+
+    const okResponse = (bytes: Uint8Array) =>
+      ({
+        ok: true,
+        status: 200,
+        headers: new Headers({ "content-type": "image/jpeg", "content-length": String(bytes.byteLength) }),
+        body: null,
+        arrayBuffer: async () => bytes.buffer.slice(0) as ArrayBuffer,
+      }) as unknown as Response;
+
+    it("re-uploads an expiring Instagram attachment to our own storage", async () => {
+      fetchSpy.mockResolvedValue(okResponse(new Uint8Array([1, 2, 3, 4])) as never);
+
+      const result = await service.fetchInstagramInboundMedia({
+        businessId: "test-business",
+        attachments: [{ type: "image", payload: { url: "https://lookaside.fbsbx.com/expiring.jpg" } }],
+      });
+
+      expect(result.urls).toEqual(["https://res.cloudinary.com/x/image/upload/stored.jpg"]);
+      expect(result.kinds).toEqual(["image"]);
+      expect(h.uploadBuffer).toHaveBeenCalledTimes(1);
+      expect(h.uploadBuffer.mock.calls[0]![0]).toMatchObject({ folder: "knowvya/conversations/test-business" });
+    });
+
+    it("returns nothing for attachment types that carry no file, and never calls out", async () => {
+      fetchSpy.mockResolvedValue(okResponse(new Uint8Array([1])) as never);
+      const result = await service.fetchInstagramInboundMedia({
+        businessId: "test-business",
+        attachments: [{ type: "share", payload: { url: "https://example.com/post" } }, { type: "story_mention" }],
+      });
+      expect(result).toEqual({ urls: [], kinds: [] });
+      expect(fetchSpy).not.toHaveBeenCalled();
+      expect(h.uploadBuffer).not.toHaveBeenCalled();
+    });
+
+    it("swallows a failed download instead of throwing", async () => {
+      fetchSpy.mockRejectedValue(new Error("network down") as never);
+      const result = await service.fetchInstagramInboundMedia({
+        businessId: "test-business",
+        attachments: [{ type: "image", payload: { url: "https://lookaside.fbsbx.com/expiring.jpg" } }],
+      });
+      expect(result).toEqual({ urls: [], kinds: [] });
+      expect(h.uploadBuffer).not.toHaveBeenCalled();
+    });
+
+    it("skips oversized media without buffering it", async () => {
+      fetchSpy.mockResolvedValue({
+        ok: true,
+        status: 200,
+        headers: new Headers({ "content-type": "video/mp4", "content-length": String(40 * 1024 * 1024) }),
+        body: null,
+        arrayBuffer: async () => new ArrayBuffer(0),
+      } as unknown as never);
+      const result = await service.fetchInstagramInboundMedia({
+        businessId: "test-business",
+        attachments: [{ type: "video", payload: { url: "https://lookaside.fbsbx.com/big.mp4" } }],
+      });
+      expect(result).toEqual({ urls: [], kinds: [] });
+      expect(h.uploadBuffer).not.toHaveBeenCalled();
+    });
+
+    it("extracts WhatsApp media refs only for types that carry a file", () => {
+      expect(service.extractWhatsAppMedia({ type: "image", image: { id: "m1", mime_type: "image/jpeg" } })).toEqual({
+        kind: "image",
+        id: "m1",
+        mimeType: "image/jpeg",
+        filename: undefined,
+      });
+      expect(service.extractWhatsAppMedia({ type: "text", text: { body: "hi" } })).toBeNull();
+      expect(service.extractWhatsAppMedia({ type: "location", location: { latitude: 1 } })).toBeNull();
+      expect(service.extractWhatsAppMedia({ type: "image", image: {} })).toBeNull();
+    });
+
+    it("skips WhatsApp media when no token is configured (DEMO_MODE) without any network call", async () => {
+      fetchSpy.mockResolvedValue(okResponse(new Uint8Array([1])) as never);
+      const result = await service.fetchWhatsAppInboundMedia({
+        businessId: "test-business",
+        media: [{ kind: "image", id: "m1", mimeType: "image/jpeg" }],
+      });
+      expect(result).toEqual({ urls: [], kinds: [] });
+      expect(fetchSpy).not.toHaveBeenCalled();
+    });
+  });
+
   describe("POST /webhook Instagram processing", () => {
     const igPayload = (event: any) => ({ object: "instagram", entry: [{ id: IG_ACCOUNT, time: 1, messaging: [event] }] });
 
@@ -478,7 +699,7 @@ describe("Meta Webhooks", () => {
       expect(insertsInto("messages")[0]).toMatchObject({
         conversationId: "conv-ig",
         senderType: "owner",
-        direction: "inbound",
+        direction: "outbound",
       });
       expect(h.state.updates.filter((u) => u.table === "conversations")[0]?.vals).toEqual({
         state: "owner_handling",

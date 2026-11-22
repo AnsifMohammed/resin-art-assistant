@@ -59,6 +59,22 @@ function isBroadcast(m: MessageRow): boolean {
   return (m.metadata as { kind?: string } | null)?.kind === "broadcast";
 }
 
+/**
+ * A photo sent with no caption has empty content, which the AI cannot act on.
+ * The stored row keeps its empty content (the inbox renders the media itself);
+ * only the text handed to the AI gets a short "[image]" style stand-in.
+ */
+function mediaPlaceholder(m: { mediaUrls?: unknown; metadata?: unknown }): string {
+  const urls = Array.isArray(m.mediaUrls) ? m.mediaUrls.filter((u) => typeof u === "string" && u) : [];
+  if (urls.length === 0) return "";
+  const meta = (m.metadata ?? {}) as Record<string, unknown>;
+  const kinds = Array.isArray(meta.mediaTypes)
+    ? meta.mediaTypes.filter((k): k is string => typeof k === "string" && k.length > 0)
+    : [];
+  const labels = kinds.length > 0 ? kinds : urls.map(() => "attachment");
+  return labels.map((k) => `[${k}]`).join(" ");
+}
+
 export function selectBatch(
   allMessages: MessageRow[],
   processedMessageIds: Set<string>,
@@ -303,7 +319,7 @@ async function runPipeline(params: ProcessMessageParams, outcome: PipelineOutcom
   const { batch, history } = selectBatch(allMessages, new Set(decided.map((d) => d.messageId)));
   const latestInbound = batch[batch.length - 1];
   const rawText = batch
-    .map((m) => (m.content ?? "").trim())
+    .map((m) => (m.content ?? "").trim() || mediaPlaceholder(m))
     .filter(Boolean)
     .join("\n");
 

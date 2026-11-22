@@ -377,6 +377,18 @@ describe("processMessageJob: outcomes", () => {
     expect(state.inserted.ai_decisions?.[0]?.messageId).toBe("m6");
   });
 
+  it("gives the AI a placeholder for a caption-less photo instead of skipping it", async () => {
+    state.messages = [
+      msg({ content: "", mediaUrls: ["https://res.cloudinary.com/x/a.jpg"], metadata: { mediaTypes: ["image"] } }),
+    ];
+    processAiDecision.mockResolvedValue(autoReply);
+
+    await processMessageJob(params);
+
+    expect(processAiDecision).toHaveBeenCalledOnce();
+    expect(processAiDecision.mock.calls[0]![0].incomingText).toBe("[image]");
+  });
+
   it("does nothing when every inbound message already has a decision", async () => {
     state.decidedMessageIds = ["m1"];
     expect(await processMessageJob(params)).toBeNull();

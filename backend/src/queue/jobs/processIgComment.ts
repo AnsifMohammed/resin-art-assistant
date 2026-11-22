@@ -407,7 +407,15 @@ export async function processIgCommentJob(params: ProcessIgCommentParams): Promi
 
         if (conv) {
           convId = conv.id;
-          const [insertedMsg] = await db
+          const dmMetadata = {
+            kind: "ig_comment_dm",
+            igCommentId: comment.id,
+            mediaId: comment.mediaId,
+          };
+
+          // The Instagram echo webhook can store this same meta_message_id first,
+          // so never let the unique index turn a duplicate into a crash.
+          let [insertedMsg] = await db
             .insert(messages)
             .values({
               conversationId: conv.id,
@@ -417,13 +425,35 @@ export async function processIgCommentJob(params: ProcessIgCommentParams): Promi
               content: dmText,
               metaMessageId: dmMessageId,
               deliveryStatus: "sent",
-              metadata: {
-                kind: "ig_comment_dm",
-                igCommentId: comment.id,
-                mediaId: comment.mediaId,
-              },
+              metadata: dmMetadata,
             })
+            .onConflictDoNothing({ target: messages.metaMessageId })
             .returning();
+
+          if (!insertedMsg && dmMessageId) {
+            // The echo won the race and stored it as an inbound owner message.
+            // Correct it in place and keep any metadata the echo wrote (e.g. echo: true).
+            const [existingMsg] = await db
+              .select()
+              .from(messages)
+              .where(eq(messages.metaMessageId, dmMessageId));
+
+            if (existingMsg) {
+              const [correctedMsg] = await db
+                .update(messages)
+                .set({
+                  direction: "outbound",
+                  senderType: "system",
+                  metadata: {
+                    ...((existingMsg.metadata as Record<string, unknown> | null) ?? {}),
+                    ...dmMetadata,
+                  },
+                })
+                .where(eq(messages.id, existingMsg.id))
+                .returning();
+              insertedMsg = correctedMsg ?? existingMsg;
+            }
+          }
 
           await db
             .update(conversations)
