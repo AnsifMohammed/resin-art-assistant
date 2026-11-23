@@ -190,6 +190,6 @@ export function useOrderNotifications(limit = 20, options: { enabled?: boolean }
     queryKey: queryKeys.orders.notifications(limit),
     queryFn: ({ signal }) => getOrderNotifications(limit, signal),
     enabled,
-    refetchInterval: enabled ? 10000 : false,
+    refetchInterval: enabled ? 60000 : false,
   });
 }

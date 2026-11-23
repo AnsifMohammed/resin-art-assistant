@@ -284,6 +284,7 @@ function NotificationsMenu() {
                   {orderNotifications.map((n) => {
                     const isUnread = !readIds.has(n.id);
                     const isFailed = n.deliveryStatus === "failed";
+                    const isSkipped = n.deliveryStatus === "skipped";
                     return (
                       <button
                         key={n.id}
@@ -297,6 +298,8 @@ function NotificationsMenu() {
                           "block w-full text-left p-2.5 rounded-lg border active:scale-[0.99] cursor-pointer transition text-xs relative",
                           isFailed
                             ? "bg-rose-500/10 hover:bg-rose-500/15 border-rose-500/30"
+                            : isSkipped
+                            ? "bg-amber-500/10 hover:bg-amber-500/15 border-amber-500/30"
                             : isUnread
                             ? "bg-primary-soft/30 hover:bg-primary-soft/50 border-primary/30"
                             : "bg-surface-muted/60 hover:bg-surface-muted border-transparent"
@@ -318,15 +321,21 @@ function NotificationsMenu() {
                           <p className="text-text-muted truncate">
                             {isFailed ? (
                               <span className="text-rose-500 font-medium">Delivery failed: {n.error || "Failed to send"}</span>
+                            ) : isSkipped ? (
+                              <span className="text-amber-600 font-medium">Not sent: {n.error || "Message was skipped"}</span>
                             ) : (
                               <span>Update sent via {n.channel === "whatsapp" ? "WhatsApp" : "Instagram DM"}{n.templateName ? `: ${n.templateName}` : ""}</span>
                             )}
                           </p>
                           <span className={cn(
                             "px-1.5 py-0.5 rounded text-[9px] font-bold shrink-0",
-                            isFailed ? "bg-rose-500/20 text-rose-600" : "bg-emerald-500/15 text-emerald-600"
+                            isFailed
+                              ? "bg-rose-500/20 text-rose-600"
+                              : isSkipped
+                              ? "bg-amber-500/20 text-amber-600"
+                              : "bg-emerald-500/15 text-emerald-600"
                           )}>
-                            {isFailed ? "Failed" : "Sent"}
+                            {isFailed ? "Failed" : isSkipped ? "Skipped" : "Sent"}
                           </span>
                         </div>
                         {n.preview && (

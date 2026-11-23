@@ -1368,7 +1368,7 @@ export interface OrderNotificationItem {
   orderNo: string;
   customerName: string;
   status: OrderStatus;
-  action: "order_notification_sent" | "order_notification_failed";
+  action: "order_notification_sent" | "order_notification_failed" | "order_notification_skipped";
   deliveryStatus: "sent" | "failed" | "skipped";
   channel: "whatsapp" | "instagram";
   templateName?: string | null | undefined;

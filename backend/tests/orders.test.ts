@@ -77,9 +77,6 @@ function answerOrders(q: FakeQuery): any[] | undefined {
       details: l.details,
       createdAt: l.createdAt || new Date(),
       actorName: "Asha",
-      fallbackCustomerName: "Meera",
-      fallbackOrderNo: "ORD-001",
-      fallbackChannel: "whatsapp",
     }));
   }
   return undefined;

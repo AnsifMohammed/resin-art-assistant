@@ -399,10 +399,13 @@ export async function sendOrderStatusNotification({
             details: {
               orderId: order.id,
               orderNo: order.orderNo,
+              customerName: order.customerName,
               status: newStatus,
+              deliveryStatus: "skipped",
               templateName: template.name,
               channel: targetChannel,
               reason: "template_inactive",
+              error: `Template "${template.name}" is inactive. Automatic message was not sent.`,
             },
           });
         } catch {}
@@ -1233,7 +1236,8 @@ export const orderRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
     { preHandler: [authenticate, requireAdmin] },
     async (request) => {
       const businessId = request.user.businessId;
-      const { limit = 20 } = request.query as { limit?: number };
+      const rawQuery = request.query as { limit?: string };
+      const limit = Math.min(50, Math.max(1, parseInt(rawQuery.limit ?? "20", 10) || 20));
 
       const rows = await db
         .select({
@@ -1242,35 +1246,37 @@ export const orderRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
           details: auditLog.details,
           createdAt: auditLog.createdAt,
           actorName: users.name,
-          fallbackCustomerName: orders.customerName,
-          fallbackOrderNo: orders.orderNo,
-          fallbackChannel: orders.channel,
         })
         .from(auditLog)
         .leftJoin(users, eq(auditLog.actorId, users.id))
-        .leftJoin(orders, sql`(${auditLog.details}->>'orderId') = ${orders.id}`)
         .where(
           and(
             eq(auditLog.businessId, businessId),
-            sql`${auditLog.action} IN ('order_notification_sent', 'order_notification_failed')`
+            sql`${auditLog.action} IN ('order_notification_sent', 'order_notification_failed', 'order_notification_skipped')`
           )
         )
         .orderBy(desc(auditLog.createdAt))
-        .limit(Math.min(50, Number(limit) || 20));
+        .limit(limit);
 
       const notifications = rows.map((r) => {
         const details = (r.details || {}) as Record<string, any>;
-        const orderNo = details.orderNo || r.fallbackOrderNo || "Order";
-        const customerName = details.customerName || r.fallbackCustomerName || "Customer";
-        const channel = details.channel || r.fallbackChannel || "whatsapp";
+        const orderNo = details.orderNo || "Order";
+        const customerName = details.customerName || "Customer";
+        const channel = details.channel || "whatsapp";
         return {
           id: r.id,
           orderId: details.orderId || "",
           orderNo,
           customerName,
           status: (details.status || "in_production") as OrderStatus,
-          action: r.action as "order_notification_sent" | "order_notification_failed",
-          deliveryStatus: (details.deliveryStatus as "sent" | "failed" | "skipped") || (r.action === "order_notification_sent" ? "sent" : "failed"),
+          action: r.action as "order_notification_sent" | "order_notification_failed" | "order_notification_skipped",
+          deliveryStatus:
+            (details.deliveryStatus as "sent" | "failed" | "skipped") ||
+            (r.action === "order_notification_sent"
+              ? "sent"
+              : r.action === "order_notification_skipped"
+              ? "skipped"
+              : "failed"),
           channel: channel as "whatsapp" | "instagram",
           templateName: details.templateName || null,
           type: details.type || "production_progress",
