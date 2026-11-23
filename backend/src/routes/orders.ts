@@ -12,6 +12,7 @@ import {
   orderItems,
   orders,
   payments,
+  users,
 } from "../db/schema.ts";
 import { AppError } from "../lib/errors.ts";
 import { derivePaymentSummary } from "./payments.ts";
@@ -345,6 +346,7 @@ export async function sendOrderStatusNotification({
   trackingId,
   courier,
   customText,
+  templateId,
 }: {
   businessId: string;
   order: typeof orders.$inferSelect;
@@ -354,6 +356,7 @@ export async function sendOrderStatusNotification({
   trackingId?: string | null | undefined;
   courier?: string | null | undefined;
   customText?: string | null | undefined;
+  templateId?: string | null | undefined;
 }): Promise<{
   sent: boolean;
   deliveryStatus: "sent" | "failed" | "skipped";
@@ -366,8 +369,25 @@ export async function sendOrderStatusNotification({
   let messageText = customText?.trim() || "";
   let template: typeof messageTemplates.$inferSelect | null = null;
 
+  if (templateId) {
+    try {
+      const [found] = await db
+        .select()
+        .from(messageTemplates)
+        .where(
+          and(
+            eq(messageTemplates.id, templateId),
+            eq(messageTemplates.businessId, businessId)
+          )
+        );
+      if (found) template = found;
+    } catch {}
+  }
+
   if (!messageText) {
-    template = await findTemplateForStatus(businessId, newStatus, targetChannel);
+    if (!template) {
+      template = await findTemplateForStatus(businessId, newStatus, targetChannel);
+    }
     if (template) {
       if (!template.isActive) {
         try {
@@ -475,12 +495,16 @@ export async function sendOrderStatusNotification({
       details: {
         orderId: order.id,
         orderNo: order.orderNo,
+        customerName: order.customerName,
         status: newStatus,
         messageId: createdMessage?.id,
         deliveryStatus,
         channel: resolvedChannel,
+        templateId: template?.id || templateId || null,
+        templateName: template?.name || null,
+        type: newStatus === "in_production" ? "production_progress" : "order_status_update",
         error: errorMsg,
-        preview: messageText.slice(0, 100),
+        preview: messageText.slice(0, 120),
       },
     });
   } catch {}
@@ -1203,6 +1227,66 @@ export const orderRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
     }
   );
 
+  // GET /orders/notifications - List recent order/production progress notifications for bell menu
+  app.get(
+    "/orders/notifications",
+    { preHandler: [authenticate, requireAdmin] },
+    async (request) => {
+      const businessId = request.user.businessId;
+      const { limit = 20 } = request.query as { limit?: number };
+
+      const rows = await db
+        .select({
+          id: auditLog.id,
+          action: auditLog.action,
+          details: auditLog.details,
+          createdAt: auditLog.createdAt,
+          actorName: users.name,
+          fallbackCustomerName: orders.customerName,
+          fallbackOrderNo: orders.orderNo,
+          fallbackChannel: orders.channel,
+        })
+        .from(auditLog)
+        .leftJoin(users, eq(auditLog.actorId, users.id))
+        .leftJoin(orders, sql`(${auditLog.details}->>'orderId') = ${orders.id}`)
+        .where(
+          and(
+            eq(auditLog.businessId, businessId),
+            sql`${auditLog.action} IN ('order_notification_sent', 'order_notification_failed')`
+          )
+        )
+        .orderBy(desc(auditLog.createdAt))
+        .limit(Math.min(50, Number(limit) || 20));
+
+      const notifications = rows.map((r) => {
+        const details = (r.details || {}) as Record<string, any>;
+        const orderNo = details.orderNo || r.fallbackOrderNo || "Order";
+        const customerName = details.customerName || r.fallbackCustomerName || "Customer";
+        const channel = details.channel || r.fallbackChannel || "whatsapp";
+        return {
+          id: r.id,
+          orderId: details.orderId || "",
+          orderNo,
+          customerName,
+          status: (details.status || "in_production") as OrderStatus,
+          action: r.action as "order_notification_sent" | "order_notification_failed",
+          deliveryStatus: (details.deliveryStatus as "sent" | "failed" | "skipped") || (r.action === "order_notification_sent" ? "sent" : "failed"),
+          channel: channel as "whatsapp" | "instagram",
+          templateName: details.templateName || null,
+          type: details.type || "production_progress",
+          preview: details.preview || "",
+          error: details.error || null,
+          createdAt: r.createdAt.toISOString(),
+          actorName: r.actorName || null,
+        };
+      });
+
+      return {
+        notifications,
+      };
+    }
+  );
+
   // POST /orders/:id/progress-update - Send manual or template production progress update via Instagram
   app.post(
     "/orders/:id/progress-update",
@@ -1269,6 +1353,7 @@ export const orderRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
         actorId: request.user.sub,
         newStatus: order.status,
         customText: parsed.data.text,
+        templateId: parsed.data.templateId || undefined,
       });
 
       return {
