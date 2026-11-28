@@ -61,6 +61,7 @@ export const queryKeys = {
     }) => [...queryKeys.orders.all, "list", params] as const,
     detail: (id: string) => [...queryKeys.orders.all, "detail", id] as const,
     messages: (id: string) => [...queryKeys.orders.all, "messages", id] as const,
+    notifications: (limit?: number) => [...queryKeys.orders.all, "notifications", limit ?? 20] as const,
   },
   customers: {
     all: ["customers"] as const,

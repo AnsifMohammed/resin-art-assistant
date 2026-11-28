@@ -3,6 +3,7 @@ import {
   createOrder,
   deleteOrder,
   getOrderMessages,
+  getOrderNotifications,
   listOrders,
   retryOrderNotification,
   sendProgressUpdate,
@@ -164,6 +165,7 @@ export function useSendProgressUpdate() {
       void qc.invalidateQueries({ queryKey: queryKeys.orders.messages(vars.id) });
       void qc.invalidateQueries({ queryKey: queryKeys.orders.detail(vars.id) });
       void qc.invalidateQueries({ queryKey: queryKeys.orders.all });
+      void qc.invalidateQueries({ queryKey: queryKeys.auditLog.all });
     },
   });
 }
@@ -176,6 +178,18 @@ export function useRetryOrderNotification() {
     onSuccess: (_, vars) => {
       void qc.invalidateQueries({ queryKey: queryKeys.orders.messages(vars.id) });
       void qc.invalidateQueries({ queryKey: queryKeys.orders.detail(vars.id) });
+      void qc.invalidateQueries({ queryKey: queryKeys.orders.all });
+      void qc.invalidateQueries({ queryKey: queryKeys.auditLog.all });
     },
+  });
+}
+
+export function useOrderNotifications(limit = 20, options: { enabled?: boolean } = {}) {
+  const { enabled = true } = options;
+  return useQuery({
+    queryKey: queryKeys.orders.notifications(limit),
+    queryFn: ({ signal }) => getOrderNotifications(limit, signal),
+    enabled,
+    refetchInterval: enabled ? 60000 : false,
   });
 }

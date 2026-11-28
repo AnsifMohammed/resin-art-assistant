@@ -13,12 +13,13 @@ import {
   Minimize,
   X,
   AlertTriangle,
+  Send,
 } from "lucide-react";
 import { cn } from "../../lib/cn.ts";
 import { useAuth } from "../../context/AuthContext.tsx";
 import { useTheme } from "../../context/ThemeContext.tsx";
 import { useEscalations } from "../../hooks/useEscalations.ts";
-import { useOrders } from "../../hooks/useOrders.ts";
+import { useOrderNotifications, useOrders } from "../../hooks/useOrders.ts";
 import { usePushNotifications } from "../../hooks/usePushNotifications.ts";
 import { useSocket } from "../../hooks/useSocket.ts";
 import { escalationReasonLabel } from "../../lib/escalationReasons.ts";
@@ -88,14 +89,57 @@ function ConnectionDot() {
 }
 
 
-/** Bell: real open escalations (GET /escalations, scoped to the user's role by the server). */
+/** Bell: real open escalations (GET /escalations, scoped to the user's role by the server) & production progress updates. */
 function NotificationsMenu() {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
   const escalations = useEscalations();
-  const ordersQuery = useOrders({ status: "in_production" });
+  const ordersQuery = useOrders({ status: "in_production" }, { enabled: isAdmin });
+  const orderNotificationsQuery = useOrderNotifications(10, { enabled: isAdmin });
   const push = usePushNotifications();
+
+  const orderNotifications = useMemo(
+    () => orderNotificationsQuery.data?.notifications ?? [],
+    [orderNotificationsQuery.data]
+  );
+
+  const storageKey = `resin_read_order_notifications_${user?.id || "guest"}`;
+  const [readIds, setReadIds] = useState<Set<string>>(() => {
+    try {
+      const stored = localStorage.getItem(storageKey);
+      return stored ? new Set(JSON.parse(stored)) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
+
+  const markAsRead = (id: string) => {
+    setReadIds((prev) => {
+      const next = new Set(prev);
+      next.add(id);
+      try {
+        localStorage.setItem(storageKey, JSON.stringify([...next]));
+      } catch {}
+      return next;
+    });
+  };
+
+  const markAllAsRead = () => {
+    const all = new Set(readIds);
+    orderNotifications.forEach((n) => all.add(n.id));
+    setReadIds(all);
+    try {
+      localStorage.setItem(storageKey, JSON.stringify([...all]));
+    } catch {}
+  };
+
+  const unreadOrderNotifications = useMemo(
+    () => orderNotifications.filter((n) => !readIds.has(n.id)),
+    [orderNotifications, readIds]
+  );
 
   // Close when tapping outside or pressing Escape
   useEffect(() => {
@@ -137,7 +181,10 @@ function NotificationsMenu() {
         .slice(0, 6),
     [escalations.data],
   );
-  const openCount = (escalations.data?.length ?? 0) + overdueProductionOrders.length;
+  const openCount =
+    (escalations.data?.length ?? 0) +
+    overdueProductionOrders.length +
+    unreadOrderNotifications.length;
 
   return (
     <div className="relative" ref={menuRef}>
@@ -208,6 +255,100 @@ function NotificationsMenu() {
 
             {/* Notifications scrollable list */}
             <div className="mt-2 space-y-1.5 max-h-[min(20rem,calc(100dvh-13rem))] sm:max-h-80 overflow-y-auto custom-scrollbar pr-0.5">
+              {/* Production Progress Updates */}
+              {orderNotifications.length > 0 && (
+                <div className="space-y-1 pb-1">
+                  <div className="flex items-center justify-between px-1 text-[10px] font-bold uppercase tracking-wider text-primary">
+                    <div className="flex items-center gap-1">
+                      <Send size={11} />
+                      <span>Production Updates</span>
+                      {unreadOrderNotifications.length > 0 && (
+                        <span className="px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-primary-soft text-primary-text">
+                          {unreadOrderNotifications.length} new
+                        </span>
+                      )}
+                    </div>
+                    {unreadOrderNotifications.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          markAllAsRead();
+                        }}
+                        className="text-[10px] font-normal text-text-muted hover:text-primary transition lowercase hover:underline cursor-pointer"
+                      >
+                        mark all read
+                      </button>
+                    )}
+                  </div>
+                  {orderNotifications.map((n) => {
+                    const isUnread = !readIds.has(n.id);
+                    const isFailed = n.deliveryStatus === "failed";
+                    const isSkipped = n.deliveryStatus === "skipped";
+                    return (
+                      <button
+                        key={n.id}
+                        type="button"
+                        onClick={() => {
+                          markAsRead(n.id);
+                          setOpen(false);
+                          navigate(`/orders?focus=${encodeURIComponent(n.orderId)}`);
+                        }}
+                        className={cn(
+                          "block w-full text-left p-2.5 rounded-lg border active:scale-[0.99] cursor-pointer transition text-xs relative",
+                          isFailed
+                            ? "bg-rose-500/10 hover:bg-rose-500/15 border-rose-500/30"
+                            : isSkipped
+                            ? "bg-amber-500/10 hover:bg-amber-500/15 border-amber-500/30"
+                            : isUnread
+                            ? "bg-primary-soft/30 hover:bg-primary-soft/50 border-primary/30"
+                            : "bg-surface-muted/60 hover:bg-surface-muted border-transparent"
+                        )}
+                      >
+                        {isUnread && (
+                          <span className="absolute top-2.5 right-2 w-1.5 h-1.5 rounded-full bg-primary" />
+                        )}
+                        <div className="flex items-center justify-between gap-1.5 pr-3">
+                          <span className="flex items-center gap-1.5 font-semibold text-text truncate min-w-0">
+                            <ChannelIcon channel={n.channel} size={12} />
+                            <span className="truncate">#{n.orderNo} · {n.customerName}</span>
+                          </span>
+                          <span className="text-[10px] text-text-muted shrink-0 whitespace-nowrap">
+                            {formatRelative(n.createdAt)}
+                          </span>
+                        </div>
+                        <div className="mt-1 flex items-center justify-between gap-2 text-[11px]">
+                          <p className="text-text-muted truncate">
+                            {isFailed ? (
+                              <span className="text-rose-500 font-medium">Delivery failed: {n.error || "Failed to send"}</span>
+                            ) : isSkipped ? (
+                              <span className="text-amber-600 font-medium">Not sent: {n.error || "Message was skipped"}</span>
+                            ) : (
+                              <span>Update sent via {n.channel === "whatsapp" ? "WhatsApp" : "Instagram DM"}{n.templateName ? `: ${n.templateName}` : ""}</span>
+                            )}
+                          </p>
+                          <span className={cn(
+                            "px-1.5 py-0.5 rounded text-[9px] font-bold shrink-0",
+                            isFailed
+                              ? "bg-rose-500/20 text-rose-600"
+                              : isSkipped
+                              ? "bg-amber-500/20 text-amber-600"
+                              : "bg-emerald-500/15 text-emerald-600"
+                          )}>
+                            {isFailed ? "Failed" : isSkipped ? "Skipped" : "Sent"}
+                          </span>
+                        </div>
+                        {n.preview && (
+                          <p className="text-[10px] text-text-muted/80 line-clamp-1 italic mt-0.5">
+                            "{n.preview}"
+                          </p>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
               {/* Overdue Production Alerts */}
               {overdueProductionOrders.length > 0 && (
                 <div className="space-y-1 pb-1">
@@ -234,7 +375,13 @@ function NotificationsMenu() {
                         </span>
                       </div>
                       <p className="text-[11px] text-text-muted mt-1 truncate">
-                        In production for {o.calculatedDays} days without moving to Ready · Send progress update
+                        {(() => {
+                          const lastUpdate = orderNotifications.find((n) => n.orderId === o.id);
+                          if (lastUpdate) {
+                            return `Update sent ${formatRelative(lastUpdate.createdAt)} · In production for ${o.calculatedDays}d`;
+                          }
+                          return `In production for ${o.calculatedDays} days without moving to Ready · Send progress update`;
+                        })()}
                       </p>
                     </button>
                   ))}
@@ -246,7 +393,7 @@ function NotificationsMenu() {
                 <p className="py-4 text-center text-xs text-text-muted">Loading…</p>
               ) : escalations.isError ? (
                 <p className="py-4 text-center text-xs text-danger">Couldn't load escalations.</p>
-              ) : recent.length === 0 && overdueProductionOrders.length === 0 ? (
+              ) : recent.length === 0 && overdueProductionOrders.length === 0 && orderNotifications.length === 0 ? (
                 <div className="py-6 text-center">
                   <p className="text-xs text-text-muted">No open alerts.</p>
                   <p className="text-[11px] text-text-muted/70 mt-0.5">Everything is running smoothly.</p>

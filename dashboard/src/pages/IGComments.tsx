@@ -23,6 +23,7 @@ import {
   Image as ImageIcon,
   Layers,
   CornerDownRight,
+  Shield,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -145,6 +146,18 @@ export default function IGCommentsPage() {
     [mediaSummary],
   );
 
+  const ruleCountByMedia = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const rule of rules) {
+      if (rule.mediaIds && rule.mediaIds.length > 0) {
+        for (const mid of rule.mediaIds) {
+          map.set(mid, (map.get(mid) ?? 0) + 1);
+        }
+      }
+    }
+    return map;
+  }, [rules]);
+
   // Mutations
   const createRuleMutation = useCreateIgRule();
   const updateRuleMutation = useUpdateIgRule();
@@ -186,6 +199,13 @@ export default function IGCommentsPage() {
   const { data: testResult, isFetching: testFetching } = useTestIgRule(
     testCommentText,
     testCommentMediaId || undefined,
+  );
+
+  // Post Detail SlideOver (per-post rules)
+  const [selectedMediaId, setSelectedMediaId] = useState<string | null>(null);
+  const selectedMedia = useMemo(
+    () => mediaSummary.find((m) => m.mediaId === selectedMediaId) ?? null,
+    [mediaSummary, selectedMediaId],
   );
 
   // Delete Confirm Dialog
@@ -264,6 +284,25 @@ export default function IGCommentsPage() {
     setFormActive(true);
     setTestCommentText("How much does this cost?");
     setTestCommentMediaId("");
+    setIsRuleSlideOverOpen(true);
+  };
+
+  const handleAddRuleForMedia = (mediaId: string) => {
+    setSelectedMediaId(null); // close post detail
+    setEditingRule(null);
+    setFormName("");
+    setFormKeywords(["price", "cost", "how much", "rate"]);
+    setFormCategories(["price"]);
+    setFormReplyMode("both");
+    setFormPublicText("Hi {customerHandle}! We sent you a DM with the pricing details 💕");
+    setFormDmText(
+      "Hi {customerHandle}! Thanks for asking about {postTitle}. Would you like to place an order?",
+    );
+    setFormMediaScope("specific");
+    setFormMediaIds([mediaId]);
+    setFormActive(true);
+    setTestCommentText("How much does this cost?");
+    setTestCommentMediaId(mediaId);
     setIsRuleSlideOverOpen(true);
   };
 
@@ -809,14 +848,24 @@ export default function IGCommentsPage() {
 
           {/* Active media filter pill if filtered to single media */}
           {mediaFilter && (
-            <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-lg bg-pink-500/10 border border-pink-500/20 text-11 text-pink-600 dark:text-pink-400">
-              <span>Filtered to: <strong>{activeMediaLabel}</strong></span>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-lg bg-pink-500/10 border border-pink-500/20 text-11 text-pink-600 dark:text-pink-400">
+                <span>Filtered to: <strong>{activeMediaLabel}</strong></span>
+                <button
+                  type="button"
+                  onClick={() => setFilterParam("mediaId", "all")}
+                  className="font-bold underline hover:opacity-80 cursor-pointer ml-1"
+                >
+                  Clear
+                </button>
+              </div>
               <button
                 type="button"
-                onClick={() => setFilterParam("mediaId", "all")}
-                className="font-bold underline hover:opacity-80 cursor-pointer ml-1"
+                onClick={() => setSelectedMediaId(mediaFilter)}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-primary/30 bg-primary/5 text-11 font-semibold text-primary hover:bg-primary/10 transition-colors cursor-pointer"
               >
-                Clear
+                <Shield className="w-3 h-3" />
+                Manage Rules ({ruleCountByMedia.get(mediaFilter) ?? 0})
               </button>
             </div>
           )}
@@ -1160,15 +1209,7 @@ export default function IGCommentsPage() {
                     {posts.map((item) => (
                       <div
                         key={item.mediaId}
-                        onClick={() => {
-                          setSearchParams((prev) => {
-                            const next = new URLSearchParams(prev);
-                            next.set("tab", "comments");
-                            next.set("mediaId", item.mediaId);
-                            next.delete("mediaType");
-                            return next;
-                          });
-                        }}
+                        onClick={() => setSelectedMediaId(item.mediaId)}
                         className="p-3.5 rounded-xl border border-border bg-surface hover:border-primary/50 hover:shadow-xs transition-all cursor-pointer flex items-start gap-3.5 group"
                       >
                         {/* Thumbnail 60x60 */}
@@ -1214,6 +1255,12 @@ export default function IGCommentsPage() {
                             <span className="px-2 py-0.5 rounded-md font-bold font-outfit bg-surface-muted border border-border text-text">
                               {item.counts.total} comments
                             </span>
+                            {(ruleCountByMedia.get(item.mediaId) ?? 0) > 0 && (
+                              <span className="px-2 py-0.5 rounded-md font-semibold bg-primary/10 text-primary border border-primary/30 inline-flex items-center gap-1">
+                                <Shield className="w-3 h-3" />
+                                {ruleCountByMedia.get(item.mediaId)} rule{ruleCountByMedia.get(item.mediaId)! > 1 ? "s" : ""}
+                              </span>
+                            )}
                             {item.counts.needs_attention > 0 && (
                               <span className="px-2 py-0.5 rounded-md font-semibold bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/30">
                                 {item.counts.needs_attention} needs attention
@@ -1268,15 +1315,7 @@ export default function IGCommentsPage() {
                     {reels.map((item) => (
                       <div
                         key={item.mediaId}
-                        onClick={() => {
-                          setSearchParams((prev) => {
-                            const next = new URLSearchParams(prev);
-                            next.set("tab", "comments");
-                            next.set("mediaId", item.mediaId);
-                            next.delete("mediaType");
-                            return next;
-                          });
-                        }}
+                        onClick={() => setSelectedMediaId(item.mediaId)}
                         className="p-3.5 rounded-xl border border-border bg-surface hover:border-primary/50 hover:shadow-xs transition-all cursor-pointer flex items-start gap-3.5 group"
                       >
                         {/* Thumbnail 60x60 */}
@@ -1322,6 +1361,12 @@ export default function IGCommentsPage() {
                             <span className="px-2 py-0.5 rounded-md font-bold font-outfit bg-surface-muted border border-border text-text">
                               {item.counts.total} comments
                             </span>
+                            {(ruleCountByMedia.get(item.mediaId) ?? 0) > 0 && (
+                              <span className="px-2 py-0.5 rounded-md font-semibold bg-primary/10 text-primary border border-primary/30 inline-flex items-center gap-1">
+                                <Shield className="w-3 h-3" />
+                                {ruleCountByMedia.get(item.mediaId)} rule{ruleCountByMedia.get(item.mediaId)! > 1 ? "s" : ""}
+                              </span>
+                            )}
                             {item.counts.needs_attention > 0 && (
                               <span className="px-2 py-0.5 rounded-md font-semibold bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/30">
                                 {item.counts.needs_attention} needs attention
@@ -1464,11 +1509,22 @@ export default function IGCommentsPage() {
                       <Layers className="w-3.5 h-3.5 text-text-muted" />
                       <span>
                         Scope:{" "}
-                        <strong className="text-text font-medium">
-                          {rule.mediaIds && rule.mediaIds.length > 0
-                            ? `${rule.mediaIds.length} specific post(s)`
-                            : "All posts & reels"}
-                        </strong>
+                        {rule.mediaIds && rule.mediaIds.length > 0 ? (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedMediaId(rule.mediaIds[0]!);
+                            }}
+                            className="text-primary font-medium hover:underline cursor-pointer"
+                          >
+                            {rule.mediaIds.length} specific post{rule.mediaIds.length > 1 ? "s" : ""} →
+                          </button>
+                        ) : (
+                          <strong className="text-text font-medium">
+                            All posts & reels
+                          </strong>
+                        )}
                       </span>
                     </div>
 
@@ -2197,6 +2253,324 @@ export default function IGCommentsPage() {
             </button>
           </div>
         </div>
+      </SlideOver>
+
+      {/* ─── SLIDEOVER 3: POST DETAIL & PER-POST RULES ───────────────────────── */}
+      <SlideOver
+        open={Boolean(selectedMediaId)}
+        onClose={() => setSelectedMediaId(null)}
+        widthClass="max-w-[560px]"
+        title={
+          selectedMedia ? (
+            <span className="inline-flex items-center gap-2 max-w-full align-middle">
+              <span
+                className={`px-1.5 py-0.5 rounded text-[9px] font-bold font-outfit uppercase tracking-wider text-white shrink-0 ${
+                  selectedMedia.mediaType === "reel" ? "bg-purple-600" : "bg-blue-500"
+                }`}
+              >
+                {selectedMedia.mediaType === "reel" ? "REEL" : "POST"}
+              </span>
+              <span className="truncate">
+                {selectedMedia.mediaCaption
+                  ? selectedMedia.mediaCaption.length > 40
+                    ? `${selectedMedia.mediaCaption.slice(0, 40)}…`
+                    : selectedMedia.mediaCaption
+                  : selectedMedia.mediaType === "reel"
+                    ? "Untitled Reel"
+                    : "Untitled Post"}
+              </span>
+            </span>
+          ) : (
+            "Post Details"
+          )
+        }
+      >
+        {selectedMedia && selectedMediaId && (() => {
+          const postRules = rules.filter((r) => r.mediaIds?.includes(selectedMediaId));
+          const globalRules = rules.filter((r) => !r.mediaIds || r.mediaIds.length === 0);
+          const c = selectedMedia.counts;
+          const isReel = selectedMedia.mediaType === "reel";
+          const FallbackIcon = isReel ? Film : ImageIcon;
+          const replyModeLabel = (m: IgReplyMode) =>
+            m === "both"
+              ? "Public Reply + DM"
+              : m === "public"
+                ? "Public Reply Only"
+                : m === "dm"
+                  ? "DM Only"
+                  : "No Reply";
+
+          return (
+            <>
+              {/* a) Post info card */}
+              <div className="p-3.5 rounded-xl border border-border bg-surface-muted/40 flex items-start gap-3.5">
+                {selectedMedia.mediaThumbnailUrl ? (
+                  <img
+                    src={selectedMedia.mediaThumbnailUrl}
+                    alt=""
+                    className="w-20 h-20 rounded-lg object-cover border border-border bg-surface-muted shrink-0"
+                  />
+                ) : (
+                  <div className="w-20 h-20 rounded-lg border border-border bg-surface-muted flex items-center justify-center shrink-0 text-text-muted">
+                    <FallbackIcon className="w-7 h-7" />
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-2 mb-1.5">
+                    <span
+                      className={`px-1.5 py-0.5 rounded text-[9px] font-bold font-outfit uppercase tracking-wider text-white ${
+                        isReel ? "bg-purple-600" : "bg-blue-500"
+                      }`}
+                    >
+                      {isReel ? "REEL" : "POST"}
+                    </span>
+                    {selectedMedia.mediaPermalink && (
+                      <a
+                        href={selectedMedia.mediaPermalink}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1 text-11 text-text-muted hover:text-pink-500 transition-colors"
+                        title="Open on Instagram"
+                      >
+                        <InstagramIcon size={14} />
+                        <span>Open on Instagram</span>
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+                    )}
+                  </div>
+                  <p className="text-13 text-text leading-snug line-clamp-4">
+                    {selectedMedia.mediaCaption || (isReel ? "Untitled Reel" : "Untitled Post")}
+                  </p>
+                </div>
+              </div>
+
+              {/* b) Comment stats row */}
+              <div className="space-y-2.5">
+                <div className="flex flex-wrap items-center gap-1.5 text-11">
+                  <span className="px-2 py-0.5 rounded-md font-bold font-outfit bg-surface-muted border border-border text-text">
+                    {c.total} comments
+                  </span>
+                  {c.needs_attention > 0 && (
+                    <span className="px-2 py-0.5 rounded-md font-semibold bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/30">
+                      {c.needs_attention} needs attention
+                    </span>
+                  )}
+                  {c.replied > 0 && (
+                    <span className="px-2 py-0.5 rounded-md font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                      {c.replied} replied
+                    </span>
+                  )}
+                  {c.skipped > 0 && (
+                    <span className="px-2 py-0.5 rounded-md text-text-muted bg-surface-muted border border-border">
+                      {c.skipped} skipped
+                    </span>
+                  )}
+                  {c.dismissed && c.dismissed > 0 ? (
+                    <span className="px-2 py-0.5 rounded-md text-zinc-600 dark:text-zinc-400 bg-zinc-500/10 border border-zinc-500/30">
+                      {c.dismissed} dismissed
+                    </span>
+                  ) : null}
+                  {c.failed > 0 && (
+                    <span className="px-2 py-0.5 rounded-md font-semibold bg-red-500/10 text-danger border border-red-500/30">
+                      {c.failed} failed
+                    </span>
+                  )}
+                </div>
+
+                {/* c) View comments link */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const id = selectedMediaId;
+                    setSelectedMediaId(null);
+                    setSearchParams({ tab: "comments", mediaId: id });
+                    setPage(1);
+                  }}
+                  className="inline-flex items-center gap-1.5 text-12 font-semibold text-primary hover:underline cursor-pointer"
+                >
+                  <MessageCircle className="w-3.5 h-3.5" />
+                  View Comments
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              {/* d) Rules for this post */}
+              <section className="space-y-3">
+                <div className="flex items-center justify-between pb-1.5 border-b border-border">
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-md bg-primary/10 text-primary flex items-center justify-center">
+                      <Shield className="w-3.5 h-3.5" />
+                    </div>
+                    <h3 className="text-14 font-bold font-outfit text-text">
+                      Rules for this Post ({postRules.length})
+                    </h3>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleAddRuleForMedia(selectedMediaId)}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-primary hover:bg-amber-600 text-primary-foreground text-12 font-semibold cursor-pointer shadow-xs"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    Add Rule
+                  </button>
+                </div>
+
+                {postRules.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-border p-5 text-center space-y-3">
+                    <p className="text-12 text-text-muted">
+                      No rules specific to this post. Comments will be matched against global
+                      rules only.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => handleAddRuleForMedia(selectedMediaId)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-border bg-surface hover:bg-surface-muted text-12 font-medium text-text cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      Add Rule for this Post
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {postRules.map((rule) => (
+                      <div
+                        key={rule.id}
+                        className={`p-3.5 rounded-xl border border-border bg-surface space-y-2.5 ${
+                          rule.isActive ? "" : "opacity-60"
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <h4 className="text-13 font-bold font-outfit text-text leading-tight">
+                            {rule.name}
+                          </h4>
+                          <Switch
+                            label={`Toggle rule ${rule.name}`}
+                            checked={rule.isActive}
+                            onChange={(checked) =>
+                              updateRuleMutation.mutate({
+                                id: rule.id,
+                                body: { isActive: checked },
+                              })
+                            }
+                          />
+                        </div>
+
+                        {rule.keywords && rule.keywords.length > 0 && (
+                          <div className="flex flex-wrap gap-1">
+                            {rule.keywords.map((k, i) => (
+                              <span
+                                key={i}
+                                className="px-1.5 py-0.5 rounded text-11 font-mono font-medium bg-surface-muted text-text border border-border/70"
+                              >
+                                {k}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+
+                        {rule.categories && rule.categories.length > 0 && (
+                          <div className="flex flex-wrap gap-1">
+                            {rule.categories.map((cat, i) => (
+                              <span
+                                key={i}
+                                className={`px-1.5 py-0.5 rounded text-11 font-medium border ${
+                                  CATEGORY_COLORS[cat] || CATEGORY_COLORS.other
+                                }`}
+                              >
+                                {cat.replace("_", " ")}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+
+                        <div className="text-11 text-text-muted">
+                          Action:{" "}
+                          <span className="font-semibold text-primary">
+                            {replyModeLabel(rule.replyMode)}
+                          </span>
+                        </div>
+
+                        {(rule.publicReplyText || rule.dmText) && (
+                          <p className="text-12 text-text italic line-clamp-2">
+                            "{rule.publicReplyText || rule.dmText}"
+                          </p>
+                        )}
+
+                        <div className="pt-2 border-t border-border/50 flex items-center justify-end gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedMediaId(null);
+                              handleEditRule(rule);
+                            }}
+                            className="p-1.5 rounded-lg hover:bg-surface-muted text-text-muted hover:text-text cursor-pointer transition-colors"
+                            title="Edit rule"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setRuleToDelete(rule)}
+                            className="p-1.5 rounded-lg hover:bg-red-500/10 text-text-muted hover:text-danger cursor-pointer transition-colors"
+                            title="Delete rule"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+
+              {/* e) Global rules (inherited) */}
+              <section className="space-y-3">
+                <div className="flex items-center justify-between pb-1.5 border-b border-border">
+                  <h3 className="text-13 font-bold font-outfit text-text-muted">
+                    Global Rules (inherited) ({globalRules.length})
+                  </h3>
+                  <span className="text-11 text-text-muted">Managed in the Rules tab</span>
+                </div>
+
+                {globalRules.length === 0 ? (
+                  <p className="text-12 text-text-muted">No global rules configured.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {globalRules.map((rule) => (
+                      <div
+                        key={rule.id}
+                        className="p-3 rounded-xl border border-border/70 bg-surface-muted/40 opacity-60 space-y-1.5"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-12 font-semibold text-text">{rule.name}</span>
+                          <span className="text-10 uppercase tracking-wider font-bold text-text-muted flex items-center gap-1">
+                            <Layers className="w-3 h-3" />
+                            Applies to all posts
+                          </span>
+                        </div>
+                        {rule.keywords && rule.keywords.length > 0 && (
+                          <div className="flex flex-wrap gap-1">
+                            {rule.keywords.map((k, i) => (
+                              <span
+                                key={i}
+                                className="px-1.5 py-0.5 rounded text-11 font-mono bg-surface-muted text-text border border-border/70"
+                              >
+                                {k}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        <div className="text-11 text-text-muted">
+                          {replyModeLabel(rule.replyMode)}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+            </>
+          );
+        })()}
       </SlideOver>
 
       {/* ─── MODAL: SIMULATE INCOMING COMMENT (DEMO_MODE) ────────────────────── */}

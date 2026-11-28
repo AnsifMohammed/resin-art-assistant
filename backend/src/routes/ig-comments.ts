@@ -179,7 +179,11 @@ export const igCommentsRoutes: FastifyPluginAsync = async (app: FastifyInstance)
       }
 
       if (q.mediaType) {
-        conditions.push(eq(igComments.mediaType, q.mediaType));
+        if (q.mediaType === "post") {
+          conditions.push(inArray(igComments.mediaType, ["post", "carousel"]));
+        } else {
+          conditions.push(eq(igComments.mediaType, q.mediaType));
+        }
       }
 
       if (q.search) {

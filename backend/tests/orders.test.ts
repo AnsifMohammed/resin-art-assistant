@@ -69,6 +69,16 @@ function answerOrders(q: FakeQuery): any[] | undefined {
   if (q.table === "orders" && q.groupBy) {
     return [{ status: "confirmed", count: 1 }];
   }
+  if (q.table === "audit_log") {
+    const logs = fake.tables.audit_log || [];
+    return logs.map((l) => ({
+      id: l.id || "log-1",
+      action: l.action,
+      details: l.details,
+      createdAt: l.createdAt || new Date(),
+      actorName: "Asha",
+    }));
+  }
   return undefined;
 }
 
@@ -274,6 +284,26 @@ describe("Orders routes security & functionality", () => {
       expect(body.deliveryStatus).toBe("sent");
       expect(body.channel).toBe("whatsapp");
       expect(body.preview).toContain("ORD-001");
+    });
+  });
+
+  describe("GET /orders/notifications", () => {
+    it("forbids staff from viewing order notifications (403)", async () => {
+      const res = await call("GET", "/orders/notifications", staffToken);
+      expect(res.statusCode).toBe(403);
+    });
+
+    it("allows admin to view recent order notifications", async () => {
+      await call("POST", "/orders/ord-1/progress-update", adminToken, {
+        text: "Hi Meera! Your order ORD-001 is currently in production.",
+      });
+      const res = await call("GET", "/orders/notifications", adminToken);
+      expect(res.statusCode).toBe(200);
+      const body = res.json();
+      expect(Array.isArray(body.notifications)).toBe(true);
+      expect(body.notifications.length).toBeGreaterThan(0);
+      expect(body.notifications[0].orderNo).toBe("ORD-001");
+      expect(body.notifications[0].customerName).toBe("Meera");
     });
   });
 });
